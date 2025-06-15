@@ -16,11 +16,16 @@
 ### Info extra varia
 
 [Introduction to UEFI](http://x86asm.net/articles/introduction-to-uefi/index.html)
+Util lectura para introducirse en el tema.
 
+[VESA osdev.org](https://wiki.osdev.org/User:Omarrx024/VESA_Tutorial)
+Informacion VESA en general: breve historia, vbe_info_structure, vbe_mode_info_structure, codigo asm para una funcion vbe_set_mode.
 
-[VESA](https://wiki.osdev.org/User:Omarrx024/VESA_Tutorial)
-https://delorie.com/djgpp/doc/ug/graphics/vbe20.html
-[VESA](https://www.kernel.org/doc/html/latest/fb/vesafb.html)	
+[VESA delorie.com](https://delorie.com/djgpp/doc/ug/graphics/vbe20.html)
+Informacion de bajo nivel para setear VESA.
+
+[VESA kernel.org](https://www.kernel.org/doc/html/latest/fb/vesafb.html)
+Informacion especifica de Linux acerca de VESA.
 
 
 
