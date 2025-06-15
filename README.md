@@ -5,7 +5,7 @@
 ### Codigo
 
 [Simple Assembly UEFI Application - Can't Exit Boot Services](https://forum.osdev.org/viewtopic.php?t=33666)
-El el ultimo posteo tiene codigo ejemplo en asm.
+El el ultimo posteo (pagina 1) tiene codigo ejemplo en asm.
 
 
 ### Documentos
