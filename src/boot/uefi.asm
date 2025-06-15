@@ -1,20 +1,22 @@
 ;; =============================================================================
+;; 
 ;; Muchos de los comentarios realizados estan basados en la informacion provista 
 ;; por el documento: Extensible Firmware Interface Specification Version 1.10 De
-;; cember 1, 2002
+;; cember 1, 2002.
 ;; 
 ;; Info:
 ;; Calling convention: https://learn.microsoft.com/en-us/cpp/build/x64-calling-c
 ;; onvention?view=msvc-170
 
-; UEFI loader for Pure64
-; Copyright (C) 2008-2025 Return Infinity -- see LICENSE.TXT
-;
+
+
+; Revisar estos links:
 ; Adapted from https://stackoverflow.com/questions/72947069/how-to-write-hello-w
 ; orld-efi-application-in-nasm
 ; and https://github.com/charlesap/nasm-uefi/blob/master/shoe-x64.asm
 ; PE https://wiki.osdev.org/PE
 ; GOP https://wiki.osdev.org/GOP
+
 ; Automatic boot: Assemble and save as /EFI/BOOT/BOOTX64.EFI
 ; Add payload up to 60KB
 ; dd if=PAYLOAD of=BOOTX64.EFI bs=4096 seek=1 conv=notrunc > /dev/null 2>&1
