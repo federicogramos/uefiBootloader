@@ -14,6 +14,12 @@ El el ultimo posteo (pagina 1) tiene codigo ejemplo en asm.
 
 [EFI Specification Version 1.10](https://www.intel.com/content/dam/www/public/us/en/zip/efi-110.zip)
 
+
+
+[UEFI codigo](https://stackoverflow.com/questions/72947069/how-to-write-hello-world-efi-application-in-nasm)
+
+[UEFI bootloader para extraer ideas](https://github.com/charlesap/nasm-uefi/tree/master)
+
 ### Info extra varia
 
 [Introduction to UEFI](http://x86asm.net/articles/introduction-to-uefi/index.html)
@@ -28,6 +34,7 @@ Informacion de bajo nivel para setear VESA.
 [VESA kernel.org](https://www.kernel.org/doc/html/latest/fb/vesafb.html)
 Informacion especifica de Linux acerca de VESA.
 
+[PE format](https://wiki.osdev.org/PE)
 
-
+[GOP](https://wiki.osdev.org/GOP)
 
