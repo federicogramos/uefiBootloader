@@ -34,7 +34,9 @@ Informacion de bajo nivel para setear VESA.
 [VESA kernel.org](https://www.kernel.org/doc/html/latest/fb/vesafb.html)
 Informacion especifica de Linux acerca de VESA.
 
-[PE format](https://wiki.osdev.org/PE)
+[PE format microsoft.com](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format)
+
+[PE format osdev.org](https://wiki.osdev.org/PE)
 
 [GOP](https://wiki.osdev.org/GOP)
 

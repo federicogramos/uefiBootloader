@@ -11,13 +11,13 @@
 ;;
 ;; La salida de NASM se guarda en /EFI/BOOT/BOOTX64.EFI y se le inyecta el paylo
 ;; ad (packedKernel.bin) que se requiera. BOOTX64.EFI:
-;;  +--------------------------------+---------------+
-;;  | binario     | payload          | padeo de 0x00 |
-;;  | BOOTX64.EFI | packedKernel.bin | hasta el fin  |
-;;  +-------------+------------------+---------------+
-;;  |             |                  |               |
-;; 0x0           0x1000           0x40000         0xFFFFF
-;; 0             4KiB             256KiB          1MiB-1
+;;  +-----------------------------+------------------+---------------+--
+;;  | binario BOOTX64.EFI         | payload          | padeo de 0x00 |
+;;  | Encabezado | Codigo | Datos | packedKernel.bin | hasta el fin  |
+;;  +------------+--------+-------+------------------+---------------+--
+;;  |                     |       |                  |                |
+;; 0x0                   0x800   0x1000           0x40000          0xFFFFF
+;; 0                     2KiB    4KiB             256KiB           1MiB
 ;;==============================================================================
 
 
@@ -32,34 +32,41 @@ HEADER:
 
 ;; Header DOS, 128 bytes.
 DOS_SIGNATURE:			db "MZ", 0x00, 0x00
-DOS_HEADERS:			times 60-($-HEADER) db 0;; The DOS Headers
+DOS_HEADERS:			times 60-($-HEADER) db 0
 PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - START	;; File offset.
 DOS_STUB:				times 64 db 0			;; No program, zero fill.
 
-;; Encabezado PE, 24 bytes.
+;; Encabezado PE.
 PE_SIGNATURE:			db "PE", 0x00, 0x00
 
-;; COFF File Header.
+;; COFF File Header, 20 bytes.
 MACHINE_TYPE:			dw 0x8664	;; x86-64 machine.
 NUMBER_OF_SECTIONS:		dw 2		;; Number of entries in the section table. Section table immediately follows the headers.
 TIMESTAMP:		dd 1745097600 ;; File creation, seconds since 1970.
-SYMBOL_TABLE_POINTER:		dd 0
-NUMBER_OF_SYMBOLS:		dd 0
-OHEADER_SIZE:			dw O_HEADER_END - O_HEADER	; Size of the optional header
-CHARACTERISTICS:		dw 0x222E			; Attributes of the file
+SYMBOL_TABLE_POINTER:		dd 0 ;; File offset of the COFF symbol table, zero if none. Should be zero for an image because COFF debugging information is deprecated.
+SYMBOL_TABLE_NUMBER_OF_SYMBOLS:		dd 0
+OPT_HEADER_SIZE:			dw OPT_HEADER_END - OPT_HEADER	;; Optional header. Section table is determined by calculating the location of the first byte after the headers. Make sure to use the size of the optional header as specified in the file header.
+CHARACTERISTICS:		dw 0x222E	;; Attributes of the file
+;; Flag IMAGE_FILE_DLL 0x2000
+;; IMAGE_FILE_DEBUG_STRIPPED 0x0200 Debugging information is removed from the image file.
+;; IMAGE_FILE_LARGE_ADDRESS_AWARE 0x0020 Application can handle > 2-GB addresses.
+;; IMAGE_FILE_LOCAL_SYMS_STRIPPED 0x0008 COFF symbol table entries for local symbols have been removed. This flag is deprecated and should be zero.
+IMAGE_FILE_LINE_NUMS_STRIPPED 0x0004 COFF line numbers have been removed. This flag is deprecated and should be zero.
+IMAGE_FILE_EXECUTABLE_IMAGE 0x0002 Image only. This indicates that the image file is valid and can be run.
 
-O_HEADER:
-MAGIC_NUMBER:			dw 0x020B			; PE32+ (i.e. PE64) magic number
+;; Optional Header Standard Fields
+OPT_HEADER:
+MAGIC_NUMBER:			dw 0x020B ;; PE32+ (64-bit address space) magic number stating PE format.
 MAJOR_LINKER_VERSION:	db 0
 MINOR_LINKER_VERSION:	db 0
-SIZE_OF_CODE:			dd CODE_END - CODE		; The size of the code section
-INITIALIZED_DATA_SIZE:	dd DATA_END - DATA		; Size of initialized data section
-UNINITIALIZED_DATA_SIZE:	dd 0x00				; Size of uninitialized data section
-ENTRY_POINT_ADDRESS:		dd EntryPoint - START		; Address of entry point relative to image base when the image is loaded in memory
-BASE_OF_CODE_ADDRESS:		dd CODE - START			; Relative address of base of code
-IMAGE_BASE:				dq 0x400000			; Where in memory we would prefer the image to be loaded at
-SECTION_ALIGNMENT:		dd 0x1000			; Alignment in bytes of sections when they are loaded in memory. Align to page boundary (4kb)
-FILE_ALIGNMENT:			dd 0x1000			; Alignment of sections in the file. Also align to 4kb
+SIZE_OF_CODE:			dd CODE_END - CODE		; Text.
+INITIALIZED_DATA_SIZE:	dd DATA_END - DATA		; Data.
+UNINITIALIZED_DATA_SIZE:	dd 0x00				; Bss.
+ENTRY_POINT_ADDRESS:		dd EntryPoint - START		; Address of entry point relative to image base when the image is loaded in memory.
+BASE_OF_CODE_ADDRESS:		dd CODE - START			; Relative address of base of code section.
+IMAGE_BASE:				dq 0x400000			; Where in memory we would prefer the image to be loaded at. Must be a multiple of 64K.
+SECTION_ALIGNMENT:		dd 0x1000			; Alignment in bytes of sections when they are loaded in memory. Align to page boundary (4K)
+FILE_ALIGNMENT:			dd 0x1000			; Alignment of sections in the file, 4K.
 MAJOR_OS_VERSION:		dw 0
 MINOR_OS_VERSION:		dw 0
 MAJOR_IMAGE_VERSION:	dw 0
@@ -67,19 +74,23 @@ MINOR_IMAGE_VERSION:	dw 0
 MAJOR_SUBSYS_VERSION:	dw 0
 MINOR_SUBSYS_VERSION:	dw 0
 WIN32_VERSION_VALUE:	dd 0				; Reserved, must be 0
-IMAGE_SIZE:				dd END - START			; The size in bytes of the image when loaded in memory including all headers
+IMAGE_SIZE:				dd END - START			; The size (in bytes) of the image, including all headers, as the image is loaded in memory. It must be a multiple of SectionAlignment.
+
 HEADERS_SIZE:			dd HEADER_END - HEADER		; Size of all the headers
 CHECKSUM:				dd 0
-SUBSYSTEM:				dw 10				; The subsystem. In this case we're making a UEFI application.
+SUBSYSTEM:				dw 10				;;IMAGE_SUBSYSTEM_EFI_APPLICATION = 10, Extensible Firmware Interface (EFI) application
+
 DLL_CHARACTERISTICS:	dw 0
-STACK_RESERVE_SIZE:		dq 0x200000			; Reserve 2MB for the stack
+STACK_RESERVE_SIZE:		dq 0x200000			; 2MB. The size of the stack to reserve. Only SizeOfStackCommit is committed; the rest is made available one page at a time until the reserve size is reached.
+
 STACK_COMMIT_SIZE:		dq 0x1000			; Commit 4KB of the stack
 HEAP_RESERVE_SIZE:		dq 0x200000			; Reserve 2MB for the heap
 HEAP_COMMIT_SIZE:		dq 0x1000			; Commit 4KB of heap
 LOADER_FLAGS:			dd 0x00				; Reserved, must be zero
 NUMBER_OF_RVA_AND_SIZES:	dd 0x00				; Number of entries in the data directory
-O_HEADER_END:
+OPT_HEADER_END:
 
+;; Section Table (Section Headers)
 SECTION_HEADERS:
 SECTION_CODE:
 .name					db ".text", 0x00, 0x00, 0x00
@@ -92,6 +103,10 @@ SECTION_CODE:
 .number_of_relocations		dw 0
 .number_of_line_numbers		dw 0
 .characteristics			dd 0x70000020
+;;IMAGE_SCN_MEM_SHARED 0x10000000 The section can be shared in memory.
+;;IMAGE_SCN_MEM_EXECUTE 0x20000000 The section can be executed as code.
+;;IMAGE_SCN_MEM_READ 0x40000000 The section can be read.
+;;IMAGE_SCN_CNT_CODE 0x00000020 The section contains executable code.
 
 SECTION_DATA:
 .name						db ".data", 0x00, 0x00, 0x00
@@ -104,6 +119,10 @@ SECTION_DATA:
 .number_of_relocations		dw 0
 .number_of_line_numbers		dw 0
 .characteristics			dd 0xD0000040
+;;IMAGE_SCN_MEM_SHARED 0x10000000 The section can be shared in memory.
+;;IMAGE_SCN_MEM_READ 0x40000000 The section can be read.
+;;IMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040 The section contains initialized data.
+;;IMAGE_SCN_MEM_WRITE 0x80000000 The section can be written to.
 
 HEADER_END:
 
