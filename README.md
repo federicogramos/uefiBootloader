@@ -38,7 +38,7 @@ Informacion especifica de Linux acerca de VESA.
 Encabezado y sus partes en detalle.
 
 [PE format osdev.org](https://wiki.osdev.org/PE)
-Menos detalle que el anterior, pero buenas referencias al fondo de la pagina.
+Menos detalle que el anterior, pero buenas referencias al fondo de la pagina. Algunos links rotos.
 
 [GOP](https://wiki.osdev.org/GOP)
 
