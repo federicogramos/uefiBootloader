@@ -1,4 +1,4 @@
-# Bootloader UEFI para microprocesadores Intel x86-64
+# Bootloader UEFI para procesadores Intel x86-64
 
 ## Referencias y documentacion
 
