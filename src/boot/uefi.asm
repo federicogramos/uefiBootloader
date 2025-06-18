@@ -29,18 +29,20 @@ ORG 0x00400000
 START:
 PE:
 HEADER:
-DOS_HEADER:										;; 128 bytes
-DOS_SIGNATURE:			db 'MZ', 0x00, 0x00		;; The DOS signature
-DOS_HEADERS:			times 60-($-HEADER) db 0;; The DOS Headers
-SIGNATURE_POINTER:		dd PE_SIGNATURE - START	;; Pointer to the PE Signature
-DOS_STUB:				times 64 db 0			;; The DOS stub. Fill with zeros
-PE_HEADER:										;; 24 bytes
-PE_SIGNATURE:			db 'PE', 0x00, 0x00		;; This is the PE signature. The char
 
-;;acters 'PE' followed by 2 null bytes
-MACHINE_TYPE:			dw 0x8664			; Targeting the x86-64 machine
-NUMBER_OF_SECTIONS:		dw 2				; Number of sections. Indicates size of section table that immediately follows the headers
-CREATED_DATE_TIME:		dd 1670698099			; Number of seconds since 1970 since when the file was created
+;; Header DOS, 128 bytes.
+DOS_SIGNATURE:			db "MZ", 0x00, 0x00
+DOS_HEADERS:			times 60-($-HEADER) db 0;; The DOS Headers
+PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - START	;; File offset.
+DOS_STUB:				times 64 db 0			;; No program, zero fill.
+
+;; Encabezado PE, 24 bytes.
+PE_SIGNATURE:			db "PE", 0x00, 0x00
+
+;; COFF File Header.
+MACHINE_TYPE:			dw 0x8664	;; x86-64 machine.
+NUMBER_OF_SECTIONS:		dw 2		;; Number of entries in the section table. Section table immediately follows the headers.
+TIMESTAMP:		dd 1745097600 ;; File creation, seconds since 1970.
 SYMBOL_TABLE_POINTER:		dd 0
 NUMBER_OF_SYMBOLS:		dd 0
 OHEADER_SIZE:			dw O_HEADER_END - O_HEADER	; Size of the optional header
