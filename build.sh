@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 mkdir -p bin
 
 cd src
 
-nasm -DBIOS=1 pure64.asm -o ../bin/pure64-bios.sys -l ../bin/pure64-bios-debug.txt
-nasm -DUEFI=1 pure64.asm -o ../bin/pure64-uefi.sys -l ../bin/pure64-uefi-debug.txt
+nasm -D BIOS=1 pure64.asm -o ../bin/pure64-bios.sys -l ../bin/pure64-bios-debug.txt
+nasm -D UEFI=1 pure64.asm -o ../bin/pure64-uefi.sys -l ../bin/pure64-uefi-debug.txt
 
 cd boot
 
