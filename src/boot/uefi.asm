@@ -1,23 +1,24 @@
 ;; =============================================================================
 ;; UEFI bootloader
 ;;
-;; Muchos de los comentarios realizados estan basados en la informacion provista 
-;; por el documento "Extensible Firmware Interface Specification" Version 1.10 D
-;; ecember 1, 2002.
-;; 
+;; Muchos de los comentarios realizados estan basados en la informacion de: 
+;; -- Extensible Firmware Interface Specification Version 1.10 December 1, 2002.
+;; -- Headers: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
 ;; Otra info:
 ;; Calling convention: https://learn.microsoft.com/en-us/cpp/build/x64-calling-c
 ;; onvention?view=msvc-170
 ;;
 ;; La salida de NASM se guarda en /EFI/BOOT/BOOTX64.EFI y se le inyecta el paylo
-;; ad (packedKernel.bin) que se requiera. BOOTX64.EFI:
-;;  +-----------------------------+------------------+---------------+--
-;;  | binario BOOTX64.EFI         | payload          | padeo de 0x00 |
-;;  | Encabezado | Codigo | Datos | packedKernel.bin | hasta el fin  |
-;;  +------------+--------+-------+------------------+---------------+--
-;;  |                     |       |                  |                |
-;; 0x0                   0x800   0x1000           0x40000          0xFFFFF
-;; 0                     2KiB    4KiB             256KiB           1MiB
+;; ad (UEFI bootloader + packedKernel.bin) que se requiera. Archivo BOOTX64.EFI,
+;; luego de agregado de payload queda:
+;;  +--------------------------+-------------------------+------------+
+;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
+;;  |         |        |       | UEFI       | packed     | 0x00 hasta |
+;;  | Encabez | Codigo | Datos | bootloader | Kernel.bin | el fin     |
+;;  +---------+--------+-------+------------+------------+------------+
+;;  |^                 |^      |^           |^           |^          ^|
+;; 0x0                0x800   0x1000       0x1806     0x40000      0xFFFFF
+;; 0                  2KiB    4KiB         6KiB       256KiB       1MiB-1
 ;;==============================================================================
 
 
