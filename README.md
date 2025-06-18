@@ -35,8 +35,10 @@ Informacion de bajo nivel para setear VESA.
 Informacion especifica de Linux acerca de VESA.
 
 [PE format microsoft.com](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format)
+Encabezado y sus partes en detalle.
 
 [PE format osdev.org](https://wiki.osdev.org/PE)
+Menos detalle que el anterior, pero buenas referencias al fondo de la pagina.
 
 [GOP](https://wiki.osdev.org/GOP)
 
