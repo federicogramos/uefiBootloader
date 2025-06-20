@@ -1,7 +1,4 @@
 ; =============================================================================
-; Pure64 -- a 64-bit OS/software loader written in Assembly for x86-64 systems
-; Copyright (C) 2008-2025 Return Infinity -- see LICENSE.TXT
-;
 ; System Variables
 ; =============================================================================
 
@@ -36,7 +33,7 @@ IM_ActivedCoreIDs:	equ 0x0000000000005E00		; 1 byte per entry - 1 if the core wa
 ;;;[0x00005F10]	; Screen X
 ;;;;[0x00005F12]	; Screen Y
 ;;;;[0x00005F14]	; PixelsPerScanLine
-;;; luego, durante pure, la mantiene aqui, pero lo copia al infoMap 0x5080
+;;; luego, durante el bootloader, la mantiene aqui, pero lo copia al infoMap 0x5080
 VBEModeInfoBlock:	equ 0x0000000000005F00		; 256 bytes
 
 

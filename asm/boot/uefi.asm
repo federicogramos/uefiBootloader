@@ -601,7 +601,7 @@ call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 
 
-;;; parate aqui si quisieras ver los seteos que le va a pasar a pure64
+;;; parate aqui si quisieras ver los seteos que le va a pasar al siguiente bootloader.
 
 	mov rsi, PAYLOAD + 6
 	mov rax, [rsi]
@@ -716,8 +716,7 @@ get_memmap:
 	rep stosq
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;; hacer un clear del screen
-	; Set screen to black before jumping to Pure64
+	;; Hacer un clear del screen.
 	mov rdi, [FB]
 	mov eax, 0x00000000					; 0x00RRGGBB
 	mov rcx, [FB_SIZE];;;;;;;;;; frame buffer size

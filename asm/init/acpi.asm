@@ -1,10 +1,6 @@
 ; =============================================================================
-; Pure64 -- a 64-bit OS/software loader written in Assembly for x86-64 systems
-; Copyright (C) 2008-2025 Return Infinity -- see LICENSE.TXT
-;
 ; INIT ACPI
-;
-; Comments reference the following document:
+;; Comments reference the following document:
 ; Advanced Configuration and Power Interface (ACPI) Specification Release 6.5
 ; https://uefi.org/sites/default/files/resources/ACPI_Spec_6_5_Aug29.pdf
 ; =============================================================================

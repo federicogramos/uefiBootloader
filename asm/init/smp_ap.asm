@@ -1,7 +1,4 @@
 ; =============================================================================
-; Pure64 -- a 64-bit OS/software loader written in Assembly for x86-64 systems
-; Copyright (C) 2008-2025 Return Infinity -- see LICENSE.TXT
-;
 ; INIT SMP AP
 ; =============================================================================
 
@@ -126,7 +123,7 @@ startap64:
 	shr rax, 24			; Shift to the right and AL now holds the CPU's APIC ID
 	shl rax, 10			; shift left 10 bits for a 1024byte stack
 	add rax, 0x0000000000090000	; stacks decrement when you "push", start at 1024 bytes in
-	mov rsp, rax			; Pure64 leaves 0x50000-0x9FFFF free so we use that
+	mov rsp, rax			; Leave 0x50000-0x9FFFF free so we use that
 
 	lgdt [GDTR64]			; Load the GDT
 	lidt [IDTR64]			; Load the IDT

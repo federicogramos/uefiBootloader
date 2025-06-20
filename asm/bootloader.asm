@@ -1,21 +1,14 @@
-; =============================================================================
-; Pure64 -- a 64-bit OS/software loader written in Assembly for x86-64 systems
-; Copyright (C) 2008-2025 Return Infinity -- see LICENSE.TXT
-;
-; The first stage loader is required to gather information about the system
-; while the BIOS or UEFI is still available and load the Pure64 binary to
-; 0x00008000. Setup a minimal 64-bit environment, copy the 64-bit kernel from
-; the end of the Pure64 binary to the 1MiB memory mark and jump to it.
+;;=============================================================================
+;; The first stage loader is required to gather information about the system
+;; while the BIOS or UEFI is still available and load the payload binary to
+;; 0x00008000. Setup a minimal 64-bit environment, copy the 64-bit kernel from
+;; the end of the payload binary to the 1MiB memory mark and jump to it.
 ;;1Mib mark se refiere a copiar nuestro kernel a la dir 100000 donde a donde luego salta yendo a _start en 0x100000
-;
-; Pure64 requires a payload for execution! The stand-alone pure64.sys file
-; is not sufficient. You must append your kernel or software to the end of
-; the Pure64 binary. The maximum size of the kernel or software is 26KiB.
-;
-; Windows - copy /b pure64.sys + kernel64.sys
-; Unix - cat pure64.sys kernel64.sys > pure64.sys
-; Max size of the resulting pure64.sys is 32768 bytes (32KiB)
-; =============================================================================
+;;
+;;  requires a payload for execution! The stand-alone bootloader.sys file
+;; is not sufficient. You must append your kernel or software to the end of
+;; the bootloader binary. The maximum size of the kernel or software is 26KiB (a definir!!!)
+;;=============================================================================
 
 
 
@@ -591,7 +584,7 @@ make_interrupt_gates: 			; make gates for the other interrupts
 
 	lidt [IDTR64]			; load IDT register
 
-; Patch Pure64 AP code			; The AP's will be told to start execution at 0x8000
+; Patch bootloader AP code			; The AP's will be told to start execution at 0x8000
 	mov edi, start			; We need to remove the BSP Jump call to get the AP's
 	mov eax, 0x90909090		; to fall through to the AP Init code
 	stosd
@@ -859,7 +852,7 @@ pde_end:
 	shr rax, 24			; Shift to the right and AL now holds the CPU's APIC ID
 	shl rax, 10			; shift left 10 bits for a 1024byte stack
 	add rax, 0x0000000000050400	; stacks decrement when you "push", start at 1024 bytes in
-	mov rsp, rax			; Pure64 leaves 0x50000-0x9FFFF free so we use that
+	mov rsp, rax			; leave 0x50000-0x9FFFF free so we use that
 
 ; Build the InfoMap
 	xor edi, edi
@@ -1004,7 +997,7 @@ lfb_wc_end:
 	wbinvd				; Flush Cache
 
 ; Move the trailing binary to its final location
-	mov esi, 0x8000+UEFI_BOOTLOADER_SIZE	; Memory offset to end of pure64.sys
+	mov esi, 0x8000+UEFI_BOOTLOADER_SIZE	; Memory offset to end of bootloader.sys
 	
 ;; esto es la direccion a la cual nuestro kernel se copia, tal como luego comienza ejecutando en _start en 100000
 	mov edi, 0x100000		; Destination address at the 1MiB mark
@@ -1062,7 +1055,7 @@ clear_regs:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;hlt;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	jmp 0x00100000			; Done with Pure64, jump to the kernel
+	jmp 0x00100000			; Done with bootloader, jump to the kernel
 
 
 %include "init/acpi.asm"
@@ -1329,7 +1322,7 @@ debug_progressbar:
 %endif
 
 
-;;;;;;;;;;; para generar un loop y dejar q se vea mensaje antes de ir a pure
+;;;;;;;;;;; para generar un loop y dejar q se vea mensaje antes de ir a bootloader
 ;;; sacar, no va
 ;;;time_delay dq 800000
 
