@@ -4,21 +4,28 @@
 
 ### Codigo
 
+#### Asm
+
+[Pure64 loader](https://github.com/ReturnInfinity/Pure64)
+
 [Simple Assembly UEFI Application - Can't Exit Boot Services](https://forum.osdev.org/viewtopic.php?t=33666)
 El el ultimo posteo (pagina 1) tiene codigo ejemplo en asm.
 
+[UEFI codigo](https://stackoverflow.com/questions/72947069/how-to-write-hello-world-efi-application-in-nasm)
+
+[UEFI bootloader para extraer ideas](https://github.com/charlesap/nasm-uefi/tree/master)
+Va directo a usar GOP, no revisa EDID.
+
+#### Cpp
+
+[Implementacion C++ con UEFI boot services](https://github.com/kiznit/rainbow-os)
+Ver /boot/src/boot.cpp
 
 ### Documentos
 
 [Pagina oficial de la especificacion UEFI](https://uefi.org/uefi)
 
 [EFI Specification Version 1.10](https://www.intel.com/content/dam/www/public/us/en/zip/efi-110.zip)
-
-
-
-[UEFI codigo](https://stackoverflow.com/questions/72947069/how-to-write-hello-world-efi-application-in-nasm)
-
-[UEFI bootloader para extraer ideas](https://github.com/charlesap/nasm-uefi/tree/master)
 
 ### Info extra varia
 

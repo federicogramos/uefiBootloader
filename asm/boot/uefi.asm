@@ -1,7 +1,7 @@
-;; =============================================================================
+;;==============================================================================
 ;; UEFI bootloader
-;;
-;; Muchos de los comentarios realizados estan basados en la informacion de: 
+;;==============================================================================
+;; Varios de los comentarios realizados estan basados en la informacion de: 
 ;; -- Extensible Firmware Interface Specification Version 1.10 December 1, 2002.
 ;; -- Headers: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
 ;; Otra info:
@@ -33,7 +33,7 @@ HEADER:
 
 ;; Header DOS, 128 bytes.
 DOS_SIGNATURE:			db "MZ", 0x00, 0x00
-DOS_HEADERS:			times 60-($-HEADER) db 0
+DOS_HDRS:			times 60-($-HEADER) db 0
 PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - START	;; File offset.
 DOS_STUB:				times 64 db 0			;; No program, zero fill.
 
@@ -42,57 +42,77 @@ PE_SIGNATURE:			db "PE", 0x00, 0x00
 
 ;; COFF File Header, 20 bytes.
 MACHINE_TYPE:			dw 0x8664	;; x86-64 machine.
-NUMBER_OF_SECTIONS:		dw 2		;; Number of entries in the section table. Section table immediately follows the headers.
-TIMESTAMP:		dd 1745097600 ;; File creation, seconds since 1970.
-SYMBOL_TABLE_POINTER:		dd 0 ;; File offset of the COFF symbol table, zero if none. Should be zero for an image because COFF debugging information is deprecated.
-SYMBOL_TABLE_NUMBER_OF_SYMBOLS:		dd 0
-OPT_HEADER_SIZE:			dw OPT_HEADER_END - OPT_HEADER	;; Optional header. Section table is determined by calculating the location of the first byte after the headers. Make sure to use the size of the optional header as specified in the file header.
-CHARACTERISTICS:		dw 0x222E	;; Attributes of the file
-;; Flag IMAGE_FILE_DLL 0x2000
-;; IMAGE_FILE_DEBUG_STRIPPED 0x0200 Debugging information is removed from the image file.
-;; IMAGE_FILE_LARGE_ADDRESS_AWARE 0x0020 Application can handle > 2-GB addresses.
-;; IMAGE_FILE_LOCAL_SYMS_STRIPPED 0x0008 COFF symbol table entries for local symbols have been removed. This flag is deprecated and should be zero.
-IMAGE_FILE_LINE_NUMS_STRIPPED 0x0004 COFF line numbers have been removed. This flag is deprecated and should be zero.
-IMAGE_FILE_EXECUTABLE_IMAGE 0x0002 Image only. This indicates that the image file is valid and can be run.
+N_SECTIONS:				dw 2		;; Number of entries in section table. Secti
+									;; on table immediately follows the headers.
+TIMESTAMP:			dd 1745097600	;; File creation, seconds since 1970.
+SYM_TAB_P2:			dd 0			;; File offset of the COFF symbol table, zer
+									;; o if none. Should be zero for an image be
+									;; cause COFF debug info is deprecated.
+SYM_TAB_N_SYMBOLS:	dd 0
+OPT_HDR_SIZE:		dw OPT_HDR_END - OPT_HDR	;; Optional header. Section tabl
+												;; e is determined by calculatin
+												;; g the location of the first b
+												;; yte after headers. Make sure 
+												;; use size of optional header a
+												;; s specified in file header.
+CHARACTERISTICS:	dw 0x222E		;; Attributes of the file.
+;; Flags:
+;; IMG_DLL					0x2000
+;; IMG_DEBUG_STRIPPED		0x0200	Debugging info removed from the image file.
+;; IMG_LARGE_ADDR_AWARE		0x0020	Application can handle > 2-GB addresses.
+;; IMG_LOC_SYMS_STRIPPED	0x0008	COFF symbol table entries for local symbols 
+;;									removed. Deprecated and should be zero.
+;; IMG_LINE_NUMS_STRIPPED	0x0004	COFF line numbers removed. Dep, should be 0.
+;; IMG_EXECUTABLE_IMAGE		0x0002	Image only. Image file is valid, can be run.
 
 ;; Optional Header Standard Fields
-OPT_HEADER:
-MAGIC_NUMBER:			dw 0x020B ;; PE32+ (64-bit address space) magic number stating PE format.
+OPT_HDR:
+MAGIC_NUMBER:			dw 0x020B ;; PE32+ (64-bit address space) PE format.
 MAJOR_LINKER_VERSION:	db 0
 MINOR_LINKER_VERSION:	db 0
-SIZE_OF_CODE:			dd CODE_END - CODE		; Text.
-INITIALIZED_DATA_SIZE:	dd DATA_END - DATA		; Data.
-UNINITIALIZED_DATA_SIZE:	dd 0x00				; Bss.
-ENTRY_POINT_ADDRESS:		dd EntryPoint - START		; Address of entry point relative to image base when the image is loaded in memory.
-BASE_OF_CODE_ADDRESS:		dd CODE - START			; Relative address of base of code section.
-IMAGE_BASE:				dq 0x400000			; Where in memory we would prefer the image to be loaded at. Must be a multiple of 64K.
-SECTION_ALIGNMENT:		dd 0x1000			; Alignment in bytes of sections when they are loaded in memory. Align to page boundary (4K)
-FILE_ALIGNMENT:			dd 0x1000			; Alignment of sections in the file, 4K.
+CODE_SIZE:					dd CODE_END - CODE	;; Text.
+INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
+UNINITIALIZED_DATA_SIZE:	dd 0x00				;; Bss.
+ENTRY_POINT_ADDR:		dd EntryPoint - START	;; Entry point relative to img b
+												;; ase loaded in memory.
+BASE_OF_CODE_ADDR:		dd CODE - START	;; Relative addr of base of code sect.
+IMAGE_BASE:				dq 0x400000		;; Where in memory we would prefer image
+										;; to be loaded at. Multiple of 64K.
+SECTION_ALIGNMENT:		dd 0x1000		;; Alignment [bytes] of sections when lo
+										;; aded in mem (to page boundary, 4K).
+FILE_ALIGNMENT:			dd 0x1000		;; Alignment of sections in file, 4K.
 MAJOR_OS_VERSION:		dw 0
 MINOR_OS_VERSION:		dw 0
 MAJOR_IMAGE_VERSION:	dw 0
 MINOR_IMAGE_VERSION:	dw 0
 MAJOR_SUBSYS_VERSION:	dw 0
 MINOR_SUBSYS_VERSION:	dw 0
-WIN32_VERSION_VALUE:	dd 0				; Reserved, must be 0
-IMAGE_SIZE:				dd END - START			; The size (in bytes) of the image, including all headers, as the image is loaded in memory. It must be a multiple of SectionAlignment.
+WIN32_VERSION_VALUE:	dd 0			;; Reserved, must be 0.
+IMAGE_SIZE:				dd END - START	;; The size [bytes] of img loaded in mem
+										;; including all headers. Must be multip
+										;; le of SectionAlignment (?). Aparentem
+										;; ente no es mandatorio. 
 
-HEADERS_SIZE:			dd HEADER_END - HEADER		; Size of all the headers
+HEADERS_SIZE:			dd HEADER_END - HEADER	;; Size of all the headers.
 CHECKSUM:				dd 0
-SUBSYSTEM:				dw 10				;;IMAGE_SUBSYSTEM_EFI_APPLICATION = 10, Extensible Firmware Interface (EFI) application
+SUBSYSTEM:				dw 10		;; IMAGE_SUBSYSTEM_EFI_APPLICATION = 10, Ext
+									;; ensible Firmware Interface (EFI) app.
 
 DLL_CHARACTERISTICS:	dw 0
-STACK_RESERVE_SIZE:		dq 0x200000			; 2MB. The size of the stack to reserve. Only SizeOfStackCommit is committed; the rest is made available one page at a time until the reserve size is reached.
+STACK_RESERVE_SIZE:		dq 0x200000	;; 2MB. The size of the stack to reserve. On
+									;; ly SizeOfStackCommit is committed, rest i
+									;; s made available one page at a time until
+									;; the reserve size is reached.
 
-STACK_COMMIT_SIZE:		dq 0x1000			; Commit 4KB of the stack
-HEAP_RESERVE_SIZE:		dq 0x200000			; Reserve 2MB for the heap
-HEAP_COMMIT_SIZE:		dq 0x1000			; Commit 4KB of heap
-LOADER_FLAGS:			dd 0x00				; Reserved, must be zero
-NUMBER_OF_RVA_AND_SIZES:	dd 0x00				; Number of entries in the data directory
-OPT_HEADER_END:
+STACK_COMMIT_SIZE:	dq 0x1000		;; Commit 4KB of the stack.
+HEAP_RESERVE_SIZE:	dq 0x200000		;; Reserve 2MB for the heap.
+HEAP_COMMIT_SIZE:	dq 0x1000		;; Commit 4KB of heap.
+LOADER_FLAGS:		dd 0x00			;; Reserved, must be zero.
+N_OF_RVA_AND_SIZES:	dd 0x00			;; Number of entries in the data directory.
+OPT_HDR_END:
 
 ;; Section Table (Section Headers)
-SECTION_HEADERS:
+SECTION_HDRS:
 SECTION_CODE:
 .name					db ".text", 0x00, 0x00, 0x00
 .virtual_size			dd CODE_END - CODE
@@ -184,68 +204,76 @@ EntryPoint:
 
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONOUT]
-	mov [TEXT_OUTPUT_INTERFACE], rax
+	mov [TXT_OUT_INTERFACE], rax
 
 	; Set screen colour attributes
-	mov rcx, [TEXT_OUTPUT_INTERFACE] 
-	mov rdx, 0x07						; IN UINTN Attribute - Black background, grey foreground
+	mov rcx, [TXT_OUT_INTERFACE] 
+	mov rdx, 0x07	;; IN UINTN Attribute - Black background, grey foreground.
 
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_ATTRIBUTE]
 
-	; Clear screen (This also sets the cursor position to 0,0)
-	mov rcx, [TEXT_OUTPUT_INTERFACE]	
+	; Clear screen and set cursor position to (0, 0).
+	mov rcx, [TXT_OUT_INTERFACE]	
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_CLEAR_SCREEN]
 
+	;; -- Modo texto de uefi, imprime en un recuadro centrado en la pantalla ind
+	;; ependientemente de la resolucion real.
+	;; -- Aqui, hlt unicamente no va a haltear. Debe hacer cli, luego hlt.
+	;; Notificar q estamos en "UEFI boot"
 
-;; Modo texto de uefi imprime en un recuadro centrado en la pantalla.
-;; Aqui, hlt no va a detener. Probar hacer cli, luego hlt.
-;; La unica manera que tengo para detener todo es hacer algo como:
-;; loop: jmp loop
-;; Notificar q estamos en "UEFI boot"
-    mov rcx, [TEXT_OUTPUT_INTERFACE]	
+	mov rcx, [TXT_OUT_INTERFACE]	
 	lea rdx, [msg_uefi_boot]			
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
-	; Find the address of the ACPI data from the UEFI configuration table
+	;; Find the address of the ACPI data from the UEFI configuration table.
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rcx, [rax + EFI_SYSTEM_TABLE_NUMBEROFENTRIES]
 	shl rcx, 3						; rcx * 2^3
 	mov rsi, [CONFIG]
+	
 nextentry:
 	dec rcx
 	cmp rcx, 0
 	je error						; Bail out as no ACPI data was detected
-	mov rdx, [ACPI_TABLE_GUID]				; First 64 bits of the ACPI GUID
+	mov rdx, [ACPI_TABLE_GUID]		; First 64 bits of the ACPI GUID
 	lodsq
-	cmp rax, rdx						; Compare the table data to the expected GUID data
+	cmp rax, rdx					; Compare table data to expected GUID data
 	jne nextentry
-	mov rdx, [ACPI_TABLE_GUID+8]				; Second 64 bits of the ACPI GUID
+	mov rdx, [ACPI_TABLE_GUID+8]	; Second 64 bits of the ACPI GUID
 	lodsq
-	cmp rax, rdx						; Compare the table data to the expected GUID data
+	cmp rax, rdx					; Compare table data to expected GUID data
 	jne nextentry
 	lodsq							; Load the address of the ACPI table
-	mov [ACPI], rax						; Save the address
+	mov [ACPI], rax					; Save the address
 
-	; Find the interface to EFI_EDID_ACTIVE_PROTOCOL_GUID via its GUID
-	mov rcx, EFI_EDID_ACTIVE_PROTOCOL_GUID			; IN EFI_GUID *Protocol
+
+	;; Configurar pantalla. Algunas definiciones:
+	;; https://www.intel.com/content/dam/doc/guide/uefi-driver-graphics-controll
+	;; er-guide.pdf
+	;; https://uefi.org/specs/UEFI/2.10/12_Protocols_Console_Support.html
+	;; Primero intenta encontrar un EDID, si no encuentra, prueba una resolucion
+	;; por defecto directo con el GOP.
+
+	;; Intento 1: interface to EFI_EDID_ACTIVE_PROTOCOL_GUID via its GUID
+	mov rcx, EFI_EDID_ACTIVE_PROTOCOL_GUID	; IN EFI_GUID *Protocol
 	mov rdx, 0						; IN VOID *Registration OPTIONAL
-	mov r8, EDID						; OUT VOID **Interface
+	mov r8, EDID					; OUT VOID **Interface
 	mov rax, [EFI_BOOT_SERVICES]
 	mov rax, [rax + EFI_BOOT_SERVICES_LOCATEPROTOCOL]
 	call rax
 	cmp rax, EFI_SUCCESS
 	je get_EDID						; If it exists, process EDID
 
-	; Find the interface to EFI_EDID_DISCOVERED_PROTOCOL_GUID via its GUID
+	;; Intento 2: interface to EFI_EDID_DISCOVERED_PROTOCOL_GUID via its GUID
 	mov rcx, EFI_EDID_DISCOVERED_PROTOCOL_GUID		; IN EFI_GUID *Protocol
 	mov rdx, 0						; IN VOID *Registration OPTIONAL
-	mov r8, EDID						; OUT VOID **Interface
+	mov r8, EDID					; OUT VOID **Interface
 	mov rax, [EFI_BOOT_SERVICES]
 	mov rax, [rax + EFI_BOOT_SERVICES_LOCATEPROTOCOL]
 	call rax
 	cmp rax, EFI_SUCCESS
 	je get_EDID						; If it exists, process EDID
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	jmp use_GOP						; If not found, or other error, use GOP
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	jmp use_GOP						; If not found, or other error, use GOP con una resolucion por defecto hardcodeada.
 jmp edid_fail_use_GOP;; fail message, then use gop.
 
 	; Gather preferred screen resolution
@@ -253,25 +281,34 @@ get_EDID:
 
 push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_edid_found]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 pop rdx
 pop rcx
 
-	; Parse the EDID information
-	; 0  UINT32 - SizeOfEdid
-	; 4  UINT8 - *Edid
+	;; Parse EDID information returned.
+	;; https://bsdio.com/edk2/docs/master/_edid_active_8h_source.html
+	;; typedef struct {
+	;; UINT32    SizeOfEdid;
+ 	;; UINT8    *Edid;
+	;; } EFI_EDID_ACTIVE_PROTOCOL;
+
 	mov rax, [EDID]
 	mov ebx, [rax]
-	cmp ebx, 128						; Minimum size of 128 bytes
+	cmp ebx, 128	;; Minimum size of 128 bytes.
 ;;;;;;;;;;;;;;;;;;;;;;;	jb use_GOP						; Fail out to GOP with default resolution
 jb edid_fail_default;; err msg, then continue
+;;;;;; En realidad, aqui, si hubo fail en active protocol, aun tengo oportunidad de un success con discovered protocol, en lugar de ir directo a gop, puedo probar el discovered (aunque por lo general van a ser el mismo, salvo override).
 
-	mov rbx, [rax+8]					; Pointer to EDID. Why not +4? Yes, why?
-	mov rax, [rbx]						; Load RAX with EDID header
-	mov rcx, 0x00FFFFFFFFFFFF00				; Required EDID header
-	cmp rax, rcx						; Verify 8-byte header at 0x00 is 0x00FFFFFFFFFFFF00
+
+	mov rbx, [rax + 8]			;; Pointer to EDID. Why not +4? Yes, why? Pendie
+								;; nte: revisar que este codigo corra en algun m
+								;; omento y lo haga bien.
+
+	mov rax, [rbx]				;; Load RAX with EDID header.
+	mov rcx, 0x00FFFFFFFFFFFF00	;; Required EDID header
+	cmp rax, rcx				;; Verify 8-byte header at 0x00 is 0x00FFFFFFFFFFFF00
 ;;;;;;;;;;;;;	jne use_GOP						; Fail out to GOP with default resolution
 jb edid_fail_default;; err msg, then continue
 	
@@ -300,7 +337,7 @@ jb edid_fail_default;; err msg, then continue
 ;;;;;;;;;;;;;;;;;;;;; informar resolucion
 ;;;; tengo que hacerlo mas sintetico, no puede pasar 2k el codigo. Por ahora comento.
 
-;;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_resolution]					
 ;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -309,11 +346,11 @@ jb edid_fail_default;; err msg, then continue
 ;call num2strWord
 ;add rsp, 8*2
 
-;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;mov rcx, [TXT_OUT_INTERFACE]					
 ;lea rdx, [msg_placeholder]					
 ;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
-;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;mov rcx, [TXT_OUT_INTERFACE]					
 ;lea rdx, [msg_por]					
 ;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -322,7 +359,7 @@ jb edid_fail_default;; err msg, then continue
 ;call num2strWord
 ;add rsp, 8*2
 
-;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;mov rcx, [TXT_OUT_INTERFACE]					
 ;lea rdx, [msg_placeholder]					
 ;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -332,7 +369,7 @@ jmp use_GOP
 edid_fail_use_GOP:
 push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_edid_not_found]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 pop rdx
@@ -344,7 +381,7 @@ jmp use_GOP
 edid_fail_default:
 push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_edid_fail_default]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 pop rdx
@@ -358,8 +395,6 @@ jmp use_GOP
 
 	; Set video to desired resolution. By default it is 1024x768 unless EDID was found
 use_GOP:
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;l2: jmp l2;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
@@ -379,7 +414,7 @@ use_GOP:
 	; 4  UINT32 - Mode
 	; 8  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION - *Info;
 	; 16 UINTN - SizeOfInfo
-	; 24 EFI_PHYSICAL_ADDRESS - FrameBufferBase
+	; 24 EFI_PHYSICAL_ADDR - FrameBufferBase
 	; 32 UINTN - FrameBufferSize
     mov rax, [VIDEO]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
@@ -420,7 +455,7 @@ vid_query:
 
 
 ;; Si llego hasta aqui, he encontrado el modo con resolucion apropiada segun edid
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_graphics_mode_info_found]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -444,7 +479,7 @@ video_mode_success:
 ;; Logra setear
 push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_graphics_success]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 pop rdx
@@ -459,7 +494,7 @@ skip_set_video:
 
 push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_graphics_mode_info_not_found]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 pop rdx
@@ -505,7 +540,7 @@ get_video:
 ;;;;;;;;;;;;;;;;; imprime info screen en pantalla de el modo seleccionado / valores que quedaron
 ;; imprime esto: 
 ;; horizResol x vertResol x ppsl x fbSize
-;;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_resolution]					
 ;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -514,11 +549,11 @@ push qword[HR]
 call num2strWord
 add rsp, 8*2
 
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_placeholder]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_por]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -527,12 +562,12 @@ push qword[VR]
 call num2strWord
 add rsp, 8*2
 
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_placeholder]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 ;;;;;;;;;;;;;; ppsl
-;;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_por]					
 ;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -541,7 +576,7 @@ call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 ;;call num2strWord
 ;;add rsp, 8*2
 
-;;mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_placeholder]					
 ;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -551,7 +586,7 @@ call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 mov qword[msg_placeholder],0
 mov qword[msg_placeholder+8],0
 
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_por]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -560,22 +595,19 @@ push qword[FB_SIZE]
 call num2strWord
 add rsp, 8*2
 
-mov rcx, [TEXT_OUTPUT_INTERFACE]					
+mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_placeholder]					
 call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 
 
 ;;; parate aqui si quisieras ver los seteos que le va a pasar a pure64
-;;;;;;;;l0000 jmp l0000
 
-
-
-	; Check for payload
-	mov rsi, PAYLOAD+6
-	mov ax, [rsi]
-	cmp ax, 0x3436						; Match against the '64' in the Pure64 binary
-	jne sig_fail						; Bail out if Pure64 isn't present
+	mov rsi, PAYLOAD + 6
+	mov rax, [rsi]
+	mov rbx, "UEFIBOOT"	;; Chequeo simple de payload en lugar.
+	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64!
+	jne payloadSignatureFail
 
 ; Debug
 ;	mov rbx, [FB]						; Display the framebuffer address
@@ -583,7 +615,7 @@ call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 get_memmap:
 	; Output 'OK' as we are about to leave UEFI
-;;;;;;;;;;;;;;;;;;;;;;;;;	mov rcx, [TEXT_OUTPUT_INTERFACE]					
+;;;;;;;;;;;;;;;;;;;;;;;;;	mov rcx, [TXT_OUT_INTERFACE]					
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	lea rdx, [msg_OK]					
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
@@ -603,8 +635,8 @@ get_memmap:
 	; Each 48-byte record has the following format:
 	; 0  UINT32 - Type
 	; 4  UNIT32 - Padding
-	; 8  EFI_PHYSICAL_ADDRESS (UINT64) - PhysicalStart
-	; 16 EFI_VIRTUAL_ADDRESS (UINT64) - VirtualStart
+	; 8  EFI_PHYSICAL_ADDR (UINT64) - PhysicalStart
+	; 16 EFI_VIRTUAL_ADDR (UINT64) - VirtualStart
 	; 24 UINT64 - NumberOfPages - This is a number of 4K pages (must be a non-zero value)
 	; 32 UINT64 - Attribute
 	; 40 UINT64 - Blank
@@ -627,91 +659,61 @@ get_memmap:
 	; 0xE = EfiPersistentMemory
 	; 0xF = EfiMaxMemoryTyp
 
-;;;;;;;;;;;; importante, ya no uso mas uefi
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	; Exit Boot services as UEFI is no longer needed
-	mov rcx, [EFI_IMAGE_HANDLE]				; IN EFI_HANDLE ImageHandle
-	mov rdx, [memmapkey]					; IN UINTN MapKey
+	;; Importante, ya no uso mas uefi
+	mov rcx, [EFI_IMAGE_HANDLE]	; IN EFI_HANDLE ImageHandle
+	mov rdx, [memmapkey]		; IN UINTN MapKey
 	mov rax, [EFI_BOOT_SERVICES]
 	call [rax + EFI_BOOT_SERVICES_EXITBOOTSERVICES]
 	cmp rax, EFI_SUCCESS
-	jne get_memmap						; If it failed, get the memory map and try to exit again
+	jne get_memmap				; Get mem map, then try to exit again.
+	cli	;; Ya afuera.
 
-
-;; ya no se usa mas uefi, ya estamos afuera.
-	; Stop interrupts
-	cli
-
-	; Copy Pure64 to the correct memory address
+	;; Payload al destino. Aqui se estableve el maximo tamano y por eso cuando a
+	;; rmamos imagen se deberia revisar que no sea mayor. Un posible payload es 
+	;; uefiBootloader.sys + kernel.bin + modulosUserland.bin
 	mov rsi, PAYLOAD
 	mov rdi, 0x8000
+	mov rcx, (60 * 1024)	;; 60KiB a partir de 0x8000
+	rep movsb				;; Ultimo byte escrito = 0x8000 + (60 * 1024) - 1
 
-;; este es el maximo tamano y por eso cuando arma la imagen revisa que no sea mayor.
-;; un posible payload es pure64-uefi.sys + kernel.bin + monitor.bin
-	;;mov rcx, 32768						; Copy 32 KiB to 0x8000
-		mov rcx, (60*1024)						; Copy 60 KiB to 0x8000
-	rep movsb
-;; first destination byte = 0x8000
-;; last dest byte = 0x8000+(60*1024)	
-hlt
-;;;;;;;;;;;;;;;;;;;;;;;;; importante, esta info se la pasa al pure
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	; Save UEFI values to the area of memory where Pure64 expects them
+	;; Esta info de video la pasamos a la siguiente etapa de bootloader.
 	mov rdi, 0x00005F00
 	mov rax, [FB]
-	stosq						;5F00 + 8 * 0 = 64-bit Frame Buffer Base
+	stosq				;; 5F00 + 8 * 0 = 64-bit Frame Buffer Base
 	mov rax, [FB_SIZE]
-	stosq							; 5F00 + 8 * 1 = 64-bit Frame Buffer Size in bytes
+	stosq				;; 5F00 + 8 * 1 = 64-bit Frame Buffer Size in bytes
 	mov rax, [HR]
-	stosw							; 5F00 + 8 * 2 + 2 * 0 = 16-bit Screen X
+	stosw				;; 5F00 + 8 * 2 + 2 * 0 = 16-bit Screen X
 	mov rax, [VR]
-	stosw							; 5F00 + 8 * 2 + 2 * 1 = 16-bit Screen Y
+	stosw				;; 5F00 + 8 * 2 + 2 * 1 = 16-bit Screen Y
 	mov rax, [PPSL]
-	stosw							; 5F00 + 8 * 2 + 2 * 2 = 16-bit PixelsPerScanLine
-
-;; hardcodeado, supuestamente uefi siempre 32? Grub muestra que hay modos con 24 seleccionables.
-	mov rax, 32						; TODO - Verify this
-	stosw							; 16-bit BitsPerPixel
-
-
-
-
+	stosw				;; 5F00 + 8 * 2 + 2 * 2 = 16-bit PixelsPerScanLine
+	mov rax, 32			;; Hardcodeado, supuestamente uefi siempre 32? Grub mues
+						;; tra que hay modos con 24 seleccionables.
+	stosw				;; 16-bit BitsPerPixel
 
 	mov rax, [memmap]
-	mov rdx, rax						; Save Memory Map Base address to RDX
-	stosq							; Memory Map Base
+	mov rdx, rax				; Save Memory Map Base address to RDX
+	stosq						; Memory Map Base
 	mov rax, [memmapsize]
-	add rdx, rax						; Add Memory Map Size to RDX
-	stosq							; Size of Memory Map in bytes
+	add rdx, rax				; Add Memory Map Size to RDX
+	stosq						; Size of Memory Map in bytes
 	mov rax, [memmapkey]
-	stosq							; The key used to exit Boot Services
+	stosq						; The key used to exit Boot Services
 	mov rax, [memmapdescsize]
-	stosq							; EFI_MEMORY_DESCRIPTOR size in bytes
+	stosq						; EFI_MEMORY_DESCRIPTOR size in bytes
 	mov rax, [memmapdescver]
-	stosq							; EFI_MEMORY_DESCRIPTOR version
+	stosq						; EFI_MEMORY_DESCRIPTOR version
 	mov rax, [ACPI]
-	stosq							; ACPI Table Address
+	stosq						; ACPI Table Address
 	mov rax, [EDID]
-	stosq							; EDID Data (Size and Address)
+	stosq						; EDID Data (Size and Address)
 
 	; Add blank entries to the end of the UEFI memory map
-	mov rdi, rdx						; RDX holds address to end of memory map
+	mov rdi, rdx				; RDX holds address to end of memory map
 	xor eax, eax
 	mov ecx, 8
 	rep stosq
-
-
-
-;;;; sacar esto, es solo para debug
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;hago_tiempo:
-;;    dec qword[time_delay]
-;;    jz sigo
-;;    jmp hago_tiempo
-
-;;sigo:
-;;;;;;;;;;;;;;;;;;
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;; hacer un clear del screen
@@ -743,22 +745,8 @@ hlt
 
 	mov bl, 'U'
 
+	jmp 0x8000	;; Vamos a siguiente loader.
 
-
-;;;; sacar esto, es solo para debug
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;hago_tiempo:
-;;    dec qword[time_delay]
-;;    jz sigo
-;;    jmp hago_tiempo
-;;
-;;sigo:
-;;;;;;;;;;;;;;;;;;
-
-
-;;;;;;;;;;;;;;;;;;;;;;;; vamos a pure
-	jmp 0x8000
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 exitfailure:
@@ -769,13 +757,13 @@ exitfailure:
 	shr rcx, 2						; Quick divide by 4 (32-bit colour)
 	rep stosd
 error:
-	mov rcx, [TEXT_OUTPUT_INTERFACE]					
+	mov rcx, [TXT_OUT_INTERFACE]					
 	lea rdx, [msg_error]					
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 	jmp halt
-sig_fail:
-	mov rcx, [TEXT_OUTPUT_INTERFACE]					
-	lea rdx, [msg_SigFail]					
+payloadSignatureFail:
+	mov rcx, [TXT_OUT_INTERFACE]					
+	lea rdx, [msg_badPayloadSignature]					
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 halt:
 	hlt
@@ -799,12 +787,12 @@ printhex_loop:
 	mov rax, [rax + rcx]
 	mov byte [Num], al
 	lea rdx, [Num]
-	mov rcx, [TEXT_OUTPUT_INTERFACE]					
+	mov rcx, [TXT_OUT_INTERFACE]					
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 	dec rbp
 	jnz printhex_loop
 	lea rdx, [newline]
-	mov rcx, [TEXT_OUTPUT_INTERFACE]					
+	mov rcx, [TXT_OUT_INTERFACE]					
 	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 	add rsp, 32
@@ -812,46 +800,42 @@ printhex_loop:
 	pop rcx
 	pop rax
 	ret
-; -----------------------------------------------------------------------------
+;; -----------------------------------------------------------------------------
 
 
 
-;===============================================================================
-; num2strWord - convierte un entero en un string null terminated
-;===============================================================================
-; Argumentos:
-;   placeholder por stack, 1er push.
-;	el numero entero de 32 bit a convertir, pasado por stack (2so push)
-; Retorno:
-;	los caracteres ASCII (1 char = word) en rbx puntero al comienzo dentro del placeholder
-;===============================================================================
+;;==============================================================================
+;; num2strWord - convierte un entero en un string null terminated
+;;==============================================================================
+;; Argumentos:
+;; -- placeholder por stack, 1er push.
+;; -- el numero entero de 32 bit a convertir, pasado por stack (2so push)
+;; Retorno:
+;; -- los caracteres ASCII (1 char = word) en rbx puntero al comienzo dentro del
+;;    placeholder
+;;==============================================================================
+
 num2strWord:
     push rbp
-	mov rbp,rsp ; guardo el puntero del stack
+	mov rbp, rsp
 
 	push rax
 	push rcx
 	push rdx	
 
-;; blanquea placeholder porque si se uso anteriormente puede
-
 	mov rcx, 10
-	mov rdx, 0   ; Pongo en cero la parte mas significativa
-	mov rax, [rbp + 8 * 2]  ;Cargo el numero a convertir
+	mov rdx, 0  			;; En cero la parte mas significativa.
+	mov rax, [rbp + 8 * 2]  ;; Cargo el numero a convertir.
 	mov rbx, [rbp + 8 * 3]
-	;;;;add rbx, (msg_placeholder_len - 2)              ; me posiciono al final del string para empezar a colocar
-;;;;;	mov word [rbx], 0       ; los caracteres ASCII de derecha a izquierda comenzando con cero
     push word 0
 
 .calcular:
-	;;;;sub rbx, 2                 ; binario	
 	div ecx
-	or dl, 0x30  ; convierto el resto  menor a 10 a ASCII
-	;;mov word [rbx], dx
+	or dl, 0x30	;; Convierto el resto  menor a 10 a ASCII.
 	push dx  
 	cmp al, 0
 	jz .write
-	mov rdx,0
+	mov rdx, 0
 	jmp .calcular
 
 .write:
@@ -869,55 +853,49 @@ num2strWord:
 	pop rcx
 	pop rax
 
-	mov rsp,rbp
+	mov rsp, rbp
 	pop rbp	 
 	ret
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-times 2048-$+$$ db 0
+times 2048 - $ + $$	db 0
 CODE_END:
 
 ; Data begins here
 DATA:
-EFI_IMAGE_HANDLE:	dq 0					; EFI gives this in RCX
-EFI_SYSTEM_TABLE:	dq 0					; And this in RDX
-EFI_IMG_RET_ADDR:		dq 0					; And this in RSP
-EFI_BOOT_SERVICES:			dq 0					; Boot services
-RTS:			dq 0					; Runtime services
-CONFIG:			dq 0					; Config Table address
-ACPI:			dq 0					; ACPI table address
-TEXT_OUTPUT_INTERFACE:			dq 0					; Output services
-VIDEO:			dq 0					; Video services
-EDID:			dq 0
-FB:			dq 0					; Frame buffer base address
-FB_SIZE:			dq 0					; Frame buffer size
-HR:			dq 0					; Horizontal Resolution
-VR:			dq 0					; Vertical Resolution
-PPSL:			dq 0					; PixelsPerScanLine
-BPP:			dq 0					; BitsPerPixel
-memmap:			dq 0x220000				; Store the Memory Map from UEFI here
-memmapsize:		dq 32768				; Max size we are expecting in bytes
-memmapkey:		dq 0
+EFI_IMAGE_HANDLE:	dq 0	; EFI gives this in RCX
+EFI_SYSTEM_TABLE:	dq 0	; And this in RDX
+EFI_IMG_RET_ADDR:	dq 0	; And this in RSP
+EFI_BOOT_SERVICES:	dq 0	; Boot services
+RTS:				dq 0	; Runtime services
+CONFIG:				dq 0	; Config Table address
+ACPI:				dq 0	; ACPI table address
+TXT_OUT_INTERFACE:	dq 0	; Output services
+VIDEO:				dq 0	; Video services
+EDID:				dq 0
+FB:					dq 0	; Frame buffer base address
+FB_SIZE:			dq 0	; Frame buffer size
+HR:					dq 0	; Horizontal Resolution
+VR:					dq 0	; Vertical Resolution
+PPSL:				dq 0	; PixelsPerScanLine
+BPP:				dq 0		; BitsPerPixel
+memmap:				dq 0x220000	; Store the Memory Map from UEFI here
+memmapsize:			dq 32768	; Max size we are expecting in bytes
+memmapkey:			dq 0
 memmapdescsize:		dq 0
 memmapdescver:		dq 0
-vid_orig:		dq 0
-vid_index:		dq 0
-vid_max:		dq 0
-vid_size:		dq 0
-vid_info:		dq 0
+vid_orig:			dq 0
+vid_index:			dq 0
+vid_max:			dq 0
+vid_size:			dq 0
+vid_info:			dq 0
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;Importante
-;;;;;esto cambia la pantalla de qemu
-;;Horizontal_Resolution:	dd 1366				; Default resolution X - If no EDID found
-;;Vertical_Resolution:	dd 1080					; Default resolution Y - If no EDID found
-
-Horizontal_Resolution:	dd 1024				; Default resolution X - If no EDID found
-Vertical_Resolution:	dd 768					; Default resolution Y - If no EDID found
-
-;;Horizontal_Resolution:	dd 800					; Default resolution X - If no EDID found
-;;Vertical_Resolution:	dd 600					; Default resolution Y - If no EDID found
+;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
+;; va a cambiar la resolucion de la pantalla.
+Horizontal_Resolution:	dd 1024
+Vertical_Resolution:	dd 768
 
 ACPI_TABLE_GUID:
 dd 0xeb9d2d30
@@ -940,13 +918,13 @@ dw 0x23dc, 0x4a38
 db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 
 ;; Boot service para imprimir en pantalla requiere string en utf16.
-msg_uefi_boot:		dw utf16("UEFI boot"), 13, 0xA, 0
-msg_OK:			dw utf16("OK "), 0
-msg_error:		dw utf16("Error"), 0
-msg_SigFail:		dw utf16("Bad Sig!"), 0
-Hex:			db "0123456789ABCDEF"
-Num:			dw 0, 0
-newline:		dw 13, 10, 0
+msg_uefi_boot:				dw utf16("UEFI boot"), 13, 0xA, 0
+msg_OK:						dw utf16("OK "), 0
+msg_error:					dw utf16("Error"), 0
+msg_badPayloadSignature:	dw utf16("Bad payload signature."), 0
+Hex:						db "0123456789ABCDEF"
+Num:						dw 0, 0
+newline:					dw 13, 10, 0
 
 ;; Some new messages
 msg_edid_found: dw utf16("EDID found"), 13, 0xA, 0;; Carriage return
@@ -960,67 +938,63 @@ msg_por: dw utf16(" x "), 0
 msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
 msg_placeholder_len equ ($ - msg_placeholder)
 
-;;;;;;;;;;; para generar un loop y dejar q se vea mensaje antes de ir a pure
-;; deberia sacarlo, uefi tiene creo algun reset por tiempo si no llega a bootear durante un tiempo, al menos he visto ese comportamiento
-;;time_delay dq 100000
-
-align 4096 ;; El UEFI bootloader ocupa los primeros 4K. A continuacion de esos 4K, la payload.
+align 4096	;; Codigo util de BOOT64.EFI ocupa primeros 4K. Luego, la payload.
 PAYLOAD:
 
 ;; Esto cambiarlo por 256K para mas payload.
-align 65536							; Pad out to 64KiB for payload (Pure64 (6k), PackedKernel
+align 65536	; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
 RAMDISK:
 
-;; Padea con suficientes 0x00 para obtener un tamano de archivo de 1MB.
-times 65535+1048576-$+$$ db 0
+;; Suficientes 0x00 para obtener un tamano de archivo de 1MB.
+times 65535 + 1048576 - $ + $$	db 0
 DATA_END:
 END:
 
 ; Define the needed EFI constants and offsets here.
-EFI_SUCCESS						equ 0
-EFI_LOAD_ERROR						equ 1
-EFI_INVALID_PARAMETER					equ 2
-EFI_UNSUPPORTED						equ 3
-EFI_BAD_BUFFER_SIZE					equ 4
-EFI_BUFFER_TOO_SMALL					equ 5
-EFI_NOT_READY						equ 6
-EFI_DEVICE_ERROR					equ 7
-EFI_WRITE_PROTECTED					equ 8
-EFI_OUT_OF_RESOURCES					equ 9
-EFI_VOLUME_CORRUPTED					equ 10
-EFI_VOLUME_FULL						equ 11
-EFI_NO_MEDIA						equ 12
-EFI_MEDIA_CHANGED					equ 13
-EFI_NOT_FOUND						equ 14
+EFI_SUCCESS					equ 0
+EFI_LOAD_ERROR				equ 1
+EFI_INVALID_PARAMETER		equ 2
+EFI_UNSUPPORTED				equ 3
+EFI_BAD_BUFFER_SIZE			equ 4
+EFI_BUFFER_TOO_SMALL		equ 5
+EFI_NOT_READY				equ 6
+EFI_DEVICE_ERROR			equ 7
+EFI_WRITE_PROTECTED			equ 8
+EFI_OUT_OF_RESOURCES		equ 9
+EFI_VOLUME_CORRUPTED		equ 10
+EFI_VOLUME_FULL				equ 11
+EFI_NO_MEDIA				equ 12
+EFI_MEDIA_CHANGED			equ 13
+EFI_NOT_FOUND				equ 14
 
-EFI_SYSTEM_TABLE_CONOUT					equ 64
-EFI_SYSTEM_TABLE_RUNTIMESERVICES			equ 88
-EFI_SYSTEM_TABLE_BOOTSERVICES				equ 96
-EFI_SYSTEM_TABLE_NUMBEROFENTRIES			equ 104
-EFI_SYSTEM_TABLE_CONFIGURATION_TABLE			equ 112
+EFI_SYSTEM_TABLE_CONOUT								equ 64
+EFI_SYSTEM_TABLE_RUNTIMESERVICES					equ 88
+EFI_SYSTEM_TABLE_BOOTSERVICES						equ 96
+EFI_SYSTEM_TABLE_NUMBEROFENTRIES					equ 104
+EFI_SYSTEM_TABLE_CONFIGURATION_TABLE				equ 112
 
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_RESET			equ 0
+EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_RESET				equ 0
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING		equ 8
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_TEST_STRING		equ 16
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_QUERY_MODE		equ 24
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_MODE		equ 32
+EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_TEST_STRING			equ 16
+EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_QUERY_MODE			equ 24
+EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_MODE			equ 32
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_ATTRIBUTE		equ 40
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_CLEAR_SCREEN		equ 48
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_CURSOR_POSITION	equ 56
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_ENABLE_CURSOR		equ 64
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_MODE			equ 70
+EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_MODE				equ 70
 
 EFI_BOOT_SERVICES_GETMEMORYMAP				equ 56
 EFI_BOOT_SERVICES_LOCATEHANDLE				equ 176
-EFI_BOOT_SERVICES_LOADIMAGE				equ 200
-EFI_BOOT_SERVICES_EXIT					equ 216
+EFI_BOOT_SERVICES_LOADIMAGE					equ 200
+EFI_BOOT_SERVICES_EXIT						equ 216
 EFI_BOOT_SERVICES_EXITBOOTSERVICES			equ 232
-EFI_BOOT_SERVICES_STALL					equ 248
+EFI_BOOT_SERVICES_STALL						equ 248
 EFI_BOOT_SERVICES_SETWATCHDOGTIMER			equ 256
 EFI_BOOT_SERVICES_LOCATEPROTOCOL			equ 320
 
-EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE			equ 0
-EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE			equ 8
+EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE		equ 0
+EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE		equ 8
 EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT			equ 16
 EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE			equ 24
 

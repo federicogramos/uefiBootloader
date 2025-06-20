@@ -10,6 +10,9 @@
 ; =============================================================================
 
 
+
+
+
 init_acpi:
 	mov al, [p_BootMode]		; Check how the system was booted
 	cmp al, 'U'			; UEFI?
@@ -17,7 +20,7 @@ init_acpi:
 
 ; Find the ACPI RSDP Structure on a BIOS system
 	mov esi, 0x000E0000		; Start looking for the Root System Description Pointer Structure
-	mov rbx, 'RSD PTR '		; This in the Signature for the ACPI Structure Table (0x2052545020445352)
+	mov rbx, "RSD PTR "		; This in the Signature for the ACPI Structure Table (0x2052545020445352)
 searchingforACPI:
 	lodsq				; Load a quad word from RSI and store in RAX, then increment RSI by 8
 	cmp rax, rbx			; Verify the Signature

@@ -18,14 +18,17 @@
 ; =============================================================================
 
 
+
+
 BITS 64
 ORG 0x00008000
-PURE64SIZE equ 6144			; Pad Pure64 to this length
+UEFI_BOOTLOADER_SIZE equ 0x1800	;; 6KiB
 
 start:
 	jmp bootmode			; This command will be overwritten with 'NOP's before the AP's are started
 	nop
-	db 0x36, 0x34			; '64' marker
+	;;db 0x36, 0x34			; '64' marker
+	db "UEFIBOOT"	;; Simple chequeo de que hay payload.
 
 ; =============================================================================
 ; Code for AP startup
@@ -1001,11 +1004,11 @@ lfb_wc_end:
 	wbinvd				; Flush Cache
 
 ; Move the trailing binary to its final location
-	mov esi, 0x8000+PURE64SIZE	; Memory offset to end of pure64.sys
+	mov esi, 0x8000+UEFI_BOOTLOADER_SIZE	; Memory offset to end of pure64.sys
 	
 ;; esto es la direccion a la cual nuestro kernel se copia, tal como luego comienza ejecutando en _start en 100000
 	mov edi, 0x100000		; Destination address at the 1MiB mark
-	mov ecx, ((32768 - PURE64SIZE) / 8)
+	mov ecx, ((32768 - UEFI_BOOTLOADER_SIZE) / 8)
 	rep movsq			; Copy 8 bytes at a time
 
 ; Visual Debug (4/4)
@@ -1066,10 +1069,12 @@ clear_regs:
 %include "init/cpu.asm"
 %include "init/hpet.asm"
 %include "init/smp.asm"
+
 %ifdef BIOS
 %include "fdc/dma.asm"
 %include "fdc/fdc_64.asm"
 %endif
+
 %include "interrupt.asm"
 %include "sysvar.asm"
 
@@ -1332,7 +1337,7 @@ EOF:
 	db 0xDE, 0xAD, 0xC0, 0xDE
 
 ; Pad to an even KB file
-times PURE64SIZE-($-$$) db 0x90
+times UEFI_BOOTLOADER_SIZE-($-$$) db 0x90
 
 
 
