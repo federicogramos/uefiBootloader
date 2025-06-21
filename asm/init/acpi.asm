@@ -27,7 +27,8 @@ searchingforACPI:
 
 ; Find the ACPI RSDP Structure on a UEFI system
 foundACPIfromUEFI:
-	mov rsi, [0x400830]		; TODO This should be passed properly
+	mov rsi, [0x400000 + 3 * 1024 + 8 * 6]	;; TODO: simbolizar. El 3 es KiB que
+											;; ocupa seccion de codig o de uefi.
 	mov rbx, 'RSD PTR '		; This in the Signature for the ACPI Structure Table (0x2052545020445352)
 	lodsq				; Signature
 	cmp rax, rbx			; Verify the Signature

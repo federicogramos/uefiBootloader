@@ -3,6 +3,7 @@
 ;;==============================================================================
 ;; Varios de los comentarios realizados estan basados en la informacion de: 
 ;; -- Extensible Firmware Interface Specification Version 1.10 December 1, 2002.
+;; -- EFI Specification Version 2.8
 ;; -- Headers: https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
 ;; Otra info:
 ;; Calling convention: https://learn.microsoft.com/en-us/cpp/build/x64-calling-c
@@ -10,15 +11,15 @@
 ;;
 ;; La salida de NASM se guarda en /EFI/BOOT/BOOTX64.EFI y se le inyecta el paylo
 ;; ad (UEFI bootloader + packedKernel.bin) que se requiera. Archivo BOOTX64.EFI,
-;; luego de agregado de payload queda:
+;; luego de agregado el payload queda:
 ;;  +--------------------------+-------------------------+------------+
 ;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
 ;;  |         |        |       | UEFI       | packed     | 0x00 hasta |
 ;;  | Encabez | Codigo | Datos | bootloader | Kernel.bin | el fin     |
 ;;  +---------+--------+-------+------------+------------+------------+
-;;  |^                 |^      |^           |^           |^          ^|
-;; 0x0                0x800   0x1000      0x2800      0x40000      0xFFFFF
-;; 0                  2KiB    4KiB        10KiB       256KiB       1MiB-1
+;;  |^        |^       |^      |^           |^           |^          ^|
+;; 0x0      0x200     0xC00   0x1000      0x2800      0x40000      0xFFFFF
+;; 0        512B      3KiB    4KiB        10KiB       256KiB       1MiB-1
 ;;==============================================================================
 
 
@@ -124,10 +125,11 @@ SECTION_CODE:
 .number_of_relocations		dw 0
 .number_of_line_numbers		dw 0
 .characteristics			dd 0x70000020
-;;IMAGE_SCN_MEM_SHARED 0x10000000 The section can be shared in memory.
-;;IMAGE_SCN_MEM_EXECUTE 0x20000000 The section can be executed as code.
-;;IMAGE_SCN_MEM_READ 0x40000000 The section can be read.
-;;IMAGE_SCN_CNT_CODE 0x00000020 The section contains executable code.
+;; Section flags:
+;; IMAGE_SCN_MEM_SHARED		0x10000000 Can be shared in memory.
+;; IMAGE_SCN_MEM_EXECUTE	0x20000000 Can be executed as code.
+;; IMAGE_SCN_MEM_READ		0x40000000 Can be read.
+;; IMAGE_SCN_CNT_CODE		0x00000020 Contains executable code.
 
 SECTION_DATA:
 .name						db ".data", 0x00, 0x00, 0x00
@@ -140,21 +142,23 @@ SECTION_DATA:
 .number_of_relocations		dw 0
 .number_of_line_numbers		dw 0
 .characteristics			dd 0xD0000040
-;;IMAGE_SCN_MEM_SHARED 0x10000000 The section can be shared in memory.
-;;IMAGE_SCN_MEM_READ 0x40000000 The section can be read.
-;;IMAGE_SCN_CNT_INITIALIZED_DATA 0x00000040 The section contains initialized data.
-;;IMAGE_SCN_MEM_WRITE 0x80000000 The section can be written to.
+;; Section flags:
+;; IMAGE_SCN_MEM_SHARED				0x10000000 Can be shared in memory.
+;; IMAGE_SCN_MEM_READ				0x40000000 Can be read.
+;; IMAGE_SCN_CNT_INITIALIZED_DATA	0x00000040 Contains initialized data.
+;; IMAGE_SCN_MEM_WRITE				0x80000000 Can be written to.
 
+;; El header ocupo exactamente 0x160 bytes. Lo alineo a 0x200 para que termine o
+;; cupando 512 bytes.
 HEADER_END:
-
-align 16
+align 0x200
 
 
 ;; Entry point prototype:
 ;; EFI_STATUS main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 ;; Argumentos:
-;; -- ImageHandle Handle that identifies the loaded image. Type EFI_HANDLE is defin
-;;    edin the InstallProtocolInterface() function description.
+;; -- ImageHandle Handle that identifies the loaded image. Type EFI_HANDLE is de
+;;    fined in the InstallProtocolInterface() function description.
 ;; -- SystemTable System Table for this image.
 ;;
 ;; Where UEFI ABI specifies:
@@ -170,7 +174,7 @@ align 16
 ;; Note: EFI, for every supported architecture defines exact ABI.
 
 CODE:
-EntryPoint:
+EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 
 	;; UEFI entry point args and rerturn address.
 	mov [EFI_IMAGE_HANDLE], rcx
@@ -201,6 +205,10 @@ EntryPoint:
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONFIGURATION_TABLE]
 	mov [CONFIG], rax
+
+	mov rax, [EFI_SYSTEM_TABLE]
+	mov rax, [rax + EFI_SYSTEM_TABLE_CONIN]
+	mov [TXT_IN_INTERFACE], rax
 
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONOUT]
@@ -394,7 +402,7 @@ jmp use_GOP
 
 
 	; Set video to desired resolution. By default it is 1024x768 unless EDID was found
-use_GOP:
+use_GOP:	;; @0x400366
 
 
 
@@ -455,9 +463,9 @@ vid_query:
 
 
 ;; Si llego hasta aqui, he encontrado el modo con resolucion apropiada segun edid
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_graphics_mode_info_found]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;mov rcx, [TXT_OUT_INTERFACE]					
+;;lea rdx, [msg_graphics_mode_info_found]					
+;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 
 
@@ -504,7 +512,7 @@ pop rcx
 
 ;; haya econtrado match en un video mode y logrado setearlo, o no, continua (si no pudo, con la resolucion
 ;; por defecto y posiblemente no este bien configurado el video, podria fallar, pero va a buscar info igual)
-get_video:
+get_video:	;; @0x40046d
 
 
 
@@ -533,6 +541,31 @@ get_video:
 	mov [VR], rax						; Save the Vertical Resolution
 	mov eax, [rcx+32]					; RAX holds the PixelsPerScanLine
 	mov [PPSL], rax						; Save the PixelsPerScanLine
+
+
+
+
+
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;	mov rcx, [TXT_OUT_INTERFACE]					
+;;	lea rdx, [msg_error]					
+;;	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+
+
+
+
+
+
+
+
+
 
 
 
@@ -744,7 +777,7 @@ get_memmap:
 
 	mov bl, 'U'
 
-	jmp 0x8000	;; Vamos a siguiente loader.
+	jmp 0x8000	;; Vamos a siguiente loader. Aprox 0x400702
 
 
 
@@ -858,10 +891,13 @@ num2strWord:
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-times 2048 - $ + $$	db 0
+times 3 * 1024 - ($ - $$)	db 0
 CODE_END:
 
-; Data begins here
+;; section .data
+;; Cuidado con la posicion de estas tablas, no se pudede cambiar porque por el m
+;; omento estan hardcodeadas las posiciones relativas de la misma donde bootload
+;; er.asm busca, por ejemplo, ACPI.
 DATA:
 EFI_IMAGE_HANDLE:	dq 0	; EFI gives this in RCX
 EFI_SYSTEM_TABLE:	dq 0	; And this in RDX
@@ -871,6 +907,7 @@ RTS:				dq 0	; Runtime services
 CONFIG:				dq 0	; Config Table address
 ACPI:				dq 0	; ACPI table address
 TXT_OUT_INTERFACE:	dq 0	; Output services
+TXT_IN_INTERFACE:	dq 0	; Input services
 VIDEO:				dq 0	; Video services
 EDID:				dq 0
 FB:					dq 0	; Frame buffer base address
@@ -944,8 +981,9 @@ PAYLOAD:
 align 65536	; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
 RAMDISK:
 
-;; Suficientes 0x00 para obtener un tamano de archivo de 1MB.
-times 65535 + 1048576 - $ + $$	db 0
+;; Suficientes 0x00 para obtener un tamano de archivo de 1MiB.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;times 65535 + 1048576 + $$ - $	db 0
+times 1048576 - ($ - $$)	db 0
 DATA_END:
 END:
 
@@ -966,6 +1004,24 @@ EFI_NO_MEDIA				equ 12
 EFI_MEDIA_CHANGED			equ 13
 EFI_NOT_FOUND				equ 14
 
+;; EFI system table.
+;; typedef struct {
+;;		EFI_TABLE_HEADER				Hdr;					(8 * 3 bytes)
+;;		CHAR16							*FirmwareVendor;		(8 bytes)
+;;		UINT32							FirmwareRevision;		(8 bytes)
+;;		EFI_HANDLE						ConsoleInHandle;		(8 bytes)
+;;		SIMPLE_INPUT_INTERFACE			*ConIn;					(8 bytes)
+;;		EFI_HANDLE						ConsoleOutHandle;		(8 bytes)
+;;		SIMPLE_TEXT_OUTPUT_INTERFACE	*ConOut;				(8 bytes)
+;;		EFI_HANDLE						StandardErrorHandle;	(8 bytes)
+;;		SIMPLE_TEXT_OUTPUT_INTERFACE	*StdErr;				(8 bytes)
+;;		EFI_RUNTIME_SERVICES			*RuntimeServices;		(8 bytes)
+;;		EFI_BOOT_SERVICES				*BootServices;			(8 bytes)
+;	;	UINTN							NumberOfTableEntries;	(8 bytes)
+;;		EFI_CONFIGURATION_TABLE			*ConfigurationTable;
+;; } EFI_SYSTEM_TABLE;
+
+EFI_SYSTEM_TABLE_CONIN								equ 48
 EFI_SYSTEM_TABLE_CONOUT								equ 64
 EFI_SYSTEM_TABLE_RUNTIMESERVICES					equ 88
 EFI_SYSTEM_TABLE_BOOTSERVICES						equ 96

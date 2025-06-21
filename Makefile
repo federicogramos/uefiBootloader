@@ -18,6 +18,7 @@ $(BOOTLOADER):
 
 $(UEFI):
 	cd ./asm/boot; nasm uefi.asm -o ./../../build/uefi.sys
+	cd ./asm/boot; ld -g --oformat elf64-x86-64 --entry 0x400000 ./../../build/uefi.sys -o ./../../build/uefi.elf
 
 clean:
 	rm -rf *.sys

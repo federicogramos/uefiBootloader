@@ -27,6 +27,8 @@ Ver /boot/src/boot.cpp
 
 [EFI Specification Version 1.10](https://www.intel.com/content/dam/www/public/us/en/zip/efi-110.zip)
 
+[EFI Specification Version 2.8](https://uefi.org/sites/default/files/resources/UEFI_Spec_2_8_final.pdf}
+
 ### Info extra varia
 
 [Introduction to UEFI](http://x86asm.net/articles/introduction-to-uefi/index.html)

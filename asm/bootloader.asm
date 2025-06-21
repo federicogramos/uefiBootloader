@@ -15,13 +15,14 @@
 
 BITS 64
 ORG 0x00008000
-UEFI_BOOTLOADER_SIZE equ 0x1800	;; 6KiB
+BOOTLOADER_SIZE equ 0x1800	;; 6KiB
 
 start:
-	jmp bootmode			; This command will be overwritten with 'NOP's before the AP's are started
+	jmp bootmode	;; This command will be overwritten with 'NOP's before the AP's are started
 	nop
-	;;db 0x36, 0x34			; '64' marker
 	db "UEFIBOOT"	;; Simple chequeo de que hay payload.
+	nop
+	nop
 
 ; =============================================================================
 ; Code for AP startup
@@ -584,11 +585,11 @@ make_interrupt_gates: 			; make gates for the other interrupts
 
 	lidt [IDTR64]			; load IDT register
 
-; Patch bootloader AP code			; The AP's will be told to start execution at 0x8000
+; Patch bootloader AP code	; The AP's will be told to start execution at 0x8000
 	mov edi, start			; We need to remove the BSP Jump call to get the AP's
-	mov eax, 0x90909090		; to fall through to the AP Init code
-	stosd
-	stosd				; Write 8 bytes in total to overwrite the 'far jump' and marker
+	mov rax, 0x9090909090909090		; to fall through to the AP Init code
+	stosq
+	stosq				; Overwrite the 'far jump' and marker.
 
 
 
@@ -997,11 +998,11 @@ lfb_wc_end:
 	wbinvd				; Flush Cache
 
 ; Move the trailing binary to its final location
-	mov esi, 0x8000+UEFI_BOOTLOADER_SIZE	; Memory offset to end of bootloader.sys
+	mov esi, 0x8000+BOOTLOADER_SIZE	; Memory offset to end of bootloader.sys
 	
 ;; esto es la direccion a la cual nuestro kernel se copia, tal como luego comienza ejecutando en _start en 100000
 	mov edi, 0x100000		; Destination address at the 1MiB mark
-	mov ecx, ((32768 - UEFI_BOOTLOADER_SIZE) / 8)
+	mov ecx, ((32768 - BOOTLOADER_SIZE) / 8)
 	rep movsq			; Copy 8 bytes at a time
 
 ; Visual Debug (4/4)
@@ -1330,7 +1331,7 @@ EOF:
 	db 0xDE, 0xAD, 0xC0, 0xDE
 
 ; Pad to an even KB file
-times UEFI_BOOTLOADER_SIZE-($-$$) db 0x90
+times BOOTLOADER_SIZE-($-$$) db 0x90
 
 
 
