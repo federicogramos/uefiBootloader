@@ -1,13 +1,13 @@
-; =============================================================================
-; INIT ACPI
-;; Comments reference the following document:
-; Advanced Configuration and Power Interface (ACPI) Specification Release 6.5
-; https://uefi.org/sites/default/files/resources/ACPI_Spec_6_5_Aug29.pdf
-; =============================================================================
+;;==============================================================================
+;; acpi.asm
+;;==============================================================================
+;; Documentos:
+;; -- Advanced Configuration and Power Interface (ACPI) Spec Release 6.5
+;;    https://uefi.org/sites/default/files/resources/ACPI_Spec_6_5_Aug29.pdf
+;; -- https://uefi.org/sites/default/files/resources/BDAT_Spec_v4_0_9%20(2).pdf
+;;==============================================================================
 
-
-
-
+bits 64
 
 init_acpi:
 	mov al, [p_BootMode]		; Check how the system was booted
@@ -22,42 +22,45 @@ searchingforACPI:
 	cmp rax, rbx			; Verify the Signature
 	je foundACPI
 	cmp esi, 0x000FFFFF		; Keep looking until we get here
-	jae noACPI			; ACPI tables couldn't be found, fail
+	jae acpiFail			; ACPI tables couldn't be found, fail
 	jmp searchingforACPI
 
 ; Find the ACPI RSDP Structure on a UEFI system
 foundACPIfromUEFI:
 	mov rsi, [0x400000 + 3 * 1024 + 8 * 6]	;; TODO: simbolizar. El 3 es KiB que
 											;; ocupa seccion de codig o de uefi.
-	mov rbx, 'RSD PTR '		; This in the Signature for the ACPI Structure Table (0x2052545020445352)
-	lodsq				; Signature
-	cmp rax, rbx			; Verify the Signature
-	jne noACPI			; If it isn't a match then fail
+	mov rbx, "RSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
+	lodsq				;; Carga signature. Luego de carga, apunta a checksum.
+	cmp rax, rbx
+	jne acpiFail			;; If it isn't a match then fail
 
-; Parse the Root System Description Pointer (RSDP) Structure (5.2.5.3)
-foundACPI:				; Found a Pointer Structure, verify the checksum
-	push rsi			; Save the RSDP location - currently pointing to the checksum
+;; Parse the Root System Description Pointer (RSDP) Structure (5.2.5.3)
+foundACPI:			;; Found a Pointer Structure, verify the checksum
+	push rsi		;; rsi = RSDP[checksum]
 	xor ebx, ebx
-	mov ecx, 20			; As per the spec only the first 20 bytes matter
-	sub rsi, 8			; Bytes 0 thru 19 must sum to zero
-nextchecksum:
-	lodsb				; Get a byte
-	add bl, al			; Add it to the running total
-	sub cl, 1
-	cmp cl, 0
-	jne nextchecksum
-	pop rsi				; Restore the RSDP location
-	cmp bl, 0			; Verify the checksum is zero
-	jne noACPI			; Checksum didn't check out? Fail
+	mov ecx, 20		;; As per the spec only the first 20 bytes matter
+	sub rsi, 8		;; rsi = RSDP[0]. Revisar suma cero bytes 0..19.
 
-	lodsb				; Checksum
-	lodsd				; OEMID (First 4 bytes)
-	lodsw				; OEMID (Last 2 bytes)
-	lodsb				; Revision (0 is v1.0, 1 is v2.0, 2 is v3.0, etc)
+.next:
+	lodsb			;; Checksum byte
+	add bl, al
+	dec cl
+	jnz .next
+	cmp bl, 0		;; Checksum tiene q dar cero.
+	jne acpiFail
+	
+	pop rsi			;; rsi = RSDP[checksum]
+
+	lodsb			;; Checksum
+	lodsd			;; OEMID (First 4 bytes)
+	lodsw			;; OEMID (Last 2 bytes)
+	lodsb			;; Revision (0 is v1.0, 1 is v2.0, 2 is v3.0, etc)
 	cmp al, 0
-	je foundACPIv1			; If AL is 0 then the system is using ACPI v1.0
-	jmp foundACPIv2			; Otherwise it is v2.0 or higher
+	je foundACPIv1	;; If AL is 0 then the system is using ACPI v1.0
+	jmp foundACPIv2	;; Otherwise it is v2.0 or higher
 
+;; TODO: el foundACPIvN se puede juntar en 1 sola funcion o macro que contemple
+;; las pocas diferencias que hay que considerar.
 foundACPIv1:				; Root System Description Table (RSDT)
 	xor eax, eax
 	lodsd				; RsdtAddress - 32 bit physical address of the RSDT (Offset 16)
@@ -149,7 +152,7 @@ foundFADTTable:
 init_smp_acpi_done:
 	ret
 
-noACPI:
+acpiFail:
 novalidacpi:
 	; Set screen to Teal
 
