@@ -214,24 +214,87 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONOUT]
 	mov [TXT_OUT_INTERFACE], rax
 
-	; Set screen colour attributes
+	;; SIMPLE_TEXT_OUTPUT.SetAttribute(). Sets the background and foreground col
+	;; ors for the OutputString() and ClearScreen() functions.
 	mov rcx, [TXT_OUT_INTERFACE] 
-	mov rdx, 0x07	;; IN UINTN Attribute - Black background, grey foreground.
+	mov rdx, 0x07	;; IN UINTN Attribute = Black background, grey foreground.
+	call [rcx + EFI_OUT_SET_ATTRIBUTE]
 
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_ATTRIBUTE]
-
-	; Clear screen and set cursor position to (0, 0).
+	;; SIMPLE_TEXT_OUTPUT.ClearScreen(). Clears output device(s) display to the 
+	;; currently selected background color. Cursor position is set to (0, 0).
 	mov rcx, [TXT_OUT_INTERFACE]	
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_CLEAR_SCREEN]
+	call [rcx + EFI_OUT_CLEAR_SCREEN]
 
 	;; -- Modo texto de uefi, imprime en un recuadro centrado en la pantalla ind
-	;; ependientemente de la resolucion real.
+	;; ependientemente de la resolucion real. Por defecto 80x25 pero si hay otro
+	;; modo soportado lo usa.
 	;; -- Aqui, hlt unicamente no va a haltear. Debe hacer cli, luego hlt.
-	;; Notificar q estamos en "UEFI boot"
+
+;; Hacer query del modo texto usado e imprimirlo.
+;; SIMPLE_TEXT_OUTPUT.QueryMode()
+
+
+
+
+
+
+
+
+
+	mov rcx, [TXT_IN_INTERFACE]
+	mov rdx, EFI_INPUT_KEY	
+	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
+	cmp eax, EFI_NOT_READY			;; No hubo ingreso, sigo normalmente. Descar
+									;; ta bit 63, de otro modo compararia mal
+	je .continue_no_step_mode
+
+	cmp rax, EFI_SUCCESS
+	je .get_key
 
 	mov rcx, [TXT_OUT_INTERFACE]	
+	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
+	call [rcx + EFI_OUT_OUTPUTSTRING]
+	jmp .continue_no_step_mode			;; Sigo, a pesar del error.
+	
+.get_key:
+	mov dx, [EFI_INPUT_KEY + 2]
+	cmp dx, utf16('s')
+	jne .continue_no_step_mode
+	mov byte [STEP_MODE_FLAG], 1
+
+	mov rcx, [TXT_OUT_INTERFACE]	
+	mov rdx, msg_step_mode
+	call [rcx + EFI_OUT_OUTPUTSTRING]
+
+.continue_no_step_mode:
+	mov rcx, [TXT_OUT_INTERFACE]	
 	lea rdx, [msg_uefi_boot]			
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+	call [rcx + EFI_OUT_OUTPUTSTRING]
+
+;; Primer parada en el modo step.
+	call parada_step_mode
+
+;;step_0:
+;;	mov rcx, [TXT_IN_INTERFACE]
+;;	mov rdx, EFI_INPUT_KEY	
+;;	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
+;;	cmp eax, EFI_NOT_READY			;; No hubo ingreso, me quedo poleando.
+;;	je step_0
+;;
+;;	cmp rax, EFI_SUCCESS
+;;	je .get_key
+;;
+;;	mov rcx, [TXT_OUT_INTERFACE]	
+;;	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
+;;	call [rcx + EFI_OUT_OUTPUTSTRING]
+;;	jmp step_0
+;;	
+;;.get_key:
+;;	mov dx, [EFI_INPUT_KEY + 2]
+;;	cmp dx, utf16('n')
+;;	jne step_0						;; Posible salida a siguiente paso.
+
+
 
 	;; Find the address of the ACPI data from the UEFI configuration table.
 	mov rax, [EFI_SYSTEM_TABLE]
@@ -291,7 +354,7 @@ push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_edid_found]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 pop rdx
 pop rcx
 
@@ -347,7 +410,7 @@ jb edid_fail_default;; err msg, then continue
 
 ;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_resolution]					
-;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 ;push msg_placeholder
 ;push qword[Horizontal_Resolution]
@@ -356,11 +419,11 @@ jb edid_fail_default;; err msg, then continue
 
 ;mov rcx, [TXT_OUT_INTERFACE]					
 ;lea rdx, [msg_placeholder]					
-;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 ;mov rcx, [TXT_OUT_INTERFACE]					
 ;lea rdx, [msg_por]					
-;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 ;push msg_placeholder
 ;push qword[Vertical_Resolution]
@@ -369,7 +432,7 @@ jb edid_fail_default;; err msg, then continue
 
 ;mov rcx, [TXT_OUT_INTERFACE]					
 ;lea rdx, [msg_placeholder]					
-;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 jmp use_GOP
 
@@ -379,7 +442,7 @@ push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_edid_not_found]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 pop rdx
 pop rcx
 jmp use_GOP
@@ -391,7 +454,7 @@ push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_edid_fail_default]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 pop rdx
 pop rcx
 jmp use_GOP
@@ -465,7 +528,7 @@ vid_query:
 ;; Si llego hasta aqui, he encontrado el modo con resolucion apropiada segun edid
 ;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_graphics_mode_info_found]					
-;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 
 
@@ -489,7 +552,7 @@ push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_graphics_success]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 pop rdx
 pop rcx
 
@@ -504,7 +567,7 @@ push rcx;;; diria que no es necesario, por ahora lo dejo
 push rdx
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_graphics_mode_info_not_found]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 pop rdx
 pop rcx
 
@@ -556,7 +619,7 @@ get_video:	;; @0x40046d
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;	mov rcx, [TXT_OUT_INTERFACE]					
 ;;	lea rdx, [msg_error]					
-;;	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;	call [rcx + EFI_OUT_OUTPUTSTRING]
 
 
 
@@ -575,7 +638,7 @@ get_video:	;; @0x40046d
 ;; horizResol x vertResol x ppsl x fbSize
 ;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_resolution]					
-;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 push msg_placeholder
 push qword[HR]
@@ -584,11 +647,11 @@ add rsp, 8*2
 
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_placeholder]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_por]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 
 push msg_placeholder
 push qword[VR]
@@ -597,12 +660,12 @@ add rsp, 8*2
 
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_placeholder]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 
 ;;;;;;;;;;;;;; ppsl
 ;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_por]					
-;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 ;;push msg_placeholder
 ;;push qword[PPSL]
@@ -611,7 +674,7 @@ call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
 
 ;;mov rcx, [TXT_OUT_INTERFACE]					
 ;;lea rdx, [msg_placeholder]					
-;;call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;call [rcx + EFI_OUT_OUTPUTSTRING]
 
 
 
@@ -621,7 +684,7 @@ mov qword[msg_placeholder+8],0
 
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_por]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 
 push msg_placeholder
 push qword[FB_SIZE]
@@ -630,7 +693,7 @@ add rsp, 8*2
 
 mov rcx, [TXT_OUT_INTERFACE]					
 lea rdx, [msg_placeholder]					
-call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+call [rcx + EFI_OUT_OUTPUTSTRING]
 
 
 
@@ -650,7 +713,7 @@ get_memmap:
 	; Output 'OK' as we are about to leave UEFI
 ;;;;;;;;;;;;;;;;;;;;;;;;;	mov rcx, [TXT_OUT_INTERFACE]					
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	lea rdx, [msg_OK]					
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	call [rcx + EFI_OUT_OUTPUTSTRING]
 
 	; Get Memory Map from UEFI and save it [memmap]
 	lea rcx, [memmapsize]					; IN OUT UINTN *MemoryMapSize
@@ -791,12 +854,12 @@ exitfailure:
 error:
 	mov rcx, [TXT_OUT_INTERFACE]					
 	lea rdx, [msg_error]					
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+	call [rcx + EFI_OUT_OUTPUTSTRING]
 	jmp halt
 payloadSignatureFail:
 	mov rcx, [TXT_OUT_INTERFACE]					
 	lea rdx, [msg_badPayloadSignature]					
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+	call [rcx + EFI_OUT_OUTPUTSTRING]
 halt:
 	hlt
 	jmp halt
@@ -820,12 +883,12 @@ printhex_loop:
 	mov byte [Num], al
 	lea rdx, [Num]
 	mov rcx, [TXT_OUT_INTERFACE]					
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+	call [rcx + EFI_OUT_OUTPUTSTRING]
 	dec rbp
 	jnz printhex_loop
 	lea rdx, [newline]
 	mov rcx, [TXT_OUT_INTERFACE]					
-	call [rcx + EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING]
+	call [rcx + EFI_OUT_OUTPUTSTRING]
 
 	add rsp, 32
 	pop rdx
@@ -834,6 +897,38 @@ printhex_loop:
 	ret
 ;; -----------------------------------------------------------------------------
 
+
+
+;;==============================================================================
+;; Parada en el modo step.
+;;==============================================================================
+
+parada_step_mode:
+	cmp byte [STEP_MODE_FLAG], 0
+	je .fin
+	
+.pedir_tecla:
+	mov rcx, [TXT_IN_INTERFACE]
+	mov rdx, EFI_INPUT_KEY	
+	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
+	cmp eax, EFI_NOT_READY			;; No hubo ingreso, me quedo poleando.
+	je .pedir_tecla
+
+	cmp rax, EFI_SUCCESS
+	je .get_key
+
+	mov rcx, [TXT_OUT_INTERFACE]	
+	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
+	call [rcx + EFI_OUT_OUTPUTSTRING]
+	jmp .pedir_tecla
+	
+.get_key:
+	mov dx, [EFI_INPUT_KEY + 2]
+	cmp dx, utf16('n')
+	jne .pedir_tecla			;; Posible salida a siguiente paso.
+
+.fin:
+	ret
 
 
 ;;==============================================================================
@@ -927,6 +1022,13 @@ vid_max:			dq 0
 vid_size:			dq 0
 vid_info:			dq 0
 
+;; typedef struct {
+;; UINT16	ScanCode;
+;; CHAR16	UnicodeChar;
+;; } EFI_INPUT_KEY;
+EFI_INPUT_KEY		dd 0
+
+STEP_MODE_FLAG		db 0	;; Lo activa presionar 's' al booteo.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.
@@ -973,6 +1075,10 @@ msg_graphics_success: dw utf16("Graphics mod sucess."), 13, 0xA, 0
 msg_por: dw utf16(" x "), 0
 msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
 msg_placeholder_len equ ($ - msg_placeholder)
+msg_step_mode: dw utf16("Step mode"), 13, 0xA, 0
+msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
+msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
+msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
 
 align 4096	;; Codigo util de BOOT64.EFI ocupa primeros 4K. Luego, la payload.
 PAYLOAD:
@@ -987,8 +1093,10 @@ times 1048576 - ($ - $$)	db 0
 DATA_END:
 END:
 
-; Define the needed EFI constants and offsets here.
+;; EFI_STATUS Success Codes (High Bit Clear)
 EFI_SUCCESS					equ 0
+
+;; EFI_STATUS Error Codes (High Bit Set)
 EFI_LOAD_ERROR				equ 1
 EFI_INVALID_PARAMETER		equ 2
 EFI_UNSUPPORTED				equ 3
@@ -1003,6 +1111,24 @@ EFI_VOLUME_FULL				equ 11
 EFI_NO_MEDIA				equ 12
 EFI_MEDIA_CHANGED			equ 13
 EFI_NOT_FOUND				equ 14
+;;EFI_ACCESS_DENIED 15 Access was denied.
+;;EFI_NO_RESPONSE 16 The server was not found or did not respond to the request.
+;;EFI_NO_MAPPING 17 A mapping to a device does not exist.
+;;EFI_TIMEOUT 18 The timeout time expired.
+;;EFI_NOT_STARTED 19 The protocol has not been started.
+;;EFI_ALREADY_STARTED 20 The protocol has already been started.
+;;EFI_ABORTED 21 The operation was aborted.
+;;EFI_ICMP_ERROR 22 An ICMP error occurred during the network operation.
+;;EFI_TFTP_ERROR 23 A TFTP error occurred during the network operation.
+;;EFI_PROTOCOL_ERROR 24 A protocol error occurred during the network operation.
+;;EFI_INCOMPATIBLE_VERSION 25 The function encountered an internal version that was
+;;incompatible with a version requested by the caller.
+;;EFI_SECURITY_VIOLATION 26 The function was not performed due to a security violation.
+;;EFI_CRC_ERROR 27 A CRC error was detected.
+
+
+
+
 
 ;; EFI system table.
 ;; typedef struct {
@@ -1028,16 +1154,37 @@ EFI_SYSTEM_TABLE_BOOTSERVICES						equ 96
 EFI_SYSTEM_TABLE_NUMBEROFENTRIES					equ 104
 EFI_SYSTEM_TABLE_CONFIGURATION_TABLE				equ 112
 
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_RESET				equ 0
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_OUTPUTSTRING		equ 8
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_TEST_STRING			equ 16
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_QUERY_MODE			equ 24
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_MODE			equ 32
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_ATTRIBUTE		equ 40
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_CLEAR_SCREEN		equ 48
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_SET_CURSOR_POSITION	equ 56
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_ENABLE_CURSOR		equ 64
-EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_MODE				equ 70
+;; typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
+;; EFI_INPUT_RESET                       Reset;
+;; EFI_INPUT_READ_KEY                    ReadKeyStroke;
+;; EFI_EVENT                             WaitForKey;
+;; } EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
+EFI_INPUT_RESET										equ 0
+EFI_INPUT_READ_KEY									equ 8
+EFI_EVENT											equ 16
+
+;; typedef struct _EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
+;; EFI_TEXT_RESET                           Reset;
+;; EFI_TEXT_STRING                          OutputString;
+;; EFI_TEXT_TEST_STRING                     TestString;
+;; EFI_TEXT_QUERY_MODE                      QueryMode;
+;; EFI_TEXT_SET_MODE                        SetMode;
+;; EFI_TEXT_SET_ATTRIBUTE                   SetAttribute;
+;; EFI_TEXT_CLEAR_SCREEN                    ClearScreen;
+;; EFI_TEXT_SET_CURSOR_POSITION             SetCursorPosition;
+;; EFI_TEXT_ENABLE_CURSOR                   EnableCursor;
+;; SIMPLE_TEXT_OUTPUT_MODE                  *Mode;
+;; } EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
+EFI_OUT_RESET				equ 0
+EFI_OUT_OUTPUTSTRING		equ 8
+EFI_OUT_TEST_STRING			equ 16
+EFI_OUT_QUERY_MODE			equ 24
+EFI_OUT_SET_MODE			equ 32
+EFI_OUT_SET_ATTRIBUTE		equ 40
+EFI_OUT_CLEAR_SCREEN		equ 48
+EFI_OUT_SET_CURSOR_POSITION	equ 56
+EFI_OUT_ENABLE_CURSOR		equ 64
+EFI_OUT_MODE				equ 70
 
 EFI_BOOT_SERVICES_GETMEMORYMAP				equ 56
 EFI_BOOT_SERVICES_LOCATEHANDLE				equ 176
