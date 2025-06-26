@@ -14,12 +14,13 @@
 ;; luego de agregado el payload queda:
 ;;  +--------------------------+-------------------------+------------+
 ;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
-;;  |         |        |       | UEFI       | packed     | 0x00 hasta |
-;;  | Encabez | Codigo | Datos | bootloader | Kernel.bin | el fin     |
+;;  |         |        |       | bootloader | packed     | 0x00 hasta |
+;;  | Encabez | Codigo | Datos |            | Kernel.bin | el fin     |
 ;;  +---------+--------+-------+------------+------------+------------+
 ;;  |^        |^       |^      |^           |^           |^          ^|
-;; 0x0      0x200     0xC00   0x1000      0x2800      0x40000      0xFFFFF
-;; 0        512B      3KiB    4KiB        10KiB       256KiB       1MiB-1
+;; 0x0      0x200     0xC00   0x2000      0x2800      0x40000      0xFFFFF
+;; 0        512B      3KiB    8KiB        10KiB       256KiB       1MiB-1
+
 ;;==============================================================================
 
 
@@ -226,15 +227,25 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	call [rcx + EFI_OUT_CLEAR_SCREEN]
 
 	;; -- Modo texto de uefi, imprime en un recuadro centrado en la pantalla ind
-	;; ependientemente de la resolucion real. Por defecto 80x25 pero si hay otro
-	;; modo soportado lo usa.
+	;; ependientemente de la resolucion real. Por defecto 80x25 (mode = 0) pero 
+	;; si hay otro modo soportado lo usa.
 	;; -- Aqui, hlt unicamente no va a haltear. Debe hacer cli, luego hlt.
 
-;; Hacer query del modo texto usado e imprimirlo.
-;; SIMPLE_TEXT_OUTPUT.QueryMode()
+	mov rcx, [TXT_OUT_INTERFACE]
+	mov rbx, [rcx + EFI_OUT_MODE]
+	mov rax, [rbx]
+	mov rbx, 0
+	mov ebx, eax
+	mov rdx, msg_max_txt_mode
+	call print	;; Current video settings del modo texto con el q inicia.
 
-
-
+	mov rcx, [TXT_OUT_INTERFACE]
+	mov rbx, [rcx + EFI_OUT_MODE]
+	mov rax, [rbx + 4]
+	mov rbx, 0
+	mov ebx, eax
+	mov rdx, msg_curr_txt_mode
+	call print	;; Current video settings del modo texto con el q inicia.
 
 
 
@@ -316,7 +327,6 @@ nextentry:
 	jne nextentry
 	lodsq							; Load the address of the ACPI table
 	mov [ACPI], rax					; Save the address
-
 
 	;; Configurar pantalla. Algunas definiciones:
 	;; https://www.intel.com/content/dam/doc/guide/uefi-driver-graphics-controll
@@ -764,12 +774,13 @@ get_memmap:
 	jne get_memmap				; Get mem map, then try to exit again.
 	cli	;; Ya afuera.
 
-	;; Payload al destino. Aqui se estableve el maximo tamano y por eso cuando a
+	;; Payload al destino. Aqui se establece el maximo tamano y por eso cuando a
 	;; rmamos imagen se deberia revisar que no sea mayor. Un posible payload es 
 	;; uefiBootloader.sys + kernel.bin + modulosUserland.bin
 	mov rsi, PAYLOAD
 	mov rdi, 0x8000
-	mov rcx, (60 * 1024)	;; 60KiB a partir de 0x8000
+;;;;;;;;;;;;;;;;;;;;;;;;	mov rcx, (60 * 1024)	;; 60KiB a partir de 0x8000
+	mov rcx, (256 * 1024)	;; 256KiB a partir de 0x8000
 	rep movsb				;; Ultimo byte escrito = 0x8000 + (60 * 1024) - 1
 
 	;; Esta info de video la pasamos a la siguiente etapa de bootloader.
@@ -898,6 +909,81 @@ printhex_loop:
 ;; -----------------------------------------------------------------------------
 
 
+;;==============================================================================
+;; print - impresion con cadena de formato (unicamente 1 solo %: %d, %h, %c)
+;;==============================================================================
+;; Argumentos:
+;; -- rdx = cadena fmt
+;; -- rbx = 2do argumento en caso de haber %.
+;; El comportamiento si la cadena de fmt tiene % y no d, h, o c a continuacion e
+;; s que ignora el % y continua imprimiendo. Si tiene muchos % siempre va a usar
+;; el mismo argumento para la conversion (el unico que recibe en rbx).
+;;==============================================================================
+
+print:
+
+push rbp
+mov rbp, rsp
+
+	mov rcx, 0	;; Ix fmt.
+	mov rdi, 0	;; Ix placeholder.
+
+parse:
+	cmp word [rdx + 2 * rcx], 0x0000
+	je .end_placeholder
+	cmp word [rdx + 2 * rcx], utf16('%')
+	jne .copyChar
+	inc rcx
+
+	cmp word [rdx + 2 * rcx], utf16('d')
+	je .integer
+	cmp word [rdx + 2 * rcx], utf16('h')
+	je .hexadecimal
+	cmp word [rdx + 2 * rcx], utf16('c')
+	je .character
+	jmp parse
+
+.integer:
+
+	lea rax, [print_placeholder + 2 * rdi]
+	push rax
+	push rbx
+	call num2strWord2
+	add rsp, 8 * 2
+	add rdi, rax
+	inc rcx
+	jmp parse
+.hexadecimal:
+
+	inc rcx
+	jmp parse
+	
+.character:
+
+	inc rcx
+	jmp parse
+
+.copyChar:
+	;;push word [rdx + 2 * rcx]
+	;;pop word [print_placeholder + 2 * rdi]
+	mov ax, [rdx + 2 * rcx]
+	mov [print_placeholder + 2 * rdi], ax
+	inc rcx
+	inc rdi
+	jmp parse
+
+.end_placeholder:
+	mov word [print_placeholder + 2 * rdi], 0x0000
+	mov rdx, print_placeholder
+	mov rcx, [TXT_OUT_INTERFACE]	
+	call [rcx + EFI_OUT_OUTPUTSTRING]
+
+	mov rsp, rbp
+	pop rbp
+	ret
+
+
+
 
 ;;==============================================================================
 ;; Parada en el modo step.
@@ -931,12 +1017,68 @@ parada_step_mode:
 	ret
 
 
+
+;;==============================================================================
+;; num2strWord2 - convierte un entero en un string no null terminated
+;;==============================================================================
+;; Argumentos:
+;; -- placeholder por stack, 1er push.
+;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
+;; Retorno:
+;; -- rax = cantidad de caracteres escritos.
+;; Altera unicamente rax, restantes registros los devuelve como los recibe.
+;;==============================================================================
+
+num2strWord2:
+    push rbp
+	mov rbp, rsp
+
+	push rcx
+	push rdx	
+
+division_init:
+	mov rcx, 10
+	mov rdx, 0  			;; En cero la parte mas significativa del acum.
+	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
+    push word 0				;; Marca para dejar de popear durante write.
+
+.division:
+	div ecx
+	or dl, 0x30				;; Convierto el resto  menor a 10 a ASCII.
+	push dx  
+	cmp eax, 0
+	jz .write_init
+	mov rdx, 0
+	jmp .division
+
+.write_init:
+	mov rax, 0				;; Contara chars copiados para valor de retorno.
+	mov rcx, [rbp + 8 * 3]	;; Placeholder.
+
+.write:
+	cmp word [rsp], 0
+	je .end
+    pop word [rcx + 2 * rax]
+	inc rax
+    jmp .write
+
+.end:
+	add rsp, 2	;; El cero que marcaba fin, elimino para popear regs.
+	pop rdx
+	pop rcx
+
+	mov rsp, rbp
+	pop rbp	 
+	ret
+
+
+
 ;;==============================================================================
 ;; num2strWord - convierte un entero en un string null terminated
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
-;; -- el numero entero de 32 bit a convertir, pasado por stack (2so push)
+;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
 ;; Retorno:
 ;; -- los caracteres ASCII (1 char = word) en rbx puntero al comienzo dentro del
 ;;    placeholder
@@ -983,7 +1125,7 @@ num2strWord:
 	mov rsp, rbp
 	pop rbp	 
 	ret
-	
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 times 3 * 1024 - ($ - $$)	db 0
@@ -1079,8 +1221,19 @@ msg_step_mode: dw utf16("Step mode"), 13, 0xA, 0
 msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
 msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
+msg_max_txt_mode: dw utf16("Max txt mode = %d"), 0
+msg_curr_txt_mode: dw utf16(" | Curr mode = %d"), 13, 0xA, 0
 
-align 4096	;; Codigo util de BOOT64.EFI ocupa primeros 4K. Luego, la payload.
+print_placeholder:
+times	32 dw 0x0000
+
+times 8 * 1024 - ($ - $$)	db 0
+DATA_RUNTIME_END:
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;align 4096	;; Codigo util de BOOT64.EFI ocupa primeros 4K. Luego, la payload.
+align 8 * 1024	;; Codigo + data de BOOT64.EFI ocupa primeros 8K. Luego, la payload.
 PAYLOAD:
 
 ;; Esto cambiarlo por 256K para mas payload.
@@ -1184,7 +1337,7 @@ EFI_OUT_SET_ATTRIBUTE		equ 40
 EFI_OUT_CLEAR_SCREEN		equ 48
 EFI_OUT_SET_CURSOR_POSITION	equ 56
 EFI_OUT_ENABLE_CURSOR		equ 64
-EFI_OUT_MODE				equ 70
+EFI_OUT_MODE				equ 72
 
 EFI_BOOT_SERVICES_GETMEMORYMAP				equ 56
 EFI_BOOT_SERVICES_LOCATEHANDLE				equ 176
