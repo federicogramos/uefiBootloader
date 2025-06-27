@@ -210,6 +210,10 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONIN]
 	mov [TXT_IN_INTERFACE], rax
 
+	;; -- Modo texto de uefi, imprime en un recuadro centrado en la pantalla ind
+	;; ependientemente de la resolucion real. Por defecto 80x25 (mode = 0) tambi
+	;; en segun especificacion debe soportar 80x50 = modo 1.
+	;; -- Aqui, hlt unicamente no va a haltear. Debe hacer cli, luego hlt.
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONOUT]
 	mov [TXT_OUT_INTERFACE], rax
@@ -225,18 +229,13 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	mov rcx, [TXT_OUT_INTERFACE]	
 	call [rcx + EFI_OUT_CLEAR_SCREEN]
 
-	;; -- Modo texto de uefi, imprime en un recuadro centrado en la pantalla ind
-	;; ependientemente de la resolucion real. Por defecto 80x25 (mode = 0) pero 
-	;; si hay otro modo soportado lo usa.
-	;; -- Aqui, hlt unicamente no va a haltear. Debe hacer cli, luego hlt.
-
 	mov rcx, [TXT_OUT_INTERFACE]
 	mov rbx, [rcx + EFI_OUT_MODE]
 	mov rax, [rbx]
 	mov rbx, 0
 	mov ebx, eax
 	mov rdx, msg_max_txt_mode
-	call print	;; Current video settings del modo texto con el q inicia.
+	call print	;; Cantidad maxima de modos soportados.
 
 	mov rcx, [TXT_OUT_INTERFACE]
 	mov rbx, [rcx + EFI_OUT_MODE]
@@ -246,11 +245,8 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	mov rdx, msg_curr_txt_mode
 	call print	;; Current video settings del modo texto con el q inicia.
 
-
-
-
-
-
+	;; Ventana en la que se puede activar modo step.
+modo_step_window:
 	mov rcx, [TXT_IN_INTERFACE]
 	mov rdx, EFI_INPUT_KEY	
 	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
@@ -281,49 +277,27 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	lea rdx, [msg_uefi_boot]			
 	call [rcx + EFI_OUT_OUTPUTSTRING]
 
-;; Primer parada en el modo step.
-	call parada_step_mode
-
-;;step_0:
-;;	mov rcx, [TXT_IN_INTERFACE]
-;;	mov rdx, EFI_INPUT_KEY	
-;;	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
-;;	cmp eax, EFI_NOT_READY			;; No hubo ingreso, me quedo poleando.
-;;	je step_0
-;;
-;;	cmp rax, EFI_SUCCESS
-;;	je .get_key
-;;
-;;	mov rcx, [TXT_OUT_INTERFACE]	
-;;	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
-;;	call [rcx + EFI_OUT_OUTPUTSTRING]
-;;	jmp step_0
-;;	
-;;.get_key:
-;;	mov dx, [EFI_INPUT_KEY + 2]
-;;	cmp dx, utf16('n')
-;;	jne step_0						;; Posible salida a siguiente paso.
-
-
+	call prompt_step_mode	;; Primer parada en el modo step.
 
 	;; Find the address of the ACPI data from the UEFI configuration table.
+acpi_get_init:
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rcx, [rax + EFI_SYSTEM_TABLE_NUMBEROFENTRIES]
-	shl rcx, 3						; rcx * 2^3
+	shl rcx, 3						;; rcx * 2^3
 	mov rsi, [CONFIG]
 	
-nextentry:
+.acpi_test_entry:
 	dec rcx
 	cmp rcx, 0
 	je error						; Bail out as no ACPI data was detected
 	mov rdx, [ACPI_TABLE_GUID]		; First 64 bits of the ACPI GUID
 	lodsq
 	cmp rax, rdx					; Compare table data to expected GUID data
-	jne nextentry
-	mov rdx, [ACPI_TABLE_GUID+8]	; Second 64 bits of the ACPI GUID
+	jne .acpi_test_entry
+	mov rdx, [ACPI_TABLE_GUID + 8]	; Second 64 bits of the ACPI GUID
 	lodsq
 	cmp rax, rdx					; Compare table data to expected GUID data
-	jne nextentry
+	jne .acpi_test_entry
 	lodsq							; Load the address of the ACPI table
 	mov [ACPI], rax					; Save the address
 
@@ -987,8 +961,10 @@ parse:
 ;;==============================================================================
 ;; Parada en el modo step.
 ;;==============================================================================
+;; Con la tecla 'n' se avanza.
+;;==============================================================================
 
-parada_step_mode:
+prompt_step_mode:
 	cmp byte [STEP_MODE_FLAG], 0
 	je .fin
 	
