@@ -229,23 +229,30 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	mov rcx, [TXT_OUT_INTERFACE]	
 	call [rcx + EFI_OUT_CLEAR_SCREEN]
 
+	mov rax, [EFI_SYSTEM_TABLE]
+	mov rsi, [rax + EFI_SYSTEM_TABLE_FW_VENDOR]
+	mov rdx, fmt_fw_vendor
+	call print	;; Firmware vendor.
+
 	mov rcx, [TXT_OUT_INTERFACE]
 	mov rbx, [rcx + EFI_OUT_MODE]
-	mov rax, [rbx]
-	mov rbx, 0
-	mov ebx, eax
-	mov rdx, msg_max_txt_mode
+	mov rsi, [rbx]	;; Debo transformar a uint32.
+	push rsi
+	mov dword [rsp + 4], 0
+	pop rsi
+	mov rdx, fmt_max_txt_mode
 	call print	;; Cantidad maxima de modos soportados.
 
 	mov rcx, [TXT_OUT_INTERFACE]
 	mov rbx, [rcx + EFI_OUT_MODE]
-	mov rax, [rbx + 4]
-	mov rbx, 0
-	mov ebx, eax
-	mov rdx, msg_curr_txt_mode
+	mov rsi, [rbx + 4]	;; Debo transformar a uint32.
+	push rsi
+	mov dword [rsp + 4], 0
+	pop rsi
+	mov rdx, fmt_curr_txt_mode
 	call print	;; Current video settings del modo texto con el q inicia.
 
-	;; Ventana en la que se puede activar modo step.
+;; Ventana en la que se puede activar modo step.
 modo_step_window:
 	mov rcx, [TXT_IN_INTERFACE]
 	mov rdx, EFI_INPUT_KEY	
@@ -279,7 +286,7 @@ modo_step_window:
 
 	call prompt_step_mode	;; Primer parada en el modo step.
 
-	;; Find the address of the ACPI data from the UEFI configuration table.
+;; Find the address of the ACPI data from the UEFI configuration table.
 acpi_get_init:
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rcx, [rax + EFI_SYSTEM_TABLE_NUMBEROFENTRIES]
@@ -883,25 +890,26 @@ printhex_loop:
 
 
 ;;==============================================================================
-;; print - impresion con cadena de formato (unicamente 1 solo %: %d, %h, %c)
+;; print - impresion con cadena de formato (unicamente 1 solo %: %d, %h, %c, %s)
 ;;==============================================================================
 ;; Argumentos:
 ;; -- rdx = cadena fmt
-;; -- rbx = 2do argumento en caso de haber %.
-;; El comportamiento si la cadena de fmt tiene % y no d, h, o c a continuacion e
-;; s que ignora el % y continua imprimiendo. Si tiene muchos % siempre va a usar
-;; el mismo argumento para la conversion (el unico que recibe en rbx).
+;; -- rsi = 2do argumento en caso de haber %.
+;;
+;; El comportamiento si la cadena de fmt tiene % huerfano (no hay ninguna de las
+;; siguientes a continuacion: d, h, c, s) es: ignora el % y sigue imprimiendo. S
+;; i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
+;; unico que recibe en rsi).
 ;;==============================================================================
 
 print:
-
-push rbp
-mov rbp, rsp
+	push rbp
+	mov rbp, rsp
 
 	mov rcx, 0	;; Ix fmt.
 	mov rdi, 0	;; Ix placeholder.
 
-parse:
+.parse:
 	cmp word [rdx + 2 * rcx], 0x0000
 	je .end_placeholder
 	cmp word [rdx + 2 * rcx], utf16('%')
@@ -914,36 +922,53 @@ parse:
 	je .hexadecimal
 	cmp word [rdx + 2 * rcx], utf16('c')
 	je .character
-	jmp parse
+	cmp word [rdx + 2 * rcx], utf16('s')
+	je .string
+	jmp .parse
 
 .integer:
-
+	inc rcx
 	lea rax, [print_placeholder + 2 * rdi]
 	push rax
-	push rbx
+	push rsi
 	call num2strWord2
 	add rsp, 8 * 2
 	add rdi, rax
-	inc rcx
-	jmp parse
-.hexadecimal:
+	jmp .parse
 
+.hexadecimal:
 	inc rcx
-	jmp parse
+	jmp .parse
 	
 .character:
-
 	inc rcx
-	jmp parse
+	jmp .parse
+
+.string:
+	inc rcx
+	push rsi
+	call strlenWord
+	add rsp, 8
+
+.str_copy_init:
+	push rax	;; Cantidad a copiar al stack.
+	mov rax, 0
+
+.str_copy:
+	cmp rax, [rsp]
+	je .parse
+	mov bx, [rsi + 2 * rax]
+	mov [print_placeholder + 2 * rdi], bx
+	inc rax
+	inc rdi
+	jmp .str_copy
 
 .copyChar:
-	;;push word [rdx + 2 * rcx]
-	;;pop word [print_placeholder + 2 * rdi]
-	mov ax, [rdx + 2 * rcx]
-	mov [print_placeholder + 2 * rdi], ax
+	push word [rdx + 2 * rcx]
+	pop word [print_placeholder + 2 * rdi]
 	inc rcx
 	inc rdi
-	jmp parse
+	jmp .parse
 
 .end_placeholder:
 	mov word [print_placeholder + 2 * rdi], 0x0000
@@ -955,6 +980,113 @@ parse:
 	pop rbp
 	ret
 
+
+;;==============================================================================
+;; strlenWord - cantidad de caracteres de un string utf16 (no cuenta NULL)
+;;==============================================================================
+;; Argumentos:
+;; -- cadena por stack.
+;; Retorno:
+;; -- rax = longitud.
+;; Altera unicamente rax, restantes registros los devuelve como los recibe.
+;;==============================================================================
+
+strlenWord:
+	push rbp
+	mov rbp, rsp
+
+	push rsi
+
+	mov rax, 0
+	mov rsi, [rbp + 8 * 2]
+
+.test:
+	cmp word [rsi + 2 * rax], 0
+	je .end
+	inc rax
+	jmp .test
+
+.end:
+	pop rsi
+
+	mov rsp, rbp
+	pop rbp
+	ret
+
+
+
+xxxxxxprint:
+
+push rbp
+mov rbp, rsp
+
+	
+	mov rcx, 0	;; Ix fmt.
+	mov rdi, 0	;; Ix placeholder.
+
+.parse:
+	cmp word [rdx + 2 * rcx], 0x0000
+	je .end_placeholder
+	cmp word [rdx + 2 * rcx], utf16('%')
+	jne .copyChar
+	inc rcx
+
+	cmp word [rdx + 2 * rcx], utf16('d')
+	je .integer
+	cmp word [rdx + 2 * rcx], utf16('h')
+	je .hexadecimal
+	cmp word [rdx + 2 * rcx], utf16('c')
+	je .character
+	cmp word [rdx + 2 * rcx], utf16('s')
+	je .string
+	jmp .parse
+
+.integer:
+
+	lea rax, [print_placeholder + 2 * rdi]
+	push rax
+	push rbx
+	call num2strWord2
+	add rsp, 8 * 2
+	add rdi, rax
+	inc rcx
+	jmp .parse
+
+.hexadecimal:
+
+	inc rcx
+	jmp .parse
+	
+.character:
+
+	inc rcx
+	jmp .parse
+
+.string:
+	mov rdx, rbx
+	call print
+
+	inc rcx
+	jmp .parse
+
+.copyChar:
+	;;push word [rdx + 2 * rcx]
+	;;pop word [print_placeholder + 2 * rdi]
+	mov ax, [rdx + 2 * rcx]
+	mov [print_placeholder + 2 * rdi], ax
+	inc rcx
+	inc rdi
+	jmp .parse
+
+.end_placeholder:
+	mov word [print_placeholder + 2 * rdi], 0x0000
+	mov rdx, print_placeholder
+	mov rcx, [TXT_OUT_INTERFACE]	
+	call [rcx + EFI_OUT_OUTPUTSTRING]
+
+	mov rsp, rbp
+	pop rbp
+	ret
 
 
 
@@ -1192,12 +1324,15 @@ msg_graphics_success: dw utf16("Graphics mod sucess."), 13, 0xA, 0
 msg_por: dw utf16(" x "), 0
 msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
 msg_placeholder_len equ ($ - msg_placeholder)
-msg_step_mode: dw utf16("Step mode"), 13, 0xA, 0
+msg_step_mode: dw utf16("Step mode active, presione <n> para avanzar"), 13, 0xA, 0
 msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
 msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
-msg_max_txt_mode: dw utf16("Max txt mode = %d"), 0
-msg_curr_txt_mode: dw utf16(" | Curr mode = %d"), 13, 0xA, 0
+
+fmt_max_txt_mode: dw utf16("Max txt mode = %d"), 0
+fmt_curr_txt_mode: dw utf16(" | Curr mode = %d"), 13, 0xA, 0
+fmt_fw_vendor: dw utf16("FW vendor = %s"), 13, 0xA, 0
+
 
 print_placeholder:
 times	32 dw 0x0000
@@ -1271,62 +1406,63 @@ EFI_NOT_FOUND				equ 14
 ;;		SIMPLE_TEXT_OUTPUT_INTERFACE	*StdErr;				(8 bytes)
 ;;		EFI_RUNTIME_SERVICES			*RuntimeServices;		(8 bytes)
 ;;		EFI_BOOT_SERVICES				*BootServices;			(8 bytes)
-;	;	UINTN							NumberOfTableEntries;	(8 bytes)
+;;		UINTN							NumberOfTableEntries;	(8 bytes)
 ;;		EFI_CONFIGURATION_TABLE			*ConfigurationTable;
 ;; } EFI_SYSTEM_TABLE;
 
-EFI_SYSTEM_TABLE_CONIN								equ 48
-EFI_SYSTEM_TABLE_CONOUT								equ 64
-EFI_SYSTEM_TABLE_RUNTIMESERVICES					equ 88
-EFI_SYSTEM_TABLE_BOOTSERVICES						equ 96
-EFI_SYSTEM_TABLE_NUMBEROFENTRIES					equ 104
-EFI_SYSTEM_TABLE_CONFIGURATION_TABLE				equ 112
+EFI_SYSTEM_TABLE_FW_VENDOR				equ	24
+EFI_SYSTEM_TABLE_CONIN					equ 48
+EFI_SYSTEM_TABLE_CONOUT					equ 64
+EFI_SYSTEM_TABLE_RUNTIMESERVICES		equ 88
+EFI_SYSTEM_TABLE_BOOTSERVICES			equ 96
+EFI_SYSTEM_TABLE_NUMBEROFENTRIES		equ 104
+EFI_SYSTEM_TABLE_CONFIGURATION_TABLE	equ 112
 
 ;; typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
-;; EFI_INPUT_RESET                       Reset;
-;; EFI_INPUT_READ_KEY                    ReadKeyStroke;
-;; EFI_EVENT                             WaitForKey;
+;; EFI_INPUT_RESET						Reset;
+;; EFI_INPUT_READ_KEY					ReadKeyStroke;
+;; EFI_EVENT							WaitForKey;
 ;; } EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
-EFI_INPUT_RESET										equ 0
-EFI_INPUT_READ_KEY									equ 8
-EFI_EVENT											equ 16
+EFI_INPUT_RESET							equ 0
+EFI_INPUT_READ_KEY						equ 8
+EFI_EVENT								equ 16
 
 ;; typedef struct _EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
-;; EFI_TEXT_RESET                           Reset;
-;; EFI_TEXT_STRING                          OutputString;
-;; EFI_TEXT_TEST_STRING                     TestString;
-;; EFI_TEXT_QUERY_MODE                      QueryMode;
-;; EFI_TEXT_SET_MODE                        SetMode;
-;; EFI_TEXT_SET_ATTRIBUTE                   SetAttribute;
-;; EFI_TEXT_CLEAR_SCREEN                    ClearScreen;
-;; EFI_TEXT_SET_CURSOR_POSITION             SetCursorPosition;
-;; EFI_TEXT_ENABLE_CURSOR                   EnableCursor;
-;; SIMPLE_TEXT_OUTPUT_MODE                  *Mode;
+;; EFI_TEXT_RESET						Reset;
+;; EFI_TEXT_STRING						OutputString;
+;; EFI_TEXT_TEST_STRING					TestString;
+;; EFI_TEXT_QUERY_MODE					QueryMode;
+;; EFI_TEXT_SET_MODE					SetMode;
+;; EFI_TEXT_SET_ATTRIBUTE				SetAttribute;
+;; EFI_TEXT_CLEAR_SCREEN				ClearScreen;
+;; EFI_TEXT_SET_CURSOR_POSITION			SetCursorPosition;
+;; EFI_TEXT_ENABLE_CURSOR				EnableCursor;
+;; SIMPLE_TEXT_OUTPUT_MODE				*Mode;
 ;; } EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
-EFI_OUT_RESET				equ 0
-EFI_OUT_OUTPUTSTRING		equ 8
-EFI_OUT_TEST_STRING			equ 16
-EFI_OUT_QUERY_MODE			equ 24
-EFI_OUT_SET_MODE			equ 32
-EFI_OUT_SET_ATTRIBUTE		equ 40
-EFI_OUT_CLEAR_SCREEN		equ 48
-EFI_OUT_SET_CURSOR_POSITION	equ 56
-EFI_OUT_ENABLE_CURSOR		equ 64
-EFI_OUT_MODE				equ 72
+EFI_OUT_RESET							equ 0
+EFI_OUT_OUTPUTSTRING					equ 8
+EFI_OUT_TEST_STRING						equ 16
+EFI_OUT_QUERY_MODE						equ 24
+EFI_OUT_SET_MODE						equ 32
+EFI_OUT_SET_ATTRIBUTE					equ 40
+EFI_OUT_CLEAR_SCREEN					equ 48
+EFI_OUT_SET_CURSOR_POSITION				equ 56
+EFI_OUT_ENABLE_CURSOR					equ 64
+EFI_OUT_MODE							equ 72
 
-EFI_BOOT_SERVICES_GETMEMORYMAP				equ 56
-EFI_BOOT_SERVICES_LOCATEHANDLE				equ 176
-EFI_BOOT_SERVICES_LOADIMAGE					equ 200
-EFI_BOOT_SERVICES_EXIT						equ 216
-EFI_BOOT_SERVICES_EXITBOOTSERVICES			equ 232
-EFI_BOOT_SERVICES_STALL						equ 248
-EFI_BOOT_SERVICES_SETWATCHDOGTIMER			equ 256
-EFI_BOOT_SERVICES_LOCATEPROTOCOL			equ 320
+EFI_BOOT_SERVICES_GETMEMORYMAP			equ 56
+EFI_BOOT_SERVICES_LOCATEHANDLE			equ 176
+EFI_BOOT_SERVICES_LOADIMAGE				equ 200
+EFI_BOOT_SERVICES_EXIT					equ 216
+EFI_BOOT_SERVICES_EXITBOOTSERVICES		equ 232
+EFI_BOOT_SERVICES_STALL					equ 248
+EFI_BOOT_SERVICES_SETWATCHDOGTIMER		equ 256
+EFI_BOOT_SERVICES_LOCATEPROTOCOL		equ 320
 
-EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE		equ 0
-EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE		equ 8
-EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT			equ 16
-EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE			equ 24
+EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE	equ 0
+EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE	equ 8
+EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT		equ 16
+EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE		equ 24
 
-EFI_RUNTIME_SERVICES_RESETSYSTEM			equ 104
+EFI_RUNTIME_SERVICES_RESETSYSTEM		equ 104
 
