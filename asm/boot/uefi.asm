@@ -18,8 +18,8 @@
 ;;  | Encabez | Codigo | Datos |            | Kernel.bin | el fin     |
 ;;  +---------+--------+-------+------------+------------+------------+
 ;;  |^        |^       |^      |^           |^           |^          ^|
-;; 0x0      0x200     0xC00   0x2000      0x2800      0x40000      0xFFFFF
-;; 0        512B      3KiB    8KiB        10KiB       256KiB       1MiB-1
+;; 0x0      0x200   0x1000   0x2000      0x2800      0x40000      0xFFFFF
+;; 0        512B    4KiB     8KiB        10KiB       256KiB       1MiB-1
 ;;==============================================================================
 
 
@@ -204,7 +204,7 @@ EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
 
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONFIGURATION_TABLE]
-	mov [CONFIG], rax
+	mov [CONFIG_TABLE], rax
 
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONIN]
@@ -284,420 +284,302 @@ modo_step_window:
 	lea rdx, [msg_uefi_boot]			
 	call [rcx + EFI_OUT_OUTPUTSTRING]
 
-	call prompt_step_mode	;; Primer parada en el modo step.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call prompt_step_mode	;; Primer parada en el modo step.
 
-;; Find the address of the ACPI data from the UEFI configuration table.
-acpi_get_init:
+;; Buscar info ACPI.
+acpi_get:
 	mov rax, [EFI_SYSTEM_TABLE]
 	mov rcx, [rax + EFI_SYSTEM_TABLE_NUMBEROFENTRIES]
-	shl rcx, 3						;; rcx * 2^3
-	mov rsi, [CONFIG]
+	mov rdi, 0
+	mov rsi, [CONFIG_TABLE]
+	mov rdx, [ACPI_TABLE_GUID]		;; ACPI GUID bajo.
+	mov rax, [ACPI_TABLE_GUID + 8]	;; ACPI GUID alto.
+
+.acpi_search:
+	cmp rdi, rcx
+	je .err
+	mov rbx, [rsi]
+	cmp rdx, rbx		;; ACPI GUID bajo.
+	jne .next
+	mov rbx, [rsi + 8]
+	cmp rax, rbx		;; ACPI GUID alto.
+	jne .next
+	mov rax, [rsi + 16]
+	mov [ACPI], rax
+	jmp locate_edid_active_protocol
+
+.next:
+	add rsi, 24
+	inc rdi
+	jmp .acpi_search
+
+.err:
+	mov rsi, msg_acpi_err
+	je error_fatal	;; Sin ACPI no se continua.
 	
-.acpi_test_entry:
-	dec rcx
-	cmp rcx, 0
-	je error						; Bail out as no ACPI data was detected
-	mov rdx, [ACPI_TABLE_GUID]		; First 64 bits of the ACPI GUID
-	lodsq
-	cmp rax, rdx					; Compare table data to expected GUID data
-	jne .acpi_test_entry
-	mov rdx, [ACPI_TABLE_GUID + 8]	; Second 64 bits of the ACPI GUID
-	lodsq
-	cmp rax, rdx					; Compare table data to expected GUID data
-	jne .acpi_test_entry
-	lodsq							; Load the address of the ACPI table
-	mov [ACPI], rax					; Save the address
 
-	;; Configurar pantalla. Algunas definiciones:
-	;; https://www.intel.com/content/dam/doc/guide/uefi-driver-graphics-controll
-	;; er-guide.pdf
-	;; https://uefi.org/specs/UEFI/2.10/12_Protocols_Console_Support.html
-	;; Primero intenta encontrar un EDID, si no encuentra, prueba una resolucion
-	;; por defecto directo con el GOP.
+;; Configurar pantalla. Algunas definiciones:
+;; https://www.intel.com/content/dam/doc/guide/uefi-driver-graphics-controller-g
+;; uide.pdf
+;; https://uefi.org/specs/UEFI/2.10/12_Protocols_Console_Support.html
+;; Primero intenta encontrar un EDID, si no encuentra, prueba una resolucion por
+;; defecto directo con el GOP.
+;; Todos los protocolos disponibles en EDK2:
+;; https://github.com/tianocore/edk2/tree/master/MdePkg/Include/Protocol
 
-	;; Intento 1: interface to EFI_EDID_ACTIVE_PROTOCOL_GUID via its GUID
-	mov rcx, EFI_EDID_ACTIVE_PROTOCOL_GUID	; IN EFI_GUID *Protocol
-	mov rdx, 0						; IN VOID *Registration OPTIONAL
-	mov r8, EDID					; OUT VOID **Interface
+;; Intento 1: pedir el protocolo activo usando LocateProtocol().
+locate_edid_active_protocol:
+	mov rcx, EFI_EDID_ACTIVE_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
+	mov rdx, 0								;; IN VOID *Registration OPTIONAL
+	mov r8, EDID							;; OUT VOID **Interface
 	mov rax, [EFI_BOOT_SERVICES]
 	mov rax, [rax + EFI_BOOT_SERVICES_LOCATEPROTOCOL]
 	call rax
+	mov rsi, str_edid_active_protocol		;; Para mostrar info en pantalla.
 	cmp rax, EFI_SUCCESS
-	je get_EDID						; If it exists, process EDID
+	je get_EDID
 
-	;; Intento 2: interface to EFI_EDID_DISCOVERED_PROTOCOL_GUID via its GUID
-	mov rcx, EFI_EDID_DISCOVERED_PROTOCOL_GUID		; IN EFI_GUID *Protocol
-	mov rdx, 0						; IN VOID *Registration OPTIONAL
-	mov r8, EDID					; OUT VOID **Interface
+;; Intento 2: pedir el protocolo existente usando LocateProtocol().
+locate_edid_discovered_protocol:
+	mov rcx, EFI_EDID_DISCOVERED_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
+	mov rdx, 0									;; IN VOID *Registr OPTIONAL
+	mov r8, EDID								;; OUT VOID **Interface
 	mov rax, [EFI_BOOT_SERVICES]
 	mov rax, [rax + EFI_BOOT_SERVICES_LOCATEPROTOCOL]
 	call rax
+	mov rsi, str_edid_discovered_protocol		;; Para mostrar en pantalla.
 	cmp rax, EFI_SUCCESS
-	je get_EDID						; If it exists, process EDID
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	jmp use_GOP						; If not found, or other error, use GOP con una resolucion por defecto hardcodeada.
-jmp edid_fail_use_GOP;; fail message, then use gop.
+	je get_EDID
 
-	; Gather preferred screen resolution
+	jmp locate_edid_fail_use_default_resolution				;; Fail message, then use GOP.
+
+;; Si encuentra el protocolo, en cualquiera de ambos casos es:
+;; typedef struct {
+;; UINT32	SizeOfEdid;
+;; UINT8	*Edid;
+;; } EFI_EDID_ACTIVE_PROTOCOL;
+
 get_EDID:
-
-push rcx;;; diria que no es necesario, por ahora lo dejo
-push rdx
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_edid_found]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-pop rdx
-pop rcx
-
-	;; Parse EDID information returned.
-	;; https://bsdio.com/edk2/docs/master/_edid_active_8h_source.html
-	;; typedef struct {
-	;; UINT32    SizeOfEdid;
- 	;; UINT8    *Edid;
-	;; } EFI_EDID_ACTIVE_PROTOCOL;
+	mov rdx, fmt_edid_protocol_located
+	call print
 
 	mov rax, [EDID]
 	mov ebx, [rax]
-	cmp ebx, 128	;; Minimum size of 128 bytes.
-;;;;;;;;;;;;;;;;;;;;;;;	jb use_GOP						; Fail out to GOP with default resolution
-jb edid_fail_default;; err msg, then continue
-;;;;;; En realidad, aqui, si hubo fail en active protocol, aun tengo oportunidad de un success con discovered protocol, en lugar de ir directo a gop, puedo probar el discovered (aunque por lo general van a ser el mismo, salvo override).
-
+	cmp ebx, 128				;; Minimum size of 128 bytes.
+	mov rsi, str_edid_size_err	;; Para mostrar en pantalla.
+	jb edid_validation_fail		;; Err msg, then continue to GOP.
+	;; TODO: en realidad, aqui, si hubo fail en active protocol, aun tengo oport
+	;; unidad de un success con discovered protocol, en lugar de ir directo a GO
+	;; P, probar el discovered (aunque por lo general van a ser el mismo, salvo 
+	;; override).
 
 	mov rbx, [rax + 8]			;; Pointer to EDID. Why not +4? Yes, why? Pendie
 								;; nte: revisar que este codigo corra en algun m
 								;; omento y lo haga bien.
 
-	mov rax, [rbx]				;; Load RAX with EDID header.
+	mov rax, [rbx]				;; Load rax with EDID header.
 	mov rcx, 0x00FFFFFFFFFFFF00	;; Required EDID header
-	cmp rax, rcx				;; Verify 8-byte header at 0x00 is 0x00FFFFFFFFFFFF00
-;;;;;;;;;;;;;	jne use_GOP						; Fail out to GOP with default resolution
-jb edid_fail_default;; err msg, then continue
-	
-	; Preferred Timing Mode starts at 0x36
-	; 0x38 - Lower 8 bits of Horizontal pixels in bits 7:0
-	; 0x3A - Upper 4 bits of Horizontal pixels in bits 7:4
-	; 0x3B - Lower 8 bits of Vertical pixels in bits 7:0
-	; 0x3D - Upper 4 bits of Vertical pixels in bits 7:4
+	cmp rax, rcx				;; Fixed header pattern 0x00FFFFFFFFFFFF00.
+	mov rsi, str_edid_hdr_err	;; Para mostrar en pantalla.
+	jb edid_validation_fail		;; Err msg, then continue to GOP.
+
+	;; TODO: extraer Digital input, Bit depth, Video interface, Manufacturer ID.
+	;; https://en.wikipedia.org/wiki/Extended_Display_Identification_Data
+
+	;; Preferred Timing Mode starts at 0x36
+	;; 0x38 - Lower 8 bits of Horizontal pixels in bits 7:0
+	;; 0x3A - Upper 4 bits of Horizontal pixels in bits 7:4
+	;; 0x3B - Lower 8 bits of Vertical pixels in bits 7:0
+	;; 0x3D - Upper 4 bits of Vertical pixels in bits 7:4
 	xor eax, eax
 	xor ecx, ecx
-	mov al, [rbx+0x38]
-	mov cl, [rbx+0x3A]
-	and cl, 0xF0						; Keep bits 7:4
+	mov al, [rbx + 0x38]
+	mov cl, [rbx + 0x3A]
+	and cl, 0xF0
 	shl ecx, 4
 	or eax, ecx
 	mov [Horizontal_Resolution], eax
 	xor eax, eax
 	xor ecx, ecx
-	mov al, [rbx+0x3B]
-	mov cl, [rbx+0x3D]
-	and cl, 0xF0						; Keep bits 7:4
+	mov al, [rbx + 0x3B]
+	mov cl, [rbx + 0x3D]
+	and cl, 0xF0
 	shl ecx, 4
 	or eax, ecx
 	mov [Vertical_Resolution], eax
 
-;;;;;;;;;;;;;;;;;;;;; informar resolucion
-;;;; tengo que hacerlo mas sintetico, no puede pasar 2k el codigo. Por ahora comento.
+	mov rsi, [Horizontal_Resolution]
+	mov rdx, fmt_resolution_horizontal
+	call print	;; Informar resolucion.
+	mov rsi, [Vertical_Resolution]
+	mov rdx, fmt_resolution_vertical
+	call print
+	jmp locate_gop_protocol
 
-;;mov rcx, [TXT_OUT_INTERFACE]					
-;;lea rdx, [msg_resolution]					
-;;call [rcx + EFI_OUT_OUTPUTSTRING]
+locate_edid_fail_use_default_resolution:
+	mov rdx, msg_locate_edid_fail_use_default_resolution
+	call print
+	jmp locate_gop_protocol
 
-;push msg_placeholder
-;push qword[Horizontal_Resolution]
-;call num2strWord
-;add rsp, 8*2
+edid_validation_fail:
+	mov rdx, fmt_edid_validation_fail
+	call print	;; Encuentra EDID pero detecta errores de tamano o header.
+	jmp locate_gop_protocol
 
-;mov rcx, [TXT_OUT_INTERFACE]					
-;lea rdx, [msg_placeholder]					
-;call [rcx + EFI_OUT_OUTPUTSTRING]
+locate_gop_protocol:
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call prompt_step_mode	;; Parada modo step. Antes de cambio de video.
 
-;mov rcx, [TXT_OUT_INTERFACE]					
-;lea rdx, [msg_por]					
-;call [rcx + EFI_OUT_OUTPUTSTRING]
-
-;push msg_placeholder
-;push qword[Vertical_Resolution]
-;call num2strWord
-;add rsp, 8*2
-
-;mov rcx, [TXT_OUT_INTERFACE]					
-;lea rdx, [msg_placeholder]					
-;call [rcx + EFI_OUT_OUTPUTSTRING]
-
-jmp use_GOP
-
-;;;;;;;;;;;; Ni siquiera encontro el edid
-edid_fail_use_GOP:
-push rcx;;; diria que no es necesario, por ahora lo dejo
-push rdx
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_edid_not_found]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-pop rdx
-pop rcx
-jmp use_GOP
-
-
-;;;;;;;;;; Encuentra edid pero No encuentra la resolucion por defecto
-edid_fail_default:
-push rcx;;; diria que no es necesario, por ahora lo dejo
-push rdx
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_edid_fail_default]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-pop rdx
-pop rcx
-jmp use_GOP
-
-
-
-
-
-
-	; Set video to desired resolution. By default it is 1024x768 unless EDID was found
-use_GOP:	;; @0x400366
-
-
-
-	; Find the interface to GRAPHICS_OUTPUT_PROTOCOL via its GUID
-	mov rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID		; IN EFI_GUID *Protocol
-	mov rdx, 0						; IN VOID *Registration OPTIONAL
-	mov r8, VIDEO						; OUT VOID **Interface
+	;; Pedir GOP usando LocateProtocol().
+	mov rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
+	mov rdx, 0									;; IN VOID *Registr OPTIONAL
+	mov r8, VIDEO_INTERFACE						;; OUT VOID **Interface
 	mov rax, [EFI_BOOT_SERVICES]
 	mov rax, [rax + EFI_BOOT_SERVICES_LOCATEPROTOCOL]
 	call rax
+	mov rsi, str_gop_protocol_fatal_err			;; Para mostrar en pantalla.
 	cmp rax, EFI_SUCCESS
-	jne error
+	jne error_fatal
 
-	; Parse the current graphics information
-	; EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE Structure
-	; 0  UINT32 - MaxMode
-	; 4  UINT32 - Mode
-	; 8  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION - *Info;
-	; 16 UINTN - SizeOfInfo
-	; 24 EFI_PHYSICAL_ADDR - FrameBufferBase
-	; 32 UINTN - FrameBufferSize
-    mov rax, [VIDEO]
+	;; Parse the current graphics information
+	;; EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE Structure
+	;; 0  UINT32 - MaxMode
+	;; 4  UINT32 - Mode
+	;; 8  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION - *Info;
+	;; 16 UINTN - SizeOfInfo
+	;; 24 EFI_PHYSICAL_ADDR - FrameBufferBase
+	;; 32 UINTN - FrameBufferSize
+    mov rax, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
-	mov rcx, [rcx]						; RCX holds the address of the Mode structure
-	mov eax, [rcx]						; EAX holds UINT32 MaxMode
-	mov [vid_max], rax					; The maximum video modes we can check
-	jmp vid_query
+	mov rcx, [rcx]		;; RCX holds the address of the Mode structure
+	mov eax, [rcx]		;; EAX holds UINT32 MaxMode
+	mov [vid_max], rax	;; The maximum video modes we can check
+	jmp .video_mode_busca
 
-next_video_mode:
+.next:
 	mov rax, [vid_index]
-	add rax, 1						; Increment the mode # to check
+	add rax, 1				;; Increment the mode number to check.
 	mov [vid_index], rax
 	mov rdx, [vid_max]
 	cmp rax, rdx
-	je skip_set_video					; If we have reached the max then bail out
+	je skip_set_video
 
-;; Recorre arreglo buscando modo de video
-vid_query:
-	; Query a video mode
-	mov rcx, [VIDEO]					; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
-	mov rdx, [vid_index]					; IN UINT32 ModeNumber
-	lea r8, [vid_size]					; OUT UINTN *SizeOfInfo
-	lea r9, [vid_info]					; OUT EFI_GRAPHICS_OUTPUT_MODE_INFORMATION **Info
+.video_mode_busca:
+	mov rcx, [VIDEO_INTERFACE]	;; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
+	mov rdx, [vid_index]		;; IN UINT32 ModeNumber
+	lea r8, [vid_size]			;; OUT UINTN *SizeOfInfo
+	lea r9, [vid_info]			;; OUT EFI_GRAPHICS_OUTPUT_MODE_INFORMATI **Info
 	call [rcx + EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE]
 
-	; Check mode settings
+	;; TODO: podria promptear para seleccionar por consola una resolucion, sirve
+	;; para probar respuesta de SO.
+	;; Revisar seteos. Busco el que me ha entregado EFI con el EDID o si no, Por
+	;; defecto 1024 x 768.
 	mov rsi, [vid_info]
-	lodsd							; UINT32 - Version
-	lodsd							; UINT32 - HorizontalResolution
+	lodsd					;; UINT32 - Version
+	lodsd					;; UINT32 - HorizontalResolution
 	cmp eax, [Horizontal_Resolution]
-	jne next_video_mode
-	lodsd							; UINT32 - VerticalResolution
+	jne .next
+	lodsd					;; UINT32 - VerticalResolution
 	cmp eax, [Vertical_Resolution]
-	jne next_video_mode
-	lodsd							; EFI_GRAPHICS_PIXEL_FORMAT - PixelFormat (UINT32)
-	bt eax, 0						; Bit 0 is set for 32-bit colour mode
-	jnc next_video_mode
+	jne .next
+	lodsd					;; EFI_GRAPHICS_PIXEL_FORMAT - PixelFormat (UINT32)
+	bt eax, 0				;; Bit 0 is set for 32-bit colour mode
+	jnc .next
 
+	;; Si llego hasta aqui, he encontrado el modo con resolucion pedida.
+	mov rdx, msg_graphics_mode_info_match
+	call print
 
-;; Si llego hasta aqui, he encontrado el modo con resolucion apropiada segun edid
-;;mov rcx, [TXT_OUT_INTERFACE]					
-;;lea rdx, [msg_graphics_mode_info_found]					
-;;call [rcx + EFI_OUT_OUTPUTSTRING]
+	call prompt_step_mode	;; Ultima parada antes de que se borre pantalla.
 
-
-
-
-	; Set the video mode
-	mov rcx, [VIDEO]					; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
-	mov rdx, [vid_index]					; IN UINT32 ModeNumber
+.video_mode_set:
+	mov rcx, [VIDEO_INTERFACE]	;; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
+	mov rdx, [vid_index]		;; IN UINT32 ModeNumber
 	call [rcx + EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE]
 	cmp rax, EFI_SUCCESS
-	jne next_video_mode
-;; se acaba de resetear el buffer de video, se blanquea la pantalla.
-;; antes se veia baja resolucion, ahora se setea la nueva seleccionada resolucion
-;; voy a volver a mostrar en pantalla los datos de resolucion configurados
-;; Aclaracion: aun sigo sin poder usar hlt
-	
-	
-video_mode_success:
+	jne .next
 
-;; Logra setear
-push rcx;;; diria que no es necesario, por ahora lo dejo
-push rdx
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_graphics_success]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-pop rdx
-pop rcx
+;; Se acaba de resetear el buffer de video, se blanquea la pantalla. Antes se ve
+;; ia baja resolucion, ahora se setea la nueva seleccionada resolucion. Voy a vo
+;; lver a mostrar en pantalla los datos de resolucion configurados.
 
-jmp get_video
+.video_mode_success:
 
-	
+	;; SIMPLE_TEXT_OUTPUT.ClearScreen(). Clears display. Cursor position (0, 0).
+	mov rcx, [TXT_OUT_INTERFACE]	
+	call [rcx + EFI_OUT_CLEAR_SCREEN]
+
+	mov rsi, [vid_index]
+	mov rdx, msg_graphics_success
+	call print
+	jmp get_video
+
+;; Ha probado todos los modos y no encuentra match ni con un EDID encontrado, ni
+;; con la resolucion por defecto. Lo que hace es no cambiar el actual modo.
 skip_set_video:
+	mov rdx, msg_gop_no_mode_matches
+	call print
 
+;; Haya encontrado match en un video mode y logrado setearlo, o no, continua. us
+;; a la resolucion que actualmente tiene seteada, por lo que si al arranque teni
+;; a video, se tiene que poder continuar viendo salida.
+get_video:
 
-
-push rcx;;; diria que no es necesario, por ahora lo dejo
-push rdx
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_graphics_mode_info_not_found]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-pop rdx
-pop rcx
-
-
-
-;; haya econtrado match en un video mode y logrado setearlo, o no, continua (si no pudo, con la resolucion
-;; por defecto y posiblemente no este bien configurado el video, podria fallar, pero va a buscar info igual)
-get_video:	;; @0x40046d
-
-
-
-
-	; Gather video mode details
-	mov rcx, [VIDEO]
+	;; Gather video mode details
+	mov rcx, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
-	mov rcx, [rcx]						; RCX holds the address of the Mode structure
-	mov rax, [rcx+24]					; RAX holds the FB base
-	mov [FB], rax						; Save the FB base
-	mov rax, [rcx+32]					; RAX holds the FB size
-	mov [FB_SIZE], rax						; Save the FB size. No necesariamente es 
-	;;;;;;;;; igual a w x h x bpp porque podria ser mas. Ejemplo: 800 x 600 = 1920000 pero
-	;;;;;;;;; el fbzise podria ser 1921024
-	mov rcx, [rcx+8]					; RCX holds the address of the EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Structure
-	; EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Structure
-	; 0  UINT32 - Version
-	; 4  UINT32 - HorizontalResolution
-	; 8  UINT32 - VerticalResolution
-	; 12 EFI_GRAPHICS_PIXEL_FORMAT - PixelFormat (UINT32)
-	; 16 EFI_PIXEL_BITMASK - PixelInformation (4 UINT32 - RedMask, GreenMask, BlueMask, ReservedMask)
-	; 32 UINT32 - PixelsPerScanLine - Defines the number of pixel elements per video memory line. Scan lines may be padded for memory alignment.
-	mov eax, [rcx+4]					; RAX holds the Horizontal Resolution
-	mov [HR], rax						; Save the Horizontal Resolution
-	mov eax, [rcx+8]					; RAX holds the Vertical Resolution
-	mov [VR], rax						; Save the Vertical Resolution
-	mov eax, [rcx+32]					; RAX holds the PixelsPerScanLine
-	mov [PPSL], rax						; Save the PixelsPerScanLine
+	mov rcx, [rcx]		;; RCX holds the address of the Mode structure
+	mov rax, [rcx + 24]	;; RAX holds the FB base
+	mov [FB], rax		;; Save the FB base
+	mov rax, [rcx + 32]	;; RAX holds the FB size
+	mov [FB_SIZE], rax	;; FBuff size. No necesariamente es igual a w x h x bpp 
+						;; porque podria ser mas. Ejemplo: 800 x 600 = 1920000 p
+						;; ero el fbzise podria ser 1921024 (no multiplo de 2).
+	mov rcx, [rcx + 8]	;; RCX holds the address of the EFI_GRAPHICS_OUTPUT_MODE
+						;;_INFORMATION Structure.
+	;; EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Structure
+	;; 0  UINT32 - Version
+	;; 4  UINT32 - HorizontalResolution
+	;; 8  UINT32 - VerticalResolution
+	;; 12 EFI_GRAPHICS_PIXEL_FORMAT - PixelFormat (UINT32)
+	;; 16 EFI_PIXEL_BITMASK - PixelInformation (4 UINT32 - RedMask, GreenMask, B
+	;; lueMask, ReservedMask)
+	;; 32 UINT32 - PixelsPerScanLine - Defines the number of pixel elements per 
+	;; video memory line. Scan lines may be padded for memory alignment.
+	mov eax, [rcx + 4]	;; RAX holds the Horizontal Resolution
+	mov [HR], rax		;; Save the Horizontal Resolution
+	mov eax, [rcx + 8]	;; RAX holds the Vertical Resolution
+	mov [VR], rax		;; Save the Vertical Resolution
+	mov eax, [rcx + 32]	;; RAX holds the PixelsPerScanLine
+	mov [PPSL], rax		;; Save the PixelsPerScanLine
 
+	;; Info en pantalla de el modo seleccionado y valores que quedaron. Estos so
+	;; n los seteos que le va a pasar al siguiente bootloader y SO.
+	mov rsi, [HR]
+	mov rdx, fmt_resolution_horizontal
+	call print
+	mov rsi, [VR]
+	mov rdx, fmt_resolution_vertical
+	call print
+	mov rsi, [PPSL]
+	mov rdx, fmt_ppsl
+	call print
+	mov rsi, [FB_SIZE]
+	mov rdx, fmt_fb_size
+	call print
+	mov rsi, [FB]
+	mov rdx, fmt_fb_address
+	call print
 
+	call prompt_step_mode	;; Parada modo step.
 
-
-
-
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov rcx, [TXT_OUT_INTERFACE]					
-;;	lea rdx, [msg_error]					
-;;	call [rcx + EFI_OUT_OUTPUTSTRING]
-
-
-
-
-
-
-
-
-
-
-
-
-
-;;;;;;;;;;;;;;;;; imprime info screen en pantalla de el modo seleccionado / valores que quedaron
-;; imprime esto: 
-;; horizResol x vertResol x ppsl x fbSize
-;;mov rcx, [TXT_OUT_INTERFACE]					
-;;lea rdx, [msg_resolution]					
-;;call [rcx + EFI_OUT_OUTPUTSTRING]
-
-push msg_placeholder
-push qword[HR]
-call num2strWord
-add rsp, 8*2
-
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_placeholder]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_por]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-
-push msg_placeholder
-push qword[VR]
-call num2strWord
-add rsp, 8*2
-
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_placeholder]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-
-;;;;;;;;;;;;;; ppsl
-;;mov rcx, [TXT_OUT_INTERFACE]					
-;;lea rdx, [msg_por]					
-;;call [rcx + EFI_OUT_OUTPUTSTRING]
-
-;;push msg_placeholder
-;;push qword[PPSL]
-;;call num2strWord
-;;add rsp, 8*2
-
-;;mov rcx, [TXT_OUT_INTERFACE]					
-;;lea rdx, [msg_placeholder]					
-;;call [rcx + EFI_OUT_OUTPUTSTRING]
-
-
-
-;;;;;;;;;;;;;; framebuffer size
-mov qword[msg_placeholder],0
-mov qword[msg_placeholder+8],0
-
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_por]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-
-push msg_placeholder
-push qword[FB_SIZE]
-call num2strWord
-add rsp, 8*2
-
-mov rcx, [TXT_OUT_INTERFACE]					
-lea rdx, [msg_placeholder]					
-call [rcx + EFI_OUT_OUTPUTSTRING]
-
-
-
-;;; parate aqui si quisieras ver los seteos que le va a pasar al siguiente bootloader.
-
+verifica_payload:
 	mov rsi, PAYLOAD + 6
 	mov rax, [rsi]
 	mov rbx, "UEFIBOOT"	;; Chequeo simple de payload en lugar.
 	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64!
 	jne payloadSignatureFail
 
-; Debug
-;	mov rbx, [FB]						; Display the framebuffer address
-;	call printhex
 
 get_memmap:
 	; Output 'OK' as we are about to leave UEFI
@@ -711,7 +593,7 @@ get_memmap:
 	lea r8, [memmapkey]					; OUT UINTN *MapKey
 	lea r9, [memmapdescsize]				; OUT UINTN *DescriptorSize
 	lea r10, [memmapdescver]				; OUT UINT32 *DescriptorVersion
-	mov [rsp+32], r10
+	mov [rsp + 32], r10
 	mov rax, [EFI_BOOT_SERVICES]
 	call [rax + EFI_BOOT_SERVICES_GETMEMORYMAP]
 	cmp al, EFI_BUFFER_TOO_SMALL
@@ -842,6 +724,15 @@ exitfailure:
 	mov rcx, [FB_SIZE]
 	shr rcx, 2						; Quick divide by 4 (32-bit colour)
 	rep stosd
+
+error_fatal:
+	mov rdx, fmt_err_fatal
+	call print
+.halt:
+	cli
+	hlt
+	jmp .halt
+
 error:
 	mov rcx, [TXT_OUT_INTERFACE]					
 	lea rdx, [msg_error]					
@@ -854,6 +745,13 @@ payloadSignatureFail:
 halt:
 	hlt
 	jmp halt
+
+
+
+
+
+
+
 
 ; -----------------------------------------------------------------------------
 ; printhex - Display a 64-bit value in hex
@@ -938,6 +836,12 @@ print:
 
 .hexadecimal:
 	inc rcx
+	lea rax, [print_placeholder + 2 * rdi]
+	push rax
+	push rsi
+	call printhex2
+	add rsp, 8 * 2
+	add rdi, rax
 	jmp .parse
 	
 .character:
@@ -951,11 +855,11 @@ print:
 	add rsp, 8
 
 .str_copy_init:
-	push rax	;; Cantidad a copiar al stack.
+	mov [rbp - 8], rax	;; Cantidad a copiar al stack.
 	mov rax, 0
 
 .str_copy:
-	cmp rax, [rsp]
+	cmp rax, [rbp - 8]
 	je .parse
 	mov bx, [rsi + 2 * rax]
 	mov [print_placeholder + 2 * rdi], bx
@@ -979,6 +883,65 @@ print:
 	mov rsp, rbp
 	pop rbp
 	ret
+
+
+
+
+
+
+;;==============================================================================
+; printhex2 - Display a 64-bit value in hex
+;;==============================================================================
+;; Argumentos:
+;; -- placeholder por stack, 1er push.
+;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
+;; Retorno:
+;; -- rax = cantidad de caracteres escritos.
+;; Altera unicamente rax, restantes registros los devuelve como los recibe.
+;;==============================================================================
+
+printhex2:
+    push rbp
+	mov rbp, rsp
+
+	push rcx
+	push rdx	
+
+.division_init:
+	mov rcx, 16
+	mov rdx, 0  			;; En cero la parte mas significativa del acum.
+	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
+    push word 0				;; Marca para dejar de popear durante write.
+
+.division:
+	div ecx
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;or dl, 0x30				;; Convierto el resto  menor a 10 a ASCII.
+	push word [hexConvert + 2 * rdx]  
+	cmp eax, 0
+	jz .write_init
+	mov rdx, 0
+	jmp .division
+
+.write_init:
+	mov rax, 0				;; Contara chars copiados para valor de retorno.
+	mov rcx, [rbp + 8 * 3]	;; Placeholder.
+
+.write:
+	cmp word [rsp], 0
+	je .end
+    pop word [rcx + 2 * rax]
+	inc rax
+    jmp .write
+
+.end:
+	add rsp, 2	;; El cero que marcaba fin, elimino para popear regs.
+	pop rdx
+	pop rcx
+
+	mov rsp, rbp
+	pop rbp	 
+	ret
+
 
 
 ;;==============================================================================
@@ -1089,7 +1052,6 @@ mov rbp, rsp
 	ret
 
 
-
 ;;==============================================================================
 ;; Parada en el modo step.
 ;;==============================================================================
@@ -1122,7 +1084,6 @@ prompt_step_mode:
 
 .fin:
 	ret
-
 
 
 ;;==============================================================================
@@ -1235,7 +1196,7 @@ num2strWord:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-times 3 * 1024 - ($ - $$)	db 0
+times 4 * 1024 - ($ - $$)	db 0
 CODE_END:
 
 ;; section .data
@@ -1248,11 +1209,11 @@ EFI_SYSTEM_TABLE:	dq 0	; And this in RDX
 EFI_IMG_RET_ADDR:	dq 0	; And this in RSP
 EFI_BOOT_SERVICES:	dq 0	; Boot services
 RTS:				dq 0	; Runtime services
-CONFIG:				dq 0	; Config Table address
+CONFIG_TABLE:				dq 0	; Config Table address
 ACPI:				dq 0	; ACPI table address
 TXT_OUT_INTERFACE:	dq 0	; Output services
 TXT_IN_INTERFACE:	dq 0	; Input services
-VIDEO:				dq 0	; Video services
+VIDEO_INTERFACE:	dq 0	; Video services
 EDID:				dq 0
 FB:					dq 0	; Frame buffer base address
 FB_SIZE:			dq 0	; Frame buffer size
@@ -1277,7 +1238,7 @@ vid_info:			dq 0
 ;; } EFI_INPUT_KEY;
 EFI_INPUT_KEY		dd 0
 
-STEP_MODE_FLAG		db 0	;; Lo activa presionar 's' al booteo.
+STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.
@@ -1289,6 +1250,7 @@ dd 0xeb9d2d30
 dw 0x2d88, 0x11d3
 db 0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d
 
+;; github.com/tianocore/edk2/blob/master/MdePkg/Include/Protocol/EdidActive.h
 EFI_EDID_ACTIVE_PROTOCOL_GUID:
 dd 0xbd8c1056
 dw 0x9f36, 0x44ec
@@ -1299,6 +1261,8 @@ dd 0x1c0c34f6
 dw 0xd380, 0x41fa
 db 0xa0, 0x49, 0x8a, 0xd0, 0x6c, 0x1a, 0x66, 0xaa
 
+;; https://github.com/tianocore/edk2/blob/master/MdePkg/Include/Protocol/Graphic
+;; sOutput.h
 EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID:
 dd 0x9042a9de
 dw 0x23dc, 0x4a38
@@ -1313,14 +1277,26 @@ Hex:						db "0123456789ABCDEF"
 Num:						dw 0, 0
 newline:					dw 13, 10, 0
 
-;; Some new messages
+hexConvert:					dw utf16("0123456789ABCDEF")
+
+
+;; Some new messages.
 msg_edid_found: dw utf16("EDID found"), 13, 0xA, 0;; Carriage return
-msg_edid_not_found: dw utf16("EDID not found"), 13, 0xA, 0
-msg_edid_fail_default: dw utf16("Fail out to GOP with default resolution"), 13, 0xA, 0
-msg_resolution: dw utf16("Resolution "), 0
-msg_graphics_mode_info_found: dw utf16("Graphics mode info found."), 13, 0xA, 0
-msg_graphics_mode_info_not_found: dw utf16("Graphics mode: no mode matches."), 13, 0xA, 0
-msg_graphics_success: dw utf16("Graphics mod sucess."), 13, 0xA, 0
+msg_locate_edid_fail_use_default_resolution: dw utf16("Locate EDID fail: se usara resolucion por defecto"), 13, 0xA, 0
+
+fmt_edid_validation_fail: dw utf16("EDID validation failure = %s"), 13, 0xA, 0
+str_edid_size_err: dw utf16("error de tamano"), 0
+str_edid_hdr_err: dw utf16("error en el encabezado"), 0
+
+fmt_resolution_horizontal:	dw utf16("Resolution = %d"), 0
+fmt_resolution_vertical:	dw utf16(" x %d"), 13, 0xA, 0
+fmt_ppsl:					dw utf16("PPSL = %d"), 0
+fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
+fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
+
+msg_graphics_mode_info_match: dw utf16("Graphics mode info match."), 13, 0xA, 0
+msg_gop_no_mode_matches: dw utf16("Graphics mode: no mode matches."), 13, 0xA, 0
+msg_graphics_success: dw utf16("Cambio de modo de video ok | Nuevo modo = %d"), 13, 0xA, 0
 msg_por: dw utf16(" x "), 0
 msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
 msg_placeholder_len equ ($ - msg_placeholder)
@@ -1329,9 +1305,21 @@ msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
 msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
 
-fmt_max_txt_mode: dw utf16("Max txt mode = %d"), 0
-fmt_curr_txt_mode: dw utf16(" | Curr mode = %d"), 13, 0xA, 0
-fmt_fw_vendor: dw utf16("FW vendor = %s"), 13, 0xA, 0
+msg_acpi_err:		dw utf16("ACPI no encontrado."), 0
+
+fmt_err_fatal:		dw utf16("Error fatal: %s"), 0
+fmt_max_txt_mode:	dw utf16("Max txt mode = %d"), 0
+fmt_curr_txt_mode:	dw utf16(" | Curr mode = %d"), 13, 0xA, 0
+fmt_fw_vendor:		dw utf16("FW vendor = %s"), 13, 0xA, 0
+
+str_edid_active_protocol:		dw utf16("active protocol"), 0
+str_edid_discovered_protocol:	dw utf16("discovered protocol"), 0
+fmt_edid_protocol_located:		dw utf16("EDID protocol found = %s"), 13, 0xA, 0
+
+str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
+
+
+
 
 
 print_placeholder:
