@@ -525,18 +525,18 @@ skip_set_video:
 ;; a video, se tiene que poder continuar viendo salida.
 get_video:
 
-	;; Gather video mode details
+	;; Gather video mode details.
 	mov rcx, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
-	mov rcx, [rcx]		;; RCX holds the address of the Mode structure
-	mov rax, [rcx + 24]	;; RAX holds the FB base
-	mov [FB], rax		;; Save the FB base
-	mov rax, [rcx + 32]	;; RAX holds the FB size
+	mov rcx, [rcx]
+	mov rax, [rcx + 24]	;; FBuff base.
+	mov [FB], rax
+	mov rax, [rcx + 32]	;; FBuff size.
 	mov [FB_SIZE], rax	;; FBuff size. No necesariamente es igual a w x h x bpp 
 						;; porque podria ser mas. Ejemplo: 800 x 600 = 1920000 p
 						;; ero el fbzise podria ser 1921024 (no multiplo de 2).
-	mov rcx, [rcx + 8]	;; RCX holds the address of the EFI_GRAPHICS_OUTPUT_MODE
-						;;_INFORMATION Structure.
+	mov rcx, [rcx + 8]	;; Addr of EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Struct.
+
 	;; EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Structure
 	;; 0  UINT32 - Version
 	;; 4  UINT32 - HorizontalResolution
@@ -546,12 +546,13 @@ get_video:
 	;; lueMask, ReservedMask)
 	;; 32 UINT32 - PixelsPerScanLine - Defines the number of pixel elements per 
 	;; video memory line. Scan lines may be padded for memory alignment.
-	mov eax, [rcx + 4]	;; RAX holds the Horizontal Resolution
-	mov [HR], rax		;; Save the Horizontal Resolution
-	mov eax, [rcx + 8]	;; RAX holds the Vertical Resolution
-	mov [VR], rax		;; Save the Vertical Resolution
-	mov eax, [rcx + 32]	;; RAX holds the PixelsPerScanLine
-	mov [PPSL], rax		;; Save the PixelsPerScanLine
+
+	mov eax, [rcx + 4]	;; Horizontal Resolution
+	mov [HR], rax
+	mov eax, [rcx + 8]	;; Vertical Resolution
+	mov [VR], rax
+	mov eax, [rcx + 32]	;; PixelsPerScanLine
+	mov [PPSL], rax
 
 	;; Info en pantalla de el modo seleccionado y valores que quedaron. Estos so
 	;; n los seteos que le va a pasar al siguiente bootloader y SO.
@@ -580,26 +581,28 @@ verifica_payload:
 	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64!
 	jne payloadSignatureFail
 
-
 get_memmap:
-	; Output 'OK' as we are about to leave UEFI
-;;;;;;;;;;;;;;;;;;;;;;;;;	mov rcx, [TXT_OUT_INTERFACE]					
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	lea rdx, [msg_OK]					
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	call [rcx + EFI_OUT_OUTPUTSTRING]
-
-	; Get Memory Map from UEFI and save it [memmap]
-	lea rcx, [memmapsize]					; IN OUT UINTN *MemoryMapSize
-	mov rdx, [memmap]					; OUT EFI_MEMORY_DESCRIPTOR *MemoryMap
-	lea r8, [memmapkey]					; OUT UINTN *MapKey
-	lea r9, [memmapdescsize]				; OUT UINTN *DescriptorSize
-	lea r10, [memmapdescver]				; OUT UINT32 *DescriptorVersion
+	lea rcx, [memmapsize]		;; IN OUT UINTN *MemoryMapSize
+	mov rdx, [memmap]			;; OUT EFI_MEMORY_DESCRIPTOR *MemoryMap
+	lea r8, [memmapkey]			;; OUT UINTN *MapKey
+	lea r9, [memmapdescsize]	;; OUT UINTN *DescriptorSize
+	lea r10, [memmapdescver]	;; OUT UINT32 *DescriptorVersion
 	mov [rsp + 32], r10
 	mov rax, [EFI_BOOT_SERVICES]
 	call [rax + EFI_BOOT_SERVICES_GETMEMORYMAP]
 	cmp al, EFI_BUFFER_TOO_SMALL
-	je get_memmap						; Attempt again as the memmapsize was updated by EFI
+	je .notify_change			;; UEFI ha cambiado memmapsize. Volver a llamar.
+
+	mov rsi, txt_err_memmap		;; Detalle del error, si resulta no se success.
 	cmp rax, EFI_SUCCESS
-	jne exitfailure
+	jne error_fatal
+	jmp exit_uefi_services
+
+.notify_change:
+	mov rdx, msg_notify_memmap_change
+	call print
+	jmp get_memmap
+
 	; Each 48-byte record has the following format:
 	; 0  UINT32 - Type
 	; 4  UNIT32 - Padding
@@ -627,14 +630,37 @@ get_memmap:
 	; 0xE = EfiPersistentMemory
 	; 0xF = EfiMaxMemoryTyp
 
-	;; Importante, ya no uso mas uefi
-	mov rcx, [EFI_IMAGE_HANDLE]	; IN EFI_HANDLE ImageHandle
-	mov rdx, [memmapkey]		; IN UINTN MapKey
+;; TODO: print_memmpap_info, pero aqui no la puedo hacer ya que luego de obtener
+;; mapa de mem, inmediatamente debo hacer el exit.
+	;;mov rdx, 0
+	;;mov rax, [memmapsize]
+	;;mov rcx, [memmapdescsize]
+	;;div rcx
+	;;mov rsi, rax
+	;;mov rsi, 8
+	;;mov rdx, fmt_memmap_cant_descriptors
+	;;mov rdx, msg_test
+	;;all print
+
+exit_uefi_services:
+
+;; TODO: notificar a punto de salir, pero aqui no la puedo hacer ya que luego de obtener
+;; mapa de mem, inmediatamente debo hacer el exit.
+	;;mov rdx, msg_will_exit_uefi_services
+	;;call print
+	;;call prompt_step_mode	;; Ultima parada step usando boot services.
+
+	mov rcx, [EFI_IMAGE_HANDLE]	;; IN EFI_HANDLE ImageHandle
+	mov rdx, [memmapkey]		;; IN UINTN MapKey
 	mov rax, [EFI_BOOT_SERVICES]
 	call [rax + EFI_BOOT_SERVICES_EXITBOOTSERVICES]
 	cmp rax, EFI_SUCCESS
-	jne get_memmap				; Get mem map, then try to exit again.
-	cli	;; Ya afuera.
+	jne get_memmap				;; Get mem map, then try to exit again.
+	cli							;; Ya afuera.
+
+	;; TODO: notificar salida oka, pero aqui no la puedo hacer ya que luego de obtener
+	;; mapa de mem, inmediatamente debo hacer el exit.
+
 
 	;; Payload al destino. Aqui se establece el maximo tamano y por eso cuando a
 	;; rmamos imagen se deberia revisar que no sea mayor. Un posible payload es 
@@ -747,46 +773,6 @@ halt:
 	jmp halt
 
 
-
-
-
-
-
-
-; -----------------------------------------------------------------------------
-; printhex - Display a 64-bit value in hex
-; IN: RBX = Value
-printhex:			 
-	mov rbp, 16						; Counter
-	push rax
-	push rcx
-	push rdx						; 3 pushes also align stack on 16 byte boundary
-								; (8+3*8)=32, 32 evenly divisible by 16
-	sub rsp, 32						; Allocate 32 bytes of shadow space
-printhex_loop:
-	rol rbx, 4
-	mov rax, rbx
-	and rax, 0Fh
-	lea rcx, [Hex]
-	mov rax, [rax + rcx]
-	mov byte [Num], al
-	lea rdx, [Num]
-	mov rcx, [TXT_OUT_INTERFACE]					
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-	dec rbp
-	jnz printhex_loop
-	lea rdx, [newline]
-	mov rcx, [TXT_OUT_INTERFACE]					
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-
-	add rsp, 32
-	pop rdx
-	pop rcx
-	pop rax
-	ret
-;; -----------------------------------------------------------------------------
-
-
 ;;==============================================================================
 ;; print - impresion con cadena de formato (unicamente 1 solo %: %d, %h, %c, %s)
 ;;==============================================================================
@@ -839,7 +825,7 @@ print:
 	lea rax, [print_placeholder + 2 * rdi]
 	push rax
 	push rsi
-	call printhex2
+	call printhex
 	add rsp, 8 * 2
 	add rdi, rax
 	jmp .parse
@@ -885,12 +871,8 @@ print:
 	ret
 
 
-
-
-
-
 ;;==============================================================================
-; printhex2 - Display a 64-bit value in hex
+; printhex - Display a 64-bit value in hex
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
@@ -900,7 +882,7 @@ print:
 ;; Altera unicamente rax, restantes registros los devuelve como los recibe.
 ;;==============================================================================
 
-printhex2:
+printhex:
     push rbp
 	mov rbp, rsp
 
@@ -1221,8 +1203,8 @@ HR:					dq 0	; Horizontal Resolution
 VR:					dq 0	; Vertical Resolution
 PPSL:				dq 0	; PixelsPerScanLine
 BPP:				dq 0		; BitsPerPixel
-memmap:				dq 0x220000	; Store the Memory Map from UEFI here
-memmapsize:			dq 32768	; Max size we are expecting in bytes
+memmap:				dq 0x220000	;; Address donde quedara el mapa de memoria.
+memmapsize:			dq 32768	;; Tamano max del  buffer para memmap [bytes].
 memmapkey:			dq 0
 memmapdescsize:		dq 0
 memmapdescver:		dq 0
@@ -1270,7 +1252,6 @@ db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 
 ;; Boot service para imprimir en pantalla requiere string en utf16.
 msg_uefi_boot:				dw utf16("UEFI boot"), 13, 0xA, 0
-msg_OK:						dw utf16("OK "), 0
 msg_error:					dw utf16("Error"), 0
 msg_badPayloadSignature:	dw utf16("Bad payload signature."), 0
 Hex:						db "0123456789ABCDEF"
@@ -1304,6 +1285,20 @@ msg_step_mode: dw utf16("Step mode active, presione <n> para avanzar"), 13, 0xA,
 msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
 msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
+msg_notify_memmap_change: dw utf16("Memory map buffer size change: will request again."), 13, 0xA, 0
+txt_err_memmap:		dw utf16("get memmap feilure"), 0
+msg_will_exit_uefi_services:		dw utf16("A continuacion hara exit de uefi services"), 13, 0xA, 0
+msg_boot_services_exit_ok:		dw utf16("Exit from uefi services exitoso"), 0
+
+msg_test:	dw utf16("Test"), 13, 0xA, 0
+
+
+fmt_memmap_cant_descriptors:	dw utf16("Uefi returned memmap | Cant descriptors = %d"), 13, 0xA, 0
+
+
+
+
+
 
 msg_acpi_err:		dw utf16("ACPI no encontrado."), 0
 
@@ -1323,7 +1318,7 @@ str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
 
 
 print_placeholder:
-times	32 dw 0x0000
+times	64 dw 0x0000
 
 times 8 * 1024 - ($ - $$)	db 0
 DATA_RUNTIME_END:
