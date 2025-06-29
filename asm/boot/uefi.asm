@@ -427,7 +427,6 @@ edid_validation_fail:
 	jmp locate_gop_protocol
 
 locate_gop_protocol:
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call prompt_step_mode	;; Parada modo step. Antes de cambio de video.
 
 	;; Pedir GOP usando LocateProtocol().
 	mov rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
@@ -644,8 +643,8 @@ get_memmap:
 
 exit_uefi_services:
 
-;; TODO: notificar a punto de salir, pero aqui no la puedo hacer ya que luego de obtener
-;; mapa de mem, inmediatamente debo hacer el exit.
+	;; TODO: notificar a punto de salir, pero aqui no la puedo hacer ya que lueg
+	;; o de obtener mapa de mem, inmediatamente debo hacer el exit.
 	;;mov rdx, msg_will_exit_uefi_services
 	;;call print
 	;;call prompt_step_mode	;; Ultima parada step usando boot services.
@@ -658,31 +657,29 @@ exit_uefi_services:
 	jne get_memmap				;; Get mem map, then try to exit again.
 	cli							;; Ya afuera.
 
-	;; TODO: notificar salida oka, pero aqui no la puedo hacer ya que luego de obtener
-	;; mapa de mem, inmediatamente debo hacer el exit.
+	;; TODO: notificar salida oka, pero aqui no la puedo hacer ya que luego de o
+	;; btener mapa de mem, inmediatamente debo hacer el exit.
 
-
-	;; Payload al destino. Aqui se establece el maximo tamano y por eso cuando a
-	;; rmamos imagen se deberia revisar que no sea mayor. Un posible payload es 
+	;; Payload al destino. Maximo tamano 256KiB y por eso cuando armamos imagen 
+	;; se deberia revisar que no sea mayor. Un posible payload es:
 	;; uefiBootloader.sys + kernel.bin + modulosUserland.bin
 	mov rsi, PAYLOAD
 	mov rdi, 0x8000
-;;;;;;;;;;;;;;;;;;;;;;;;	mov rcx, (60 * 1024)	;; 60KiB a partir de 0x8000
 	mov rcx, (256 * 1024)	;; 256KiB a partir de 0x8000
-	rep movsb				;; Ultimo byte escrito = 0x8000 + (60 * 1024) - 1
+	rep movsb				;; Ultimo byte escrito = 0x8000 + (256 * 1024) - 1
 
 	;; Esta info de video la pasamos a la siguiente etapa de bootloader.
 	mov rdi, 0x00005F00
 	mov rax, [FB]
-	stosq				;; 5F00 + 8 * 0 = 64-bit Frame Buffer Base
+	stosq				;; 5F00 + 8 * 0 = 64-bit Frame Buffer.
 	mov rax, [FB_SIZE]
-	stosq				;; 5F00 + 8 * 1 = 64-bit Frame Buffer Size in bytes
+	stosq				;; 5F00 + 8 * 1 = 64-bit Frame Buffer Size in bytes.
 	mov rax, [HR]
-	stosw				;; 5F00 + 8 * 2 + 2 * 0 = 16-bit Screen X
+	stosw				;; 5F00 + 8 * 2 + 2 * 0 = 16-bit Screen X.
 	mov rax, [VR]
-	stosw				;; 5F00 + 8 * 2 + 2 * 1 = 16-bit Screen Y
+	stosw				;; 5F00 + 8 * 2 + 2 * 1 = 16-bit Screen Y.
 	mov rax, [PPSL]
-	stosw				;; 5F00 + 8 * 2 + 2 * 2 = 16-bit PixelsPerScanLine
+	stosw				;; 5F00 + 8 * 2 + 2 * 2 = 16-bit PixelsPerScanLine.
 	mov rax, 32			;; Hardcodeado, supuestamente uefi siempre 32? Grub mues
 						;; tra que hay modos con 24 seleccionables.
 	stosw				;; 16-bit BitsPerPixel
