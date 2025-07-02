@@ -1104,7 +1104,7 @@ num2strWord:
 
 
 ;;==============================================================================
-;; print - impresion a buffer de video luego de ExitBootSerivces()
+;; print - impresion utf8 a buffer de video luego de ExitBootSerivces()
 ;;==============================================================================
 ;; Argumentos:
 ;; -- rdx = cadena fmt
@@ -1127,18 +1127,24 @@ strcpy16:
 print_flush:
 	mov rax, [FB]
 	mov rdi, [PPSL]
-
-	mov rcx, 'a'
-	lea rsi, [font_data + 8 * rcx]
+	mov r8, 0	;; ix src str.
+	
+.loop_read_string_char:
+	push rax
+	mov rcx, 0
+	mov cl, [msg_test8 + r8]
+	cmp cl, 0
+	je .string_flush_end
+	lea rsi, [font_data + 8 * rcx]	;; rsi p2fontLine
 	mov rdx, 0
-.loop_vertical_line:
+.loop_font_vertical_line:
 	cmp rdx, font_height
 	je .char_flush_end
 	mov rcx, 0
 	mov rbx, 0
 	mov bl, [rsi + rdx]
 
-.loop_horizontal_pixel:
+.loop_font_horizontal_pixel:
 	cmp rcx, 8
 	je .next_line
 	bt rbx, rcx
@@ -1151,17 +1157,27 @@ print_flush:
 	mov dword [rax + 4 * rcx], 0x00FFFFFF
 .nextPixel:
 	inc rcx
-	jmp .loop_horizontal_pixel
+	jmp .loop_font_horizontal_pixel
 
 .next_line:
 	inc rdx
 	lea rax, [rax + 4 * rdi]
-	jmp .loop_vertical_line
+	jmp .loop_font_vertical_line
 
 .char_flush_end:
+	inc r8
+	pop rax
+	lea rax, [rax + 8 * r8]
+	lea rax, [rax + 8 * r8]
+	lea rax, [rax + 8 * r8]
+	lea rax, [rax + 8 * r8]
+	jmp .loop_read_string_char
+
+.string_flush_end:
 	cli
 	hlt
 	ret
+	\
 
 
 times 4 * 1024 - ($ - $$)	db 0	;; Zero padding resto de .text
@@ -1278,7 +1294,7 @@ msg_will_exit_uefi_services:		dw utf16("A continuacion hara exit de uefi service
 msg_boot_services_exit_ok:		dw utf16("Exit from uefi services exitoso"), 0
 
 msg_test:	dw utf16("Test"), 13, 0xA, 0
-
+msg_test8:	db "ab", 0
 
 fmt_memmap_cant_descriptors:	dw utf16("Uefi returned memmap | Cant descriptors = %d"), 13, 0xA, 0
 
