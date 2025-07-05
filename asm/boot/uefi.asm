@@ -716,9 +716,15 @@ exit_uefi_services:
 	rep stosd
 ;;;;;;; verificado que el tamano de pantalla correcto
 
-mov rax, [FB] ;; Inicializacion del cursor.
-mov [print_cursor], rax ;; Inicializacion del cursor.
+mov rax, [FB]
+mov [print_cursor], rax	;; Inicializacion del cursor.
+mov r9, msg_boot_services_exit_ok
+mov rsi, msg_test8
 call print
+
+
+cli
+hlt
 
 
 
@@ -1108,24 +1114,21 @@ num2strWord:
 ;; print - impresion utf8 a buffer de video luego de ExitBootSerivces()
 ;;==============================================================================
 ;; Argumentos:
-;; -- rdx = cadena fmt
+;; -- r9 = cadena fmt
 ;; -- rsi = 2do argumento en caso de haber %.
+;; Retorno:
+;; -- rax = cursor (address fb) siguiente a la ultima posicion escrita.
 ;;
-;; ###########################El comportamiento si la cadena de fmt tiene % huerfano (no hay ninguna de las
-;; ###########################siguientes a continuacion: d, h, c, s) es: ignora el % y sigue imprimiendo. S
-;; ###########################i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
-;; ###########################unico que recibe en rsi).
+;; El comportamiento si la cadena de fmt tiene % huerfano (no hay ninguna de las
+;; siguientes a continuacion: d, h, c, s) es: ignora el % y sigue imprimiendo. S
+;; i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
+;; unico que recibe en rsi).
+;;
+;; El cursor para esta funcion, es la direccion del pixel superior izquierdo del
+;; bounding box del caracter de la fuente.
 ;;==============================================================================
 
 print:
-	;;call strcpy16
-	call print_flush
-	ret
-
-;;strcpy16:
-;;	ret
-
-print_flush:
 	mov rax, [print_cursor]
 	mov rdi, [PPSL]
 	mov r8, 0	;; ix src str.
@@ -1135,7 +1138,7 @@ print_flush:
 				;; nzar imprimir.
 	mov rcx, 0	;; Blanqueo de parte alta para uso en resolucion de addrress en 
 				;; .print_next_font.
-	mov cl, [msg_boot_services_exit_ok + r8]
+	mov cl, [r9 + r8]
 	cmp cl, 0
 	je .string_flush_end
 
@@ -1146,8 +1149,8 @@ print_flush:
 	je .check_nextchar_s
 
 .print_next_font:
-	lea rsi, [font_data + 8 * rcx]	;; rsi p2fontLine 16px chars.
-	lea rsi, [rsi + 8 * rcx]
+	lea r10, [font_data + 8 * rcx]	;; r10 p2fontLine 16px chars.
+	lea r10, [r10 + 8 * rcx]
 	mov rdx, 0
 
 .loop_font_vertical_line:
@@ -1155,7 +1158,7 @@ print_flush:
 	je .char_flush_end
 	mov rcx, 0
 	mov rbx, 0
-	mov bl, [rsi + rdx]
+	mov bl, [r10 + rdx]
 
 .loop_font_horizontal_pixel:
 	cmp rcx, 8
@@ -1167,7 +1170,7 @@ print_flush:
 	mov dword [rax + 4 * rcx], 0x00000000
 	jmp .nextPixel
 .setPixel:
-	mov dword [rax + 4 * rcx], 0x00FFFFFF
+	mov dword [rax + 4 * rcx], 0x00E0E0E0
 .nextPixel:
 	inc rcx
 	jmp .loop_font_horizontal_pixel
@@ -1178,10 +1181,10 @@ print_flush:
 	jmp .loop_font_vertical_line
 
 .char_flush_end:
-	pop rax
-	add rax, 32	;; rax += 8px * 4bytes/px
+	add qword [rsp], 32	;; rax += 8px * 4bytes/px
 
 .avance_next_char:
+	pop rax
 	inc r8
 	jmp .loop_read_string_char
 
@@ -1198,16 +1201,32 @@ print_flush:
 	mov rax, 4 * 16		;; Bajar 16px.
 	mov rdx, 0
 	mul rbx				;; rax = offset_bytes
-	pop rbx
-	lea rax, [rbx + rax]	
+	add [rsp], rax
 	jmp .avance_next_char
 
 .check_nextchar_s:
+	mov cl, [r9 + r8 + 1]
+	cmp cl, 's'
+	jne .avance_next_char
 
+	inc r8
+	mov [print_cursor], rax	;; Update cursor to current position.
+
+	push rdi
+	push r8
+	push r9
+	mov r9, msg_test8
+	call print
+	pop r9
+	pop r8
+	pop rdi
+
+	mov [rsp], rax			;; Actualiza cursor.
+	jmp .avance_next_char
 
 .string_flush_end:
-	cli
-	hlt
+	add rsp, 8				;; Quita push de rax q se hace para cada caracter.
+	mov [print_cursor], rax	;; Update cursor to current position.
 	ret
 
 
@@ -1236,7 +1255,8 @@ FB:					dq 0	; Frame buffer base address
 FB_SIZE:			dq 0	; Frame buffer size
 HR:					dq 0	; Horizontal Resolution
 VR:					dq 0	; Vertical Resolution
-PPSL:				dq 0	; PixelsPerScanLine
+PPSL:				dq 0	; PixelsPerScanLinemsg_boot_services_exit_ok:		db "Exit from UE%FI se", 0x0A, "rvices exit%soso.", 0
+
 BPP:				dq 0		; BitsPerPixel
 memmap:				dq 0x220000	;; Address donde quedara el mapa de memoria.
 memmapsize:			dq 32768	;; Tamano max del  buffer para memmap [bytes].
@@ -1323,8 +1343,8 @@ msg_notify_memmap_change: dw utf16("Memory map buffer size change: will request 
 txt_err_memmap:		dw utf16("get memmap feilure"), 0
 msg_will_exit_uefi_services:		dw utf16("A continuacion hara exit de uefi services"), 13, 0xA, 0
 
-msg_test:	dw utf16("Test"), 13, 0xA, 0
-msg_test8:	db "ab", 0
+msg_test16:	dw utf16("Test"), 13, 0xA, 0
+msg_test8:	db "Test", 0
 
 fmt_memmap_cant_descriptors:	dw utf16("Uefi returned memmap | Cant descriptors = %d"), 13, 0xA, 0
 
@@ -1348,8 +1368,7 @@ str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
 
 ;; UTF8 strings para bootloader.
 ____msg_boot_services_exit_ok:		db "Exit from UEFI services exitoso.", 0
-msg_boot_services_exit_ok:		db "Exit from UEFI se", 0x0A, "rvices exitoso.", 0
-
+msg_boot_services_exit_ok:		db "Exit from UE%FI se", 0x0A, "rvices exit%soso_1234567890.", 0
 
 
 
