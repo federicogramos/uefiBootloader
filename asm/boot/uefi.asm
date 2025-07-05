@@ -34,7 +34,7 @@ HEADER:
 
 ;; Header DOS, 128 bytes.
 DOS_SIGNATURE:			db "MZ", 0x00, 0x00
-DOS_HDRS:			times 60-($-HEADER) db 0
+DOS_HDRS:				times 60-($-HEADER) db 0
 PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - START	;; File offset.
 DOS_STUB:				times 64 db 0			;; No program, zero fill.
 
@@ -42,8 +42,8 @@ DOS_STUB:				times 64 db 0			;; No program, zero fill.
 PE_SIGNATURE:			db "PE", 0x00, 0x00
 
 ;; COFF File Header, 20 bytes.
-MACHINE_TYPE:			dw 0x8664	;; x86-64 machine.
-N_SECTIONS:				dw 2		;; Number of entries in section table. Secti
+MACHINE_TYPE:		dw 0x8664		;; x86-64 machine.
+N_SECTIONS:			dw 2			;; Number of entries in section table. Secti
 									;; on table immediately follows the headers.
 TIMESTAMP:			dd 1745097600	;; File creation, seconds since 1970.
 SYM_TAB_P2:			dd 0			;; File offset of the COFF symbol table, zer
@@ -68,9 +68,9 @@ CHARACTERISTICS:	dw 0x222E		;; Attributes of the file.
 
 ;; Optional Header Standard Fields
 OPT_HDR:
-MAGIC_NUMBER:			dw 0x020B ;; PE32+ (64-bit address space) PE format.
-MAJOR_LINKER_VERSION:	db 0
-MINOR_LINKER_VERSION:	db 0
+MAGIC_NUMBER:				dw 0x020B ;; PE32+ (64-bit address space) PE format.
+MAJOR_LINKER_VERSION:		db 0
+MINOR_LINKER_VERSION:		db 0
 CODE_SIZE:					dd CODE_END - CODE	;; Text.
 INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
 UNINITIALIZED_DATA_SIZE:	dd 0x00				;; Bss.
@@ -115,10 +115,10 @@ OPT_HDR_END:
 ;; Section Table (Section Headers)
 SECTION_HDRS:
 SECTION_CODE:
-.name					db ".text", 0x00, 0x00, 0x00
-.virtual_size			dd CODE_END - CODE
-.virtual_address		dd CODE - START
-.size_of_raw_data		dd CODE_END - CODE
+.name						db ".text", 0x00, 0x00, 0x00
+.virtual_size				dd CODE_END - CODE
+.virtual_address			dd CODE - START
+.size_of_raw_data			dd CODE_END - CODE
 .pointer_to_raw_data		dd CODE - START
 .pointer_to_relocations		dd 0
 .pointer_to_line_numbers	dd 0
@@ -447,9 +447,9 @@ locate_gop_protocol:
 	;; 32 UINTN - FrameBufferSize
     mov rax, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
-	mov rcx, [rcx]		;; RCX holds the address of the Mode structure
-	mov eax, [rcx]		;; EAX holds UINT32 MaxMode
-	mov [vid_max], rax	;; The maximum video modes we can check
+	mov rcx, [rcx]				;; RCX holds the address of the Mode structure.
+	mov eax, [rcx]				;; EAX holds UINT32 MaxMode
+	mov [vid_max], rax			;; The maximum video modes we can check
 	jmp .video_mode_busca
 
 .next:
@@ -487,7 +487,13 @@ locate_gop_protocol:
 	mov rdx, msg_graphics_mode_info_match
 	call efi_print
 
-	call prompt_step_mode	;; Ultima parada antes de que se borre pantalla.
+	call prompt_step_mode		;; Ultima parada antes de que se borre pantalla.
+
+
+;; Buscar info pantalla actual (modo 0), de modo de ya tener config video falle 
+;; o no el intento de cambio.
+
+;; Borrar pantalla.
 
 .video_mode_set:
 	mov rcx, [VIDEO_INTERFACE]	;; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
@@ -522,7 +528,7 @@ skip_set_video:
 ;; a video, se tiene que poder continuar viendo salida.
 get_video:
 
-	;; Gather video mode details.
+	;; Get video mode details.
 	mov rcx, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
 	mov rcx, [rcx]
@@ -551,8 +557,8 @@ get_video:
 	mov eax, [rcx + 32]	;; PixelsPerScanLine
 	mov [PPSL], rax
 
-	;; Info en pantalla de el modo seleccionado y valores que quedaron. Estos so
-	;; n los seteos que le va a pasar al siguiente bootloader y SO.
+	;; Info en pantalla del modo seleccionado y valores que quedaron. Estos son
+	;; los seteos que le va a pasar al siguiente bootloader y SO.
 	mov rsi, [HR]
 	mov rdx, fmt_resolution_horizontal
 	call efi_print
@@ -641,10 +647,19 @@ get_memmap:
 
 exit_uefi_services:
 
-	;; TODO: notificar a punto de salir, pero aqui no la puedo hacer ya que lueg
+	;; Empiezo a imprimir.
+	mov rdi, [FB]
+	mov eax, 0x00000000					; 0x00RRGGBB
+	mov rcx, [FB_SIZE];;;;;;;;;; frame buffer size
+	shr rcx, 2						; Quick divide by 4 (32-bit colour)
+	;;rep stosd
+
+	;; Notificar a punto de salir, pero aqui no la puedo hacer ya que lueg
 	;; o de obtener mapa de mem, inmediatamente debo hacer el exit.
-	;;mov rdx, msg_will_exit_uefi_services
-	;;call print
+	mov rax, [FB]
+	mov [print_cursor], rax	;; Inicializacion del cursor.
+	mov r9, msg_boot_services_exit
+	call print
 	;;call prompt_step_mode	;; Ultima parada step usando boot services.
 
 	mov rcx, [EFI_IMAGE_HANDLE]	;; IN EFI_HANDLE ImageHandle
@@ -654,10 +669,6 @@ exit_uefi_services:
 	cmp rax, EFI_SUCCESS
 	jne get_memmap				;; Get mem map, then try to exit again.
 	cli							;; Ya afuera.
-
-	;; TODO: notificar salida oka, pero aqui no la puedo hacer ya que luego de o
-	;; btener mapa de mem, inmediatamente debo hacer el exit.
-
 
 	;; Payload al destino. Maximo tamano 256KiB y por eso cuando armamos imagen 
 	;; se deberia revisar que no sea mayor. Un posible payload es:
@@ -708,18 +719,8 @@ exit_uefi_services:
 	rep stosq
 
 
-	;; Hacer un clear del screen.
-	mov rdi, [FB]
-	mov eax, 0x00000000					; 0x00RRGGBB
-	mov rcx, [FB_SIZE];;;;;;;;;; frame buffer size
-	shr rcx, 2						; Quick divide by 4 (32-bit colour)
-	rep stosd
-;;;;;;; verificado que el tamano de pantalla correcto
 
-mov rax, [FB]
-mov [print_cursor], rax	;; Inicializacion del cursor.
 mov r9, msg_boot_services_exit_ok
-mov rsi, msg_test8
 call print
 
 
@@ -1055,61 +1056,6 @@ division_init:
 	ret
 
 
-
-;;==============================================================================
-;; num2strWord - convierte un entero en un string null terminated
-;;==============================================================================
-;; Argumentos:
-;; -- placeholder por stack, 1er push.
-;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
-;; Retorno:
-;; -- los caracteres ASCII (1 char = word) en rbx puntero al comienzo dentro del
-;;    placeholder
-;;==============================================================================
-
-num2strWord:
-    push rbp
-	mov rbp, rsp
-
-	push rax
-	push rcx
-	push rdx	
-
-	mov rcx, 10
-	mov rdx, 0  			;; En cero la parte mas significativa.
-	mov rax, [rbp + 8 * 2]  ;; Cargo el numero a convertir.
-	mov rbx, [rbp + 8 * 3]
-    push word 0
-
-.calcular:
-	div ecx
-	or dl, 0x30	;; Convierto el resto  menor a 10 a ASCII.
-	push dx  
-	cmp al, 0
-	jz .write
-	mov rdx, 0
-	jmp .calcular
-
-.write:
-    pop word [rbx]
-    cmp word [rbx], 0
-    jne .avanza
-    jmp .end
-    
-.avanza:
-    add rbx, 2
-    jmp .write
-    
-.end:
-	pop rdx
-	pop rcx
-	pop rax
-
-	mov rsp, rbp
-	pop rbp	 
-	ret
-
-
 ;;==============================================================================
 ;; print - impresion utf8 a buffer de video luego de ExitBootSerivces()
 ;;==============================================================================
@@ -1341,7 +1287,6 @@ msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
 msg_notify_memmap_change: dw utf16("Memory map buffer size change: will request again."), 13, 0xA, 0
 txt_err_memmap:		dw utf16("get memmap feilure"), 0
-msg_will_exit_uefi_services:		dw utf16("A continuacion hara exit de uefi services"), 13, 0xA, 0
 
 msg_test16:	dw utf16("Test"), 13, 0xA, 0
 msg_test8:	db "Test", 0
@@ -1367,8 +1312,8 @@ fmt_edid_protocol_located:		dw utf16("EDID protocol found = %s"), 13, 0xA, 0
 str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
 
 ;; UTF8 strings para bootloader.
-____msg_boot_services_exit_ok:		db "Exit from UEFI services exitoso.", 0
-msg_boot_services_exit_ok:		db "Exit from UE%FI se", 0x0A, "rvices exit%soso_1234567890.", 0
+msg_boot_services_exit:		db "ExitBootSerivces()...", 0x0A, 0
+msg_boot_services_exit_ok:		db "Exit from UEFI services OK (ret val = EFI_SUCCESS).", 0x0A, 0
 
 
 
@@ -1477,7 +1422,7 @@ font_data:
 	dd 0x01010000, 0x04040202, 0x10100808, 0x40402020 ;; 0x5c backslash
 	dd 0x101C0000, 0x10101010, 0x10101010, 0x1C101010 ;; 0x5d bracketright
 	dd 0x24180000, 0x00008142, 0x00000000, 0x00000000 ;; 0x5e asciicircum
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x5f underscore
+	dd 0x00000000, 0x00000000, 0x00000000, 0xFF000000 ;; 0x5f underscore
 	dd 0x10080400, 0x00000000, 0x00000000, 0x00000000 ;; 0x60 grave
 	dd 0x00000000, 0x40423C00, 0x4141417E, 0x00005E61 ;; 0x61 a
 	dd 0x01010000, 0x41231D01, 0x41414141, 0x00001D23 ;; 0x62 b
