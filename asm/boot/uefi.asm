@@ -716,7 +716,8 @@ exit_uefi_services:
 	rep stosd
 ;;;;;;; verificado que el tamano de pantalla correcto
 
-
+mov rax, [FB] ;; Inicializacion del cursor.
+mov [print_cursor], rax ;; Inicializacion del cursor.
 call print
 
 
@@ -1117,30 +1118,38 @@ num2strWord:
 ;;==============================================================================
 
 print:
-	call strcpy16
+	;;call strcpy16
 	call print_flush
 	ret
 
-strcpy16:
-	ret
+;;strcpy16:
+;;	ret
 
 print_flush:
-	mov rax, [FB]
+	mov rax, [print_cursor]
 	mov rdi, [PPSL]
 	mov r8, 0	;; ix src str.
 	
 .loop_read_string_char:
 	push rax	;; FB cursor, apunta a inicio de char (pixel exactamente) a come
 				;; nzar imprimir.
-	mov rcx, 0	;; Avance cursor.
+	mov rcx, 0	;; Blanqueo de parte alta para uso en resolucion de addrress en 
+				;; .print_next_font.
 	mov cl, [msg_boot_services_exit_ok + r8]
 	cmp cl, 0
 	je .string_flush_end
+
+	cmp cl, 0x0A
+	je .linefeed
+
+	cmp cl, '%'
+	je .check_nextchar_s
+
+.print_next_font:
 	lea rsi, [font_data + 8 * rcx]	;; rsi p2fontLine 16px chars.
 	lea rsi, [rsi + 8 * rcx]
-	;;lea rsi, [font_data + 16 * 0x41]
-	;;lea rsi, [font_data]
 	mov rdx, 0
+
 .loop_font_vertical_line:
 	cmp rdx, font_height
 	je .char_flush_end
@@ -1169,13 +1178,32 @@ print_flush:
 	jmp .loop_font_vertical_line
 
 .char_flush_end:
-	inc r8
 	pop rax
 	add rax, 32	;; rax += 8px * 4bytes/px
-	;;lea rax, [rax + 8]	;; rax += 8px * 4bytes/px
-	;;lea rax, [rax + 8]	;; rax += 8px * 4bytes/px
-	;;lea rax, [rax + 8]	;; rax += 8px * 4bytes/px
+
+.avance_next_char:
+	inc r8
 	jmp .loop_read_string_char
+
+.linefeed:
+	mov rdx, 0			;; rdx:rax = 0:rax
+	sub rax, [FB]
+	mov rbx, [PPSL]
+	lea rbx, [4 * rbx]	;; 4b/px * ppsl
+	div rbx				;; rdx = offset desde comienzo de linea.
+
+	sub [rsp], rdx		;; Carriage return.
+
+	mov rbx, [PPSL]
+	mov rax, 4 * 16		;; Bajar 16px.
+	mov rdx, 0
+	mul rbx				;; rax = offset_bytes
+	pop rbx
+	lea rax, [rbx + rax]	
+	jmp .avance_next_char
+
+.check_nextchar_s:
+
 
 .string_flush_end:
 	cli
@@ -1319,12 +1347,16 @@ fmt_edid_protocol_located:		dw utf16("EDID protocol found = %s"), 13, 0xA, 0
 str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
 
 ;; UTF8 strings para bootloader.
-msg_boot_services_exit_ok:		db "Exit from UEFI services exitoso.", 0
+____msg_boot_services_exit_ok:		db "Exit from UEFI services exitoso.", 0
+msg_boot_services_exit_ok:		db "Exit from UEFI se", 0x0A, "rvices exitoso.", 0
+
 
 
 
 efi_print_placeholder:
 times	64 dw 0x0000
+
+print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
 
 font_height	equ 16
 font_data:
