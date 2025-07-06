@@ -447,9 +447,9 @@ locate_gop_protocol:
 	;; 32 UINTN - FrameBufferSize
     mov rax, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
-	mov rcx, [rcx]				;; RCX holds the address of the Mode structure.
-	mov eax, [rcx]				;; EAX holds UINT32 MaxMode
-	mov [vid_max], rax			;; The maximum video modes we can check
+	mov rcx, [rcx]				;; rcx = address of mode structure.
+	mov eax, [rcx]				;; eax = uint32_t MaxMode
+	mov [vid_max], rax			;; Max video modes.
 	jmp .video_mode_busca
 
 .next:
@@ -487,13 +487,8 @@ locate_gop_protocol:
 	mov rdx, msg_graphics_mode_info_match
 	call efi_print
 
-	call prompt_step_mode		;; Ultima parada antes de que se borre pantalla.
-
-
-;; Buscar info pantalla actual (modo 0), de modo de ya tener config video falle 
-;; o no el intento de cambio.
-
-;; Borrar pantalla.
+	call prompt_step_mode	;; Ultima parada antes de que se borre pantalla y se
+							;; pase a usar framebuffer directo.
 
 .video_mode_set:
 	mov rcx, [VIDEO_INTERFACE]	;; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
@@ -502,43 +497,66 @@ locate_gop_protocol:
 	cmp rax, EFI_SUCCESS
 	jne .next
 
+
 ;; Se acaba de resetear el buffer de video, se blanquea la pantalla. Antes se ve
 ;; ia baja resolucion, ahora se setea la nueva seleccionada resolucion. Voy a vo
 ;; lver a mostrar en pantalla los datos de resolucion configurados.
+;; Buscar info pantalla actual (modo 0), de modo de ya tener config video falle 
+;; o no el intento de cambio.
+
+	;;mov rax, 0x00000000
+	;;call memsetFramebuffer	;; Se asegura de borrar los mensajes anteriores en c
+							;; aso de no lograr cambiar de modo.
 
 .video_mode_success:
 
 	;; SIMPLE_TEXT_OUTPUT.ClearScreen(). Clears display. Cursor position (0, 0).
-	mov rcx, [TXT_OUT_INTERFACE]	
-	call [rcx + EFI_OUT_CLEAR_SCREEN]
+	;;mov rcx, [TXT_OUT_INTERFACE]	
+	;;call [rcx + EFI_OUT_CLEAR_SCREEN]
 
+	mov rax, 0x00000000
+	call memsetFramebuffer
+
+	;;mov rsi, [vid_index]
+	;;mov rdx, msg_graphics_success
+	;;call efi_print
+
+	;;mov rax, [FB]
+	;;mov [print_cursor], rax	;; Inicializacion del cursor.
+	;;mov r9, msg_graphics_success
+	;;mov rsi, [vid_index]
+	;;call print
+
+	mov qword [print_pending_msg], msg_graphics_success
 	mov rsi, [vid_index]
-	mov rdx, msg_graphics_success
-	call efi_print
+	mov [print_pending_msg + 8], rsi
 	jmp get_video
 
 ;; Ha probado todos los modos y no encuentra match ni con un EDID encontrado, ni
 ;; con la resolucion por defecto. Lo que hace es no cambiar el actual modo.
 skip_set_video:
-	mov rdx, msg_gop_no_mode_matches
-	call efi_print
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov rdx, msg_gop_no_mode_matches
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call efi_print
+
+	mov qword [print_pending_msg], msg_gop_no_mode_matches
 
 ;; Haya encontrado match en un video mode y logrado setearlo, o no, continua. us
 ;; a la resolucion que actualmente tiene seteada, por lo que si al arranque teni
-;; a video, se tiene que poder continuar viendo salida.
+;; a video, se tiene que poder continuar viendo salida. 
 get_video:
 
-	;; Get video mode details.
+	;; Get video mode details. https://github.com/tianocore/edk2/blob/master/Mde
+	;; Pkg/Include/Protocol/GraphicsOutput.h
 	mov rcx, [VIDEO_INTERFACE]
 	add rcx, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE
 	mov rcx, [rcx]
-	mov rax, [rcx + 24]	;; FBuff base.
+	mov rax, [rcx + 24]	;; EFI_PHYSICAL_ADDRESS FrameBufferBase
 	mov [FB], rax
-	mov rax, [rcx + 32]	;; FBuff size.
-	mov [FB_SIZE], rax	;; FBuff size. No necesariamente es igual a w x h x bpp 
-						;; porque podria ser mas. Ejemplo: 800 x 600 = 1920000 p
-						;; ero el fbzise podria ser 1921024 (no multiplo de 2).
-	mov rcx, [rcx + 8]	;; Addr of EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Struct.
+	mov rax, [rcx + 32]	;; UINTN FrameBufferSize
+	mov [FB_SIZE], rax	;; FB size. No necesariamente es igual a w x h x bpp por
+						;; que podria ser mas. Ejemplo: 800 x 600 = 1920000 pero
+						;; el fbzise podria ser 1921024 (no multiplo de 2).
+	mov rcx, [rcx + 8]	;; EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info
 
 	;; EFI_GRAPHICS_OUTPUT_MODE_INFORMATION Structure
 	;; 0  UINT32 - Version
@@ -557,25 +575,54 @@ get_video:
 	mov eax, [rcx + 32]	;; PixelsPerScanLine
 	mov [PPSL], rax
 
+	mov rax, [FB]
+	mov [print_cursor], rax	;; Inicializacion del cursor.
+	cmp qword [print_pending_msg], 0
+	je print_video_information
+	mov r9, [print_pending_msg]
+	mov rsi, [print_pending_msg + 8]
+	mov qword [print_pending_msg], 0
+	mov qword [print_pending_msg + 8], 0
+	call print
+
+
 	;; Info en pantalla del modo seleccionado y valores que quedaron. Estos son
 	;; los seteos que le va a pasar al siguiente bootloader y SO.
-	mov rsi, [HR]
-	mov rdx, fmt_resolution_horizontal
-	call efi_print
-	mov rsi, [VR]
-	mov rdx, fmt_resolution_vertical
-	call efi_print
-	mov rsi, [PPSL]
-	mov rdx, fmt_ppsl
-	call efi_print
-	mov rsi, [FB_SIZE]
-	mov rdx, fmt_fb_size
-	call efi_print
-	mov rsi, [FB]
-	mov rdx, fmt_fb_address
-	call efi_print
+print_video_information:
+	;;mov rsi, [HR]
+	;;mov rdx, fmt_resolution_horizontal
+	;;call efi_print
+	;;mov rsi, [VR]
+	;;mov rdx, fmt_resolution_vertical
+	;;call efi_print
+	;;mov rsi, [PPSL]
+	;;mov rdx, fmt_ppsl
+	;;call efi_print
+	;;mov rsi, [FB_SIZE]
+	;;mov rdx, fmt_fb_size
+	;;call efi_print
+	;;mov rsi, [FB]
+	;;mov rdx, fmt_fb_address
+	;;call efi_print
 
-	call prompt_step_mode	;; Parada modo step.
+	mov rsi, [HR]
+	mov r9, fmt_resolution_horizontal
+	call print
+	mov rsi, [VR]
+	mov r9, fmt_resolution_vertical
+	call print
+	mov rsi, [PPSL]
+	mov r9, fmt_ppsl
+	call print
+	mov rsi, [FB_SIZE]
+	mov r9, fmt_fb_size
+	call print
+	mov rsi, [FB]
+	mov r9, fmt_fb_address
+	call print
+
+
+	;;call prompt_step_mode	;; Parada modo step.
 
 verifica_payload:
 	mov rsi, PAYLOAD + 6
@@ -598,12 +645,12 @@ get_memmap:
 
 	mov rsi, txt_err_memmap		;; Detalle del error, si resulta no se success.
 	cmp rax, EFI_SUCCESS
-	jne error_fatal
+	jne error_fatal8
 	jmp exit_uefi_services
 
 .notify_change:
-	mov rdx, msg_notify_memmap_change
-	call efi_print
+	mov r9, msg_notify_memmap_change
+	call print
 	jmp get_memmap
 
 ;; Each 48-byte EFI_MEMORY_DESCRIPTOR record has the following format:
@@ -647,20 +694,16 @@ get_memmap:
 
 exit_uefi_services:
 
-	;; Empiezo a imprimir.
-	mov rdi, [FB]
-	mov eax, 0x00000000					; 0x00RRGGBB
-	mov rcx, [FB_SIZE];;;;;;;;;; frame buffer size
-	shr rcx, 2						; Quick divide by 4 (32-bit colour)
-	;;rep stosd
+	;;mov rax, 0x00000000
+	;;call memsetFramebuffer
 
 	;; Notificar a punto de salir, pero aqui no la puedo hacer ya que lueg
 	;; o de obtener mapa de mem, inmediatamente debo hacer el exit.
-	mov rax, [FB]
-	mov [print_cursor], rax	;; Inicializacion del cursor.
+	;;mov rax, [FB]
+	;;mov [print_cursor], rax	;; Inicializacion del cursor.
 	mov r9, msg_boot_services_exit
 	call print
-	;;call prompt_step_mode	;; Ultima parada step usando boot services.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;call prompt_step_mode	;; Ultima parada step usando boot services.
 
 	mov rcx, [EFI_IMAGE_HANDLE]	;; IN EFI_HANDLE ImageHandle
 	mov rdx, [memmapkey]		;; IN UINTN MapKey
@@ -719,13 +762,12 @@ exit_uefi_services:
 	rep stosq
 
 
-
+;; TODO: poleo para poder promptear ahora que hemos salido de bootservices.
 mov r9, msg_boot_services_exit_ok
 call print
-
-
-cli
-hlt
+;;call prompt_step_mode	;; Ultima parada antes de ir al bootloader.
+call emptyKbBuffer
+call getKey
 
 
 
@@ -752,28 +794,25 @@ hlt
 	jmp 0x8000	;; Vamos a siguiente loader. Aprox 0x400702
 
 
-
-exitfailure:
-	; Set screen to red on exit failure
-	mov rdi, [FB]
-	mov eax, 0x00FF0000					; 0x00RRGGBB
-	mov rcx, [FB_SIZE]
-	shr rcx, 2						; Quick divide by 4 (32-bit colour)
-	rep stosd
-
+;; Podria setearse el fondo de color, o el texto.
 error_fatal:
 	mov rdx, fmt_err_fatal
+	call efi_print
+	jmp .halt
+.halt:
+	cli
+	hlt
+	jmp .halt
+
+error_fatal8:
+	mov r9, fmt_err_fatal8
 	call efi_print
 .halt:
 	cli
 	hlt
 	jmp .halt
 
-error:
-	mov rcx, [TXT_OUT_INTERFACE]					
-	lea rdx, [msg_error]					
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-	jmp halt
+
 payloadSignatureFail:
 	mov rcx, [TXT_OUT_INTERFACE]					
 	lea rdx, [msg_badPayloadSignature]					
@@ -822,17 +861,17 @@ efi_print:
 
 .integer:
 	inc rcx
-	lea rax, [efi_print_placeholder + 2 * rdi]
+	lea rax, [volatile_placeholder + 2 * rdi]
 	push rax
 	push rsi
-	call num2strWord2
+	call num2strWord
 	add rsp, 8 * 2
 	add rdi, rax
 	jmp .parse
 
 .hexadecimal:
 	inc rcx
-	lea rax, [efi_print_placeholder + 2 * rdi]
+	lea rax, [volatile_placeholder + 2 * rdi]
 	push rax
 	push rsi
 	call printhex
@@ -858,21 +897,21 @@ efi_print:
 	cmp rax, [rbp - 8]
 	je .parse
 	mov bx, [rsi + 2 * rax]
-	mov [efi_print_placeholder + 2 * rdi], bx
+	mov [volatile_placeholder + 2 * rdi], bx
 	inc rax
 	inc rdi
 	jmp .str_copy
 
 .copyChar:
 	push word [rdx + 2 * rcx]
-	pop word [efi_print_placeholder + 2 * rdi]
+	pop word [volatile_placeholder + 2 * rdi]
 	inc rcx
 	inc rdi
 	jmp .parse
 
 .end_placeholder:
-	mov word [efi_print_placeholder + 2 * rdi], 0x0000
-	mov rdx, efi_print_placeholder
+	mov word [volatile_placeholder + 2 * rdi], 0x0000
+	mov rdx, volatile_placeholder
 	mov rcx, [TXT_OUT_INTERFACE]	
 	call [rcx + EFI_OUT_OUTPUTSTRING]
 
@@ -927,6 +966,59 @@ printhex:
 
 .end:
 	add rsp, 2	;; El cero que marcaba fin, elimino para popear regs.
+	pop rdx
+	pop rcx
+
+	mov rsp, rbp
+	pop rbp	 
+	ret
+
+
+;;==============================================================================
+; num2hexStr - escribe el hexadecimal de un nro, dentro de un placeholder utf8
+;;==============================================================================
+;; Argumentos:
+;; -- placeholder por stack, 1er push.
+;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
+;; Retorno:
+;; -- rax = cantidad de caracteres escritos.
+;; Altera unicamente rax, restantes registros los devuelve como los recibe.
+;;==============================================================================
+
+num2hexStr:
+    push rbp
+	mov rbp, rsp
+
+	push rcx
+	push rdx	
+
+.division_init:
+	mov rcx, 16
+	mov rdx, 0  			;; En cero la parte mas significativa del acum.
+	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
+    push qword 0			;; Marca para dejar de popear durante write.
+
+.division:
+	div rcx
+	push qword [hexConvert8 + rdx]  
+	cmp rax, 0
+	jz .write_init
+	mov rdx, 0
+	jmp .division
+
+.write_init:
+	mov rax, 0				;; Contara chars copiados para valor de retorno.
+	mov rcx, [rbp + 8 * 3]	;; Placeholder.
+
+.write:
+    pop rdx
+	mov [rcx + rax], rdx
+	cmp rdx, 0
+	je .end
+	inc rax
+    jmp .write
+
+.end:
 	pop rdx
 	pop rcx
 
@@ -1003,7 +1095,7 @@ prompt_step_mode:
 
 
 ;;==============================================================================
-;; num2strWord2 - convierte un entero en un string no null terminated
+;; num2strWord - convierte un entero en un string no null terminated
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
@@ -1013,7 +1105,7 @@ prompt_step_mode:
 ;; Altera unicamente rax, restantes registros los devuelve como los recibe.
 ;;==============================================================================
 
-num2strWord2:
+num2strWord:
     push rbp
 	mov rbp, rsp
 
@@ -1056,6 +1148,63 @@ division_init:
 	ret
 
 
+
+
+;;==============================================================================
+;; num2str - convierte un entero en un string null terminated
+;;==============================================================================
+;; Argumentos:
+;; -- placeholder por stack, 1er push.
+;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
+;; Retorno:
+;; -- rax = cantidad de caracteres escritos.
+;; Altera unicamente rax, restantes registros los devuelve como los recibe.
+;;==============================================================================
+
+num2str:
+    push rbp
+	mov rbp, rsp
+
+	push rcx
+	push rdx	
+
+.division_init:
+	mov rcx, 10
+	mov rdx, 0  			;; En cero la parte mas significativa del acum.
+	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
+    push qword 0				;; Marca para dejar de popear durante write.
+
+.division:
+	div rcx
+	or dl, 0x30				;; Convierto el resto  menor a 10 a ASCII.
+	push rdx  
+	cmp rax, 0
+	jz .write_init
+	mov rdx, 0
+	jmp .division
+
+.write_init:
+	mov rax, 0				;; Contara chars copiados para valor de retorno.
+	mov rcx, [rbp + 8 * 3]	;; Placeholder.
+
+.write:
+    pop rdx
+	mov [rcx + rax], dl
+	cmp rdx, 0
+	je .end
+	inc rax
+    jmp .write
+
+.end:
+	;;add rsp, 8	;; El cero que marcaba fin, elimino para popear regs.
+	pop rdx
+	pop rcx
+
+	mov rsp, rbp
+	pop rbp	 
+	ret
+
+
 ;;==============================================================================
 ;; print - impresion utf8 a buffer de video luego de ExitBootSerivces()
 ;;==============================================================================
@@ -1090,10 +1239,21 @@ print:
 
 	cmp cl, 0x0A
 	je .linefeed
-
 	cmp cl, '%'
-	je .check_nextchar_s
+	jne .print_next_font
+	inc r8
+	mov cl, [r9 + r8]
+	mov [print_cursor], rax	;; Update cursor to current position.
 
+	cmp cl, 'd'
+	je .integer
+	cmp cl, 'h'
+	je .hexadecimal
+	cmp cl, 'c'
+	je .character
+	cmp cl, 's'
+	je .string
+		
 .print_next_font:
 	lea r10, [font_data + 8 * rcx]	;; r10 p2fontLine 16px chars.
 	lea r10, [r10 + 8 * rcx]
@@ -1150,14 +1310,45 @@ print:
 	add [rsp], rax
 	jmp .avance_next_char
 
-.check_nextchar_s:
-	mov cl, [r9 + r8 + 1]
-	cmp cl, 's'
-	jne .avance_next_char
+.integer:
+	push rdi
+	push r8
+	push r9
+	
+	push volatile_placeholder
+	push rsi
+	call num2str
+	add rsp, 8 * 2
+	mov r9, volatile_placeholder
+	call print
+	pop r9
+	pop r8
+	pop rdi
 
-	inc r8
-	mov [print_cursor], rax	;; Update cursor to current position.
+	mov [rsp], rax			;; Actualiza cursor.
+	jmp .avance_next_char
 
+.hexadecimal:
+	push rdi
+	push r8
+	push r9
+	
+	push volatile_placeholder
+	push rsi
+	call num2hexStr
+	add rsp, 8 * 2
+	mov r9, volatile_placeholder
+	call print
+	pop r9
+	pop r8
+	pop rdi
+
+	mov [rsp], rax			;; Actualiza cursor.
+	jmp .avance_next_char
+
+.character:
+
+.string:
 	push rdi
 	push r8
 	push r9
@@ -1174,6 +1365,77 @@ print:
 	add rsp, 8				;; Quita push de rax q se hace para cada caracter.
 	mov [print_cursor], rax	;; Update cursor to current position.
 	ret
+
+
+;;==============================================================================
+;; memsetFramebuffer
+;;==============================================================================
+;; Argumentos:
+;; -- rax = 0x00RRGGBB
+;;
+;;==============================================================================
+
+memsetFramebuffer:
+	mov rdi, [FB]
+	mov rcx, [FB_SIZE]
+	shr rcx, 2	;; FB_SIZE /= 4.
+	rep stosd
+	ret
+
+
+
+;;==============================================================================
+;; 
+;;==============================================================================
+;; Argumentos:
+;;
+;;==============================================================================
+
+getKey:
+	push rbp
+	mov rbp, rsp
+	mov rax, 0
+.loop:
+	in al, 0x64
+	mov cl, al
+	and al, 0x01
+	cmp al, 0
+	je .loop
+	in al, 0x60
+
+	mov rsp, rbp
+	pop rbp
+	ret
+
+
+
+
+
+
+emptyKbBuffer:
+	push rbp
+	mov rbp, rsp
+	mov rax, 0
+.loop:
+	in al, 0x64
+	and al, 0x01
+	cmp al, 1
+	jne .exit
+	in al, 0x60
+	jmp .loop
+.exit:
+	mov rsp, rbp
+	pop rbp
+	ret
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1201,7 +1463,7 @@ FB:					dq 0	; Frame buffer base address
 FB_SIZE:			dq 0	; Frame buffer size
 HR:					dq 0	; Horizontal Resolution
 VR:					dq 0	; Vertical Resolution
-PPSL:				dq 0	; PixelsPerScanLinemsg_boot_services_exit_ok:		db "Exit from UE%FI se", 0x0A, "rvices exit%soso.", 0
+PPSL:				dq 0	; PixelsPerScanLine
 
 BPP:				dq 0		; BitsPerPixel
 memmap:				dq 0x220000	;; Address donde quedara el mapa de memoria.
@@ -1213,7 +1475,8 @@ vid_orig:			dq 0
 vid_index:			dq 0
 vid_max:			dq 0
 vid_size:			dq 0
-vid_info:			dq 0
+vid_info:			dq 0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;msg_graphics_success: dw utf16("Cambio de modo de video ok | Nuevo modo = %d"), 13, 0xA, 0
+
 
 ;; typedef struct {
 ;; UINT16	ScanCode;
@@ -1260,6 +1523,8 @@ Num:						dw 0, 0
 newline:					dw 13, 10, 0
 
 hexConvert:					dw utf16("0123456789ABCDEF")
+hexConvert8:					db "0123456789ABCDEF"
+
 
 ;; Some new messages.
 msg_edid_found: dw utf16("EDID found"), 13, 0xA, 0;; Carriage return
@@ -1269,15 +1534,18 @@ fmt_edid_validation_fail: dw utf16("EDID validation failure = %s"), 13, 0xA, 0
 str_edid_size_err: dw utf16("error de tamano"), 0
 str_edid_hdr_err: dw utf16("error en el encabezado"), 0
 
-fmt_resolution_horizontal:	dw utf16("Resolution = %d"), 0
-fmt_resolution_vertical:	dw utf16(" x %d"), 13, 0xA, 0
-fmt_ppsl:					dw utf16("PPSL = %d"), 0
-fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
-fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
+fmt_resolution_horizontal:	db "Resolution = %d", 0
+fmt_resolution_vertical:	db " x %d", 13, 0xA, 0
+fmt_ppsl:					db "PPSL = %d", 0
+fmt_fb_size:				db " | Framebuffer = %d bytes", 0
+fmt_fb_address:				db " | Address = 0x%h", 13, 0xA, 0
 
-msg_graphics_mode_info_match: dw utf16("Graphics mode info match."), 13, 0xA, 0
-msg_gop_no_mode_matches: dw utf16("Graphics mode: no mode matches."), 13, 0xA, 0
-msg_graphics_success: dw utf16("Cambio de modo de video ok | Nuevo modo = %d"), 13, 0xA, 0
+msg_graphics_mode_info_match:	dw utf16("Graphics mode info match."), 13, 0xA
+								dw utf16("SetMode()..."), 13, 0xA, 0
+
+msg_gop_no_mode_matches: db "Graphics mode: no mode matches.", 13, 0xA, 0
+msg_graphics_success: db "Cambio de modo de video ok | Nuevo modo = %d", 13, 0xA, 0
+
 msg_por: dw utf16(" x "), 0
 msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
 msg_placeholder_len equ ($ - msg_placeholder)
@@ -1285,7 +1553,9 @@ msg_step_mode: dw utf16("Step mode active, presione <n> para avanzar"), 13, 0xA,
 msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
 msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
-msg_notify_memmap_change: dw utf16("Memory map buffer size change: will request again."), 13, 0xA, 0
+
+msg_notify_memmap_change: db "Memory map buffer size change: will request again.", 13, 0xA, 0
+
 txt_err_memmap:		dw utf16("get memmap feilure"), 0
 
 msg_test16:	dw utf16("Test"), 13, 0xA, 0
@@ -1301,6 +1571,8 @@ fmt_memmap_cant_descriptors:	dw utf16("Uefi returned memmap | Cant descriptors =
 msg_acpi_err:		dw utf16("ACPI no encontrado."), 0
 
 fmt_err_fatal:		dw utf16("Error fatal: %s"), 0
+fmt_err_fatal8:		db "Error fatal: %s", 0
+
 fmt_max_txt_mode:	dw utf16("Max txt mode = %d"), 0
 fmt_curr_txt_mode:	dw utf16(" | Curr mode = %d"), 13, 0xA, 0
 fmt_fw_vendor:		dw utf16("FW vendor = %s"), 13, 0xA, 0
@@ -1312,12 +1584,15 @@ fmt_edid_protocol_located:		dw utf16("EDID protocol found = %s"), 13, 0xA, 0
 str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
 
 ;; UTF8 strings para bootloader.
-msg_boot_services_exit:		db "ExitBootSerivces()...", 0x0A, 0
-msg_boot_services_exit_ok:		db "Exit from UEFI services OK (ret val = EFI_SUCCESS).", 0x0A, 0
+msg_boot_services_exit:			db "ExitBootSerivces()...", 0x0A, 0
+msg_boot_services_exit_ok:		db "Exit from UEFI services OK "
+								db "(ret val = EFI_SUCCESS).", 0x0A, 0
 
-
-
-efi_print_placeholder:
+print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
+							;; til para establecer un mensaje distinto segun con
+							;; diciones e imprimir en 1 solo lugar el mensaje q
+							;; haya ocurrido.
+volatile_placeholder:
 times	64 dw 0x0000
 
 print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
