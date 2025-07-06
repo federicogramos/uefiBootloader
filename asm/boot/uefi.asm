@@ -314,7 +314,6 @@ acpi_get:
 .err:
 	mov rsi, msg_acpi_err
 	je error_fatal	;; Sin ACPI no se continua.
-	
 
 ;; Configurar pantalla. Algunas definiciones:
 ;; https://www.intel.com/content/dam/doc/guide/uefi-driver-graphics-controller-g
@@ -497,37 +496,19 @@ locate_gop_protocol:
 	cmp rax, EFI_SUCCESS
 	jne .next
 
-
 ;; Se acaba de resetear el buffer de video, se blanquea la pantalla. Antes se ve
 ;; ia baja resolucion, ahora se setea la nueva seleccionada resolucion. Voy a vo
 ;; lver a mostrar en pantalla los datos de resolucion configurados.
 ;; Buscar info pantalla actual (modo 0), de modo de ya tener config video falle 
 ;; o no el intento de cambio.
 
-	;;mov rax, 0x00000000
-	;;call memsetFramebuffer	;; Se asegura de borrar los mensajes anteriores en c
-							;; aso de no lograr cambiar de modo.
-
 .video_mode_success:
-
-	;; SIMPLE_TEXT_OUTPUT.ClearScreen(). Clears display. Cursor position (0, 0).
-	;;mov rcx, [TXT_OUT_INTERFACE]	
-	;;call [rcx + EFI_OUT_CLEAR_SCREEN]
 
 	mov rax, 0x00000000
 	call memsetFramebuffer
 
-	;;mov rsi, [vid_index]
-	;;mov rdx, msg_graphics_success
-	;;call efi_print
-
-	;;mov rax, [FB]
-	;;mov [print_cursor], rax	;; Inicializacion del cursor.
-	;;mov r9, msg_graphics_success
-	;;mov rsi, [vid_index]
-	;;call print
-
-	mov qword [print_pending_msg], msg_graphics_success
+	mov qword [print_pending_msg], msg_graphics_success	;; Prepara mensaje para 
+														;; mostrar luego.
 	mov rsi, [vid_index]
 	mov [print_pending_msg + 8], rsi
 	jmp get_video
@@ -535,10 +516,9 @@ locate_gop_protocol:
 ;; Ha probado todos los modos y no encuentra match ni con un EDID encontrado, ni
 ;; con la resolucion por defecto. Lo que hace es no cambiar el actual modo.
 skip_set_video:
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov rdx, msg_gop_no_mode_matches
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call efi_print
 
-	mov qword [print_pending_msg], msg_gop_no_mode_matches
+	mov qword [print_pending_msg], msg_gop_no_mode_matches	;; Mensaje para mos
+															;; trar luego.
 
 ;; Haya encontrado match en un video mode y logrado setearlo, o no, continua. us
 ;; a la resolucion que actualmente tiene seteada, por lo que si al arranque teni
@@ -585,26 +565,9 @@ get_video:
 	mov qword [print_pending_msg + 8], 0
 	call print
 
-
-	;; Info en pantalla del modo seleccionado y valores que quedaron. Estos son
-	;; los seteos que le va a pasar al siguiente bootloader y SO.
+;; Info en pantalla del modo seleccionado y valores que quedaron. Estos son los 
+;; seteos que le va a pasar al siguiente bootloader y SO.
 print_video_information:
-	;;mov rsi, [HR]
-	;;mov rdx, fmt_resolution_horizontal
-	;;call efi_print
-	;;mov rsi, [VR]
-	;;mov rdx, fmt_resolution_vertical
-	;;call efi_print
-	;;mov rsi, [PPSL]
-	;;mov rdx, fmt_ppsl
-	;;call efi_print
-	;;mov rsi, [FB_SIZE]
-	;;mov rdx, fmt_fb_size
-	;;call efi_print
-	;;mov rsi, [FB]
-	;;mov rdx, fmt_fb_address
-	;;call efi_print
-
 	mov rsi, [HR]
 	mov r9, fmt_resolution_horizontal
 	call print
@@ -620,9 +583,6 @@ print_video_information:
 	mov rsi, [FB]
 	mov r9, fmt_fb_address
 	call print
-
-
-	;;call prompt_step_mode	;; Parada modo step.
 
 verifica_payload:
 	mov rsi, PAYLOAD + 6
@@ -646,7 +606,7 @@ get_memmap:
 	mov rsi, txt_err_memmap		;; Detalle del error, si resulta no se success.
 	cmp rax, EFI_SUCCESS
 	jne error_fatal8
-	jmp exit_uefi_services
+	jmp .print_info_memmap
 
 .notify_change:
 	mov r9, msg_notify_memmap_change
@@ -682,28 +642,21 @@ get_memmap:
 
 ;; TODO: print_memmpap_info, pero aqui no la puedo hacer ya que luego de obtener
 ;; mapa de mem, inmediatamente debo hacer el exit.
-	;;mov rdx, 0
-	;;mov rax, [memmapsize]
-	;;mov rcx, [memmapdescsize]
-	;;div rcx
-	;;mov rsi, rax
-	;;mov rsi, 8
-	;;mov rdx, fmt_memmap_cant_descriptors
-	;;mov rdx, msg_test
-	;;all print
+.print_info_memmap
+	mov rdx, 0
+	mov rax, [memmapsize]
+	mov rcx, [memmapdescsize]
+	div rcx
+	mov rsi, rax
+	mov r9, fmt_memmap_cant_descriptors
+	call print
 
 exit_uefi_services:
 
-	;;mov rax, 0x00000000
-	;;call memsetFramebuffer
-
-	;; Notificar a punto de salir, pero aqui no la puedo hacer ya que lueg
-	;; o de obtener mapa de mem, inmediatamente debo hacer el exit.
-	;;mov rax, [FB]
-	;;mov [print_cursor], rax	;; Inicializacion del cursor.
+	;; Notificar a punto de salir, pero aqui no la puedo hacer con efi_print ya 
+	;; que luego de obtener mapa de mem, inmediatamente debo hacer el exit.
 	mov r9, msg_boot_services_exit
 	call print
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;call prompt_step_mode	;; Ultima parada step usando boot services.
 
 	mov rcx, [EFI_IMAGE_HANDLE]	;; IN EFI_HANDLE ImageHandle
 	mov rdx, [memmapkey]		;; IN UINTN MapKey
@@ -814,9 +767,9 @@ error_fatal8:
 
 
 payloadSignatureFail:
-	mov rcx, [TXT_OUT_INTERFACE]					
-	lea rdx, [msg_badPayloadSignature]					
-	call [rcx + EFI_OUT_OUTPUTSTRING]
+	mov r9, msg_badPayloadSignature
+	call print
+	
 halt:
 	hlt
 	jmp halt
@@ -1148,8 +1101,6 @@ division_init:
 	ret
 
 
-
-
 ;;==============================================================================
 ;; num2str - convierte un entero en un string null terminated
 ;;==============================================================================
@@ -1347,6 +1298,7 @@ print:
 	jmp .avance_next_char
 
 .character:
+	;; No necesario por el momento.
 
 .string:
 	push rdi
@@ -1383,7 +1335,6 @@ memsetFramebuffer:
 	ret
 
 
-
 ;;==============================================================================
 ;; 
 ;;==============================================================================
@@ -1408,9 +1359,12 @@ getKey:
 	ret
 
 
-
-
-
+;;==============================================================================
+;; 
+;;==============================================================================
+;; Argumentos:
+;;
+;;==============================================================================
 
 emptyKbBuffer:
 	push rbp
@@ -1427,11 +1381,6 @@ emptyKbBuffer:
 	mov rsp, rbp
 	pop rbp
 	ret
-
-
-
-
-
 
 
 
@@ -1475,8 +1424,7 @@ vid_orig:			dq 0
 vid_index:			dq 0
 vid_max:			dq 0
 vid_size:			dq 0
-vid_info:			dq 0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;msg_graphics_success: dw utf16("Cambio de modo de video ok | Nuevo modo = %d"), 13, 0xA, 0
-
+vid_info:			dq 0
 
 ;; typedef struct {
 ;; UINT16	ScanCode;
@@ -1517,7 +1465,9 @@ db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 ;; UTF16 strings para bootservices.
 msg_uefi_boot:				dw utf16("UEFI boot"), 13, 0xA, 0
 msg_error:					dw utf16("Error"), 0
-msg_badPayloadSignature:	dw utf16("Bad payload signature."), 0
+
+msg_badPayloadSignature:	db "Payload signature check failed.", 0
+
 Hex:						db "0123456789ABCDEF"
 Num:						dw 0, 0
 newline:					dw 13, 10, 0
@@ -1561,7 +1511,7 @@ txt_err_memmap:		dw utf16("get memmap feilure"), 0
 msg_test16:	dw utf16("Test"), 13, 0xA, 0
 msg_test8:	db "Test", 0
 
-fmt_memmap_cant_descriptors:	dw utf16("Uefi returned memmap | Cant descriptors = %d"), 13, 0xA, 0
+fmt_memmap_cant_descriptors:	db "Uefi returned a memory map | Cant descriptors = %d", 13, 0xA, 0
 
 
 
