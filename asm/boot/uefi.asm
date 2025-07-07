@@ -642,7 +642,7 @@ get_memmap:
 
 ;; TODO: print_memmpap_info, pero aqui no la puedo hacer ya que luego de obtener
 ;; mapa de mem, inmediatamente debo hacer el exit.
-.print_info_memmap
+.print_info_memmap:
 	mov rdx, 0
 	mov rax, [memmapsize]
 	mov rcx, [memmapdescsize]
@@ -715,14 +715,15 @@ exit_uefi_services:
 	rep stosq
 
 
-;; TODO: poleo para poder promptear ahora que hemos salido de bootservices.
-mov r9, msg_boot_services_exit_ok
-call print
-;;call prompt_step_mode	;; Ultima parada antes de ir al bootloader.
-call emptyKbBuffer
-call getKey
+	;;mov rax, 0x00000000000101F0
+	;;call keyboard_command
 
 
+	;; Poleo para poder promptear ahora que hemos salido de bootservices.
+	mov r9, msg_boot_services_exit_ok
+	call print
+	call emptyKbBuffer
+	call keyboard_get_key
 
 	; Clear registers
 	xor eax, eax
@@ -765,7 +766,6 @@ error_fatal8:
 	hlt
 	jmp .halt
 
-
 payloadSignatureFail:
 	mov r9, msg_badPayloadSignature
 	call print
@@ -787,6 +787,9 @@ halt:
 ;; i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
 ;; unico que recibe en rsi).
 ;;==============================================================================
+
+;; TODO: revisar si EFI_OUT_OUTPUTSTRING retorna alterando el rsp porque veo que
+;; sin stack frame resulta falla.
 
 efi_print:
 	push rbp
@@ -865,8 +868,11 @@ efi_print:
 .end_placeholder:
 	mov word [volatile_placeholder + 2 * rdi], 0x0000
 	mov rdx, volatile_placeholder
-	mov rcx, [TXT_OUT_INTERFACE]	
+	mov rcx, [TXT_OUT_INTERFACE]
+
+	sub rsp, 8 * 4
 	call [rcx + EFI_OUT_OUTPUTSTRING]
+	add rsp, 8 * 2
 
 	mov rsp, rbp
 	pop rbp
@@ -1026,7 +1032,9 @@ prompt_step_mode:
 .pedir_tecla:
 	mov rcx, [TXT_IN_INTERFACE]
 	mov rdx, EFI_INPUT_KEY	
+	sub rsp, 8 * 4
 	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
+	add rsp, 8 * 4
 	cmp eax, EFI_NOT_READY			;; No hubo ingreso, me quedo poleando.
 	je .pedir_tecla
 
@@ -1035,9 +1043,14 @@ prompt_step_mode:
 
 	mov rcx, [TXT_OUT_INTERFACE]	
 	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
+	sub rsp, 8 * 4
 	call [rcx + EFI_OUT_OUTPUTSTRING]
+	add rsp, 8 * 4
 	jmp .pedir_tecla
-	
+
+;; EFI_INPUT_KEY
+;; UINT16	ScanCode;
+;; CHAR16	UnicodeChar;
 .get_key:
 	mov dx, [EFI_INPUT_KEY + 2]
 	cmp dx, utf16('n')
@@ -1335,6 +1348,33 @@ memsetFramebuffer:
 	ret
 
 
+
+;;==============================================================================
+;; 
+;;==============================================================================
+;; Argumentos:
+;; -- al = command
+;; -- ah = byte requerido por el comando (de ser necesario)
+;; -- bit 16 de rax = 0 si comando no requiere ah, 1 si comando requiere enviar 
+;;    ah a continuacion de al.
+;;==============================================================================
+
+keyboard_command:
+	push rbp
+	mov rbp, rsp
+
+	out 0x64, al
+	bt rax, 16
+	jnc .fin
+	mov al, ah
+	out 0x60, al
+
+.fin:
+	mov rsp, rbp
+	pop rbp
+	ret
+
+
 ;;==============================================================================
 ;; 
 ;;==============================================================================
@@ -1342,21 +1382,36 @@ memsetFramebuffer:
 ;;
 ;;==============================================================================
 
-getKey:
+
+
+
+
+keyboard_get_key:
 	push rbp
 	mov rbp, rsp
+
+	cmp byte [STEP_MODE_FLAG], 0
+	je .fin
+
 	mov rax, 0
 .loop:
 	in al, 0x64
-	mov cl, al
 	and al, 0x01
 	cmp al, 0
 	je .loop
 	in al, 0x60
 
+;; TODO: revisar por que en pc fgr escritorio, llega a bootloader y cualga o se queda aleatoriamente.
+;; Sin estas dos, pasa oka.
+	cmp al, 0x31	;; Scancode tecla 'n'.
+	jne .loop
+
+.fin:
 	mov rsp, rbp
 	pop rbp
 	ret
+
+
 
 
 ;;==============================================================================
@@ -1430,7 +1485,7 @@ vid_info:			dq 0
 ;; UINT16	ScanCode;
 ;; CHAR16	UnicodeChar;
 ;; } EFI_INPUT_KEY;
-EFI_INPUT_KEY		dd 0
+EFI_INPUT_KEY		dw 0, 0
 
 STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
 
@@ -1484,7 +1539,7 @@ fmt_edid_validation_fail: dw utf16("EDID validation failure = %s"), 13, 0xA, 0
 str_edid_size_err: dw utf16("error de tamano"), 0
 str_edid_hdr_err: dw utf16("error en el encabezado"), 0
 
-fmt_resolution_horizontal:	db "Resolution = %d", 0
+fmt_resolution_horizontal:	db "Video resolution = %d", 0
 fmt_resolution_vertical:	db " x %d", 13, 0xA, 0
 fmt_ppsl:					db "PPSL = %d", 0
 fmt_fb_size:				db " | Framebuffer = %d bytes", 0
@@ -1512,11 +1567,6 @@ msg_test16:	dw utf16("Test"), 13, 0xA, 0
 msg_test8:	db "Test", 0
 
 fmt_memmap_cant_descriptors:	db "Uefi returned a memory map | Cant descriptors = %d", 13, 0xA, 0
-
-
-
-
-
 
 msg_acpi_err:		dw utf16("ACPI no encontrado."), 0
 
@@ -1574,7 +1624,7 @@ font_data:
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x13 uni0013
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x14 uni0014
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x15 uni0015
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x16 uni0016
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x16 uni001memmap6
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x17 uni0017
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x18 uni0018
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x19 uni0019
