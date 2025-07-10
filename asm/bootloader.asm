@@ -1,33 +1,27 @@
+;;==============================================================================
+;; Bootloader
 ;;=============================================================================
-;; The first stage loader is required to gather information about the system
-;; while the BIOS or UEFI is still available and load the payload binary to
-;; 0x00008000. Setup a minimal 64-bit environment, copy the 64-bit kernel from
-;; the end of the payload binary to the 1MiB memory mark and jump to it.
-;;1Mib mark se refiere a copiar nuestro kernel a la dir 100000 donde a donde luego salta yendo a _start en 0x100000
-;;
-;;  requires a payload for execution! The stand-alone bootloader.sys file
-;; is not sufficient. You must append your kernel or software to the end of
-;; the bootloader binary. The maximum size of the kernel or software is 26KiB (a definir!!!)
+;; Recibe la informacion del sistema. Hace configuraciones basicas del mismo. Co
+;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
+;; el en 0x100000.
 ;;=============================================================================
-
-
 
 
 BITS 64
 ORG 0x00008000
-BOOTLOADER_SIZE equ 0x1800	;; 6KiB
 
 start:
 	jmp bootmode	;; This command will be overwritten with 'NOP's before the AP's are started
 	nop
-	db "UEFIBOOT"	;; Simple chequeo de que hay payload.
+	db "UEFIBOOT"	;; Marca para un simple chequeo de que hay payload.
 	nop
 	nop
 
-; =============================================================================
-; Code for AP startup
+
 BITS 16
-	cli				; Disable all interrupts
+
+ap_startup:
+	cli
 	xor eax, eax
 	xor ebx, ebx
 	xor ecx, ecx
@@ -51,16 +45,13 @@ BITS 16
 ; immediately proceed to start64. Otherwise we need to set up a minimal 64-bit environment.
 BITS 32
 bootmode:
-;jmp bootmode;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	cmp bl, 'U'			; If it is 'U' then we booted via UEFI and are already in 64-bit mode for the BSP
 	je start64			; Jump to the 64-bit code, otherwise fall through to 32-bit init
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 %ifdef BIOS
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	mov [p_BootDisk], bh		; Save disk from where system was booted from
+
+	mov [p_BootDisk], bh	; Save disk from where system was booted from
 
 	mov eax, 16			; Set the correct segment registers
 	mov ds, ax
@@ -78,11 +69,9 @@ bootmode:
 	xor ebp, ebp
 	mov esp, 0x8000			; Set a known free location for the stack
 
-
-;;;;;;;;;;;;;;;; importante, aqui toma lo que le ha pasado desde bios, esto esta dentro de ifdef
-;;;; por eso lo que le pasa difiere de uefi
-;;;; leer info de video de VBEModeInfoBlock esta bien. Tener en cuenta que aqui es solo la asignacion para bios
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; importante, aqui toma lo que le ha pasado desde bios, esto esta dentro de ifdef
+;; por eso lo que le pasa difiere de uefi
+;; leer info de video de VBEModeInfoBlock esta bien. Tener en cuenta que aqui es solo la asignacion para bios
 
 	; Save the frame buffer address, size (after its calculated), and the screen x,y
 	xor eax, eax
@@ -1321,6 +1310,9 @@ debug_progressbar:
 	ret
 ; -----------------------------------------------------------------------------
 %endif
+
+
+BOOTLOADER_SIZE equ 0x1800	;; 6KiB
 
 
 ;;;;;;;;;;; para generar un loop y dejar q se vea mensaje antes de ir a bootloader
