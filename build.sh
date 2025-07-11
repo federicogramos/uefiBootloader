@@ -76,9 +76,10 @@ function img_install {
 
 
 function convert_img {
-	echo "Creating VMDK and QCOW2 images..."
+	echo -n "Creating VMDK and QCOW2 images... "
 	qemu-img convert -O vmdk ./img/x64_arq.img ./img/x64_arq.vmdk
 	qemu-img convert -f vmdk -O qcow2 ./img/x64_arq.vmdk ./img/x64_arq.qcow2
+	echo "OK"
 }
 
 
