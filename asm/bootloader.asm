@@ -878,7 +878,7 @@ clear_regs:
 %include "fdc/fdc_64.asm"
 %endif
 
-%include "interrupt.asm"
+%include "interrupts.asm"
 %include "sysvar.asm"
 
 
