@@ -1,5 +1,9 @@
 # Bootloader UEFI para procesadores Intel x86-64
 
+## Uso
+./build.sh
+Genera la imagen ./img/x64_arq.img
+
 ## Referencias y documentacion
 
 ### Codigo
