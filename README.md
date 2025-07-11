@@ -1,5 +1,9 @@
 # Bootloader UEFI para procesadores Intel x86-64
 
+## Uso
+./build.sh
+Genera la imagen ./img/x64_arq.img
+
 ## Referencias y documentacion
 
 ### Codigo
@@ -27,7 +31,10 @@ Ver /boot/src/boot.cpp
 
 [EFI Specification Version 1.10](https://www.intel.com/content/dam/www/public/us/en/zip/efi-110.zip)
 
-[EFI Specification Version 2.8](https://uefi.org/sites/default/files/resources/UEFI_Spec_2_8_final.pdf}
+[EFI Specification Version 2.8](https://uefi.org/sites/default/files/resources/UEFI_Spec_2_8_final.pdf)
+
+[Repositorio EDKII con los protocolos](https://github.com/tianocore/edk2/tree/master/MdePkg/Include/Protocol)
+
 
 ### Info extra varia
 
