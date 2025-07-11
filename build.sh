@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 set +e
-export EXEC_DIR="$PWD"
-export OUTPUT_DIR="$EXEC_DIR/image"
+
 
 # see if BMFS_SIZE was defined for custom disk sizes
 if [ "x$BMFS_SIZE" = x ]; then
@@ -39,7 +38,6 @@ function build_all {
 	make all -C .
 
 	init_imgs $BMFS_SIZE
-
 
 	cat ./build/bootloader.sys ./sys/kernel.bin > ./out/payload.sys
 	payload_size=$(wc -c <./out/payload.sys)
@@ -79,9 +77,8 @@ function img_install {
 
 function convert_img_vmdk {
 	echo "Creating VMDK image..."
-	qemu-img convert -O vmdk "$OUTPUT_DIR/x64_arq_os.img" "$OUTPUT_DIR/x64_arq_os.vmdk"
+	qemu-img convert -O vmdk "./image/x64_arq_os.img" "./image/x64_arq_os.vmdk"
 }
-
 
 
 build_all

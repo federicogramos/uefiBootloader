@@ -15,7 +15,7 @@ all: uefi.sys bootloader.sys
 
 $(UEFI): build
 	cd ./asm/boot; nasm uefi.asm -o ./../../build/uefi.sys
-	cd ./asm/boot; ld -g --oformat elf64-x86-64 --entry 0x400000 ./../../build/uefi.sys -o ./../../build/uefi.elf
+#cd ./asm/boot; ld -g --oformat elf64-x86-64 --entry 0x400000 ./../../build/uefi.sys -o ./../../build/uefi.elf
 
 $(BOOTLOADER): $(UEFI)
 	cd asm;	$(ASM) bootloader.asm -o ./../build/$(BOOTLOADER)
