@@ -874,8 +874,8 @@ clear_regs:
 %include "init/smp.asm"
 
 %ifdef BIOS
-%include "fdc/dma.asm"
-%include "fdc/fdc_64.asm"
+%include "bios/dma.asm"
+%include "bios/fdc_64.asm"
 %endif
 
 %include "interrupts.asm"
