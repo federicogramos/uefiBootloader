@@ -21,9 +21,9 @@ $(BOOTLOADER): $(UEFI)
 	cd asm;	$(ASM) bootloader.asm -o ./../build/$(BOOTLOADER)
 
 build:
-	mkdir build image out
+	mkdir build img out
 		
 clean:
-	rm -rf build image out
+	rm -rf build img out
 
 .PHONY: all clean

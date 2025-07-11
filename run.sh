@@ -1,6 +1,5 @@
 #!/bin/bash
 
-qemu-img convert -f vmdk -O qcow2 image/x64_arq_os.vmdk image/x64_arq_os.qcow2   
 
 if [ "$1" = "-d" ]; then
 #qemu-system-x86_64 -bios sys/OVMF.fd -s -S -hda image/x64_arq_os.qcow2 -m 512

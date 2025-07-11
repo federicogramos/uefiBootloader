@@ -14,17 +14,17 @@ function init_imgs {
 
 	echo -n "Creating disk image files... "
 
-	dd if=/dev/zero of=./image/bmfs.img count=$1 bs=1048576 > /dev/null 2>&1
+	dd if=/dev/zero of=./img/bmfs.img count=$1 bs=1048576 > /dev/null 2>&1
 
-	mformat -t 128 -h 2 -s 1024 -C -F -i ./image/fat32.img
-	mmd -i ./image/fat32.img ::/EFI > /dev/null 2>&1
-	mmd -i ./image/fat32.img ::/EFI/BOOT > /dev/null 2>&1
+	mformat -t 128 -h 2 -s 1024 -C -F -i ./img/fat32.img
+	mmd -i ./img/fat32.img ::/EFI > /dev/null 2>&1
+	mmd -i ./img/fat32.img ::/EFI/BOOT > /dev/null 2>&1
 	retVal=$?
 	if [ $retVal -ne 0 ]; then
 		echo -n "no UEFI support (due to bad mtools), "
 	fi
 	echo "\EFI\BOOT\BOOTX64.EFI" > startup.nsh
-	mcopy -i ./image/fat32.img startup.nsh ::/
+	mcopy -i ./img/fat32.img startup.nsh ::/
 	rm startup.nsh
 
 	echo "OK"
@@ -51,11 +51,11 @@ function build_all {
 	dd if=./out/payload.sys of=./out/BOOTX64.EFI bs=16384 seek=1 conv=notrunc > /dev/null 2>&1
 
 	echo -n "Formatting BMFS disk... "
-	./sys/bmfs ./image/bmfs.img format
+	./sys/bmfs ./img/bmfs.img format
 	echo "OK"
 
 	img_install
-	convert_img_vmdk
+	convert_img
 }
 
 
@@ -64,20 +64,21 @@ function img_install {
 
 	# Copy UEFI boot to disk image
 	if [ -x "$(command -v mcopy)" ]; then
-		mcopy -oi ./image/fat32.img ./out/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI > /dev/null 2>&1
+		mcopy -oi ./img/fat32.img ./out/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI > /dev/null 2>&1
 		retVal=$?
 		if [ $retVal -ne 0 ]; then
 			echo -n "no UEFI support (due to bad mtools), "
 		fi
 	fi
 
-	cat ./image/fat32.img ./image/bmfs.img > ./image/x64_arq_os.img
+	cat ./img/fat32.img ./img/bmfs.img > ./img/x64_arq.img
 }
 
 
-function convert_img_vmdk {
-	echo "Creating VMDK image..."
-	qemu-img convert -O vmdk "./image/x64_arq_os.img" "./image/x64_arq_os.vmdk"
+function convert_img {
+	echo "Creating VMDK and QCOW2 images..."
+	qemu-img convert -O vmdk ./img/x64_arq.img ./img/x64_arq.vmdk
+	qemu-img convert -f vmdk -O qcow2 ./img/x64_arq.vmdk ./img/x64_arq.qcow2
 }
 
 
