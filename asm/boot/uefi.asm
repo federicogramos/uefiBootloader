@@ -494,7 +494,7 @@ locate_gop_protocol:
 	mov rdx, msg_graphics_mode_info_match
 	call efi_print
 
-	call prompt_step_mode	;; Ultima parada antes de que se borre pantalla y se
+	call efi_prompt_step_mode	;; Ultima parada antes de que se borre pantalla y se
 							;; pase a usar framebuffer directo.
 
 .video_mode_set:
@@ -761,8 +761,13 @@ exit_uefi_services:
 	mov rcx, (256 * 1024)	;; 256KiB a partir de 0x8000
 	rep movsb				;; Ultimo byte escrito = 0x8000 + (256 * 1024) - 1
 
-	;; Datos de video la pasamos a siguiente etapa de bootloader. Movemos toda l
-	;; a info a 0x00005F00.
+	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
+	;; qword [0x00005F00] = Frame buffer base
+	;; qword [0x00005F08] = Frame buffer size (bytes)
+	;; dword [0x00005F10] = Screen X
+	;; dword [0x00005F12] = Screen Y
+	;; dword [0x00005F14] = PixelsPerScanLine
+
 	mov rdi, 0x00005F00
 	mov rax, [FB]
 	stosq				;; 5F00 + 8 * 0 = 64-bit Frame Buffer.
@@ -816,7 +821,7 @@ exit_uefi_services:
 
 
 ;;locate_device_path_protocol:
-	;;mov rcx, EFI_DEVICE_PATH_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
+;;mov rcx, EFI_DEVICE_PATH_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
 ;;	mov rdx, 0								;; IN VOID *Registration OPTIONAL
 ;;	mov r8, PROTOCOL_DEVICE_PATH			;; OUT VOID **Interface
 ;;	mov rax, [EFI_BOOT_SERVICES]
@@ -939,7 +944,7 @@ efi_print:
 	lea rax, [volatile_placeholder + 2 * rdi]
 	push rax
 	push rsi
-	call num2strWord
+	call efi_num2str
 	add rsp, 8 * 2
 	add rdi, rax
 	jmp .parse
@@ -949,7 +954,7 @@ efi_print:
 	lea rax, [volatile_placeholder + 2 * rdi]
 	push rax
 	push rsi
-	call printhex
+	call efi_printhex
 	add rsp, 8 * 2
 	add rdi, rax
 	jmp .parse
@@ -961,7 +966,7 @@ efi_print:
 .string:
 	inc rcx
 	push rsi
-	call strlenWord
+	call efi_strlen
 	add rsp, 8
 
 .str_copy_init:
@@ -999,7 +1004,7 @@ efi_print:
 
 
 ;;==============================================================================
-; printhex - Display a 64-bit value in hex
+; efi_printhex - Display a 64-bit value in hex (string utf16)
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
@@ -1010,7 +1015,7 @@ efi_print:
 ;; Altera unicamente rax, restantes registros los devuelve como los recibe.
 ;;==============================================================================
 
-printhex:
+efi_printhex:
     push rbp
 	mov rbp, rsp
 
@@ -1053,61 +1058,7 @@ printhex:
 
 
 ;;==============================================================================
-; num2hexStr - escribe el hexadecimal de un nro, dentro de un placeholder utf8
-;;==============================================================================
-;; Argumentos:
-;; -- placeholder por stack, 1er push.
-;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
-;; Retorno:
-;; -- rax = cantidad de caracteres escritos.
-;;
-;; Altera unicamente rax, restantes registros los devuelve como los recibe.
-;;==============================================================================
-
-num2hexStr:
-    push rbp
-	mov rbp, rsp
-
-	push rcx
-	push rdx	
-
-.division_init:
-	mov rcx, 16
-	mov rdx, 0  			;; En cero la parte mas significativa del acum.
-	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
-    push qword 0			;; Marca para dejar de popear durante write.
-
-.division:
-	div rcx
-	push qword [hexConvert8 + rdx]  
-	cmp rax, 0
-	jz .write_init
-	mov rdx, 0
-	jmp .division
-
-.write_init:
-	mov rax, 0				;; Contara chars copiados para valor de retorno.
-	mov rcx, [rbp + 8 * 3]	;; Placeholder.
-
-.write:
-    pop rdx
-	mov [rcx + rax], rdx
-	cmp rdx, 0
-	je .end
-	inc rax
-    jmp .write
-
-.end:
-	pop rdx
-	pop rcx
-
-	mov rsp, rbp
-	pop rbp	 
-	ret
-
-
-;;==============================================================================
-;; strlenWord - cantidad de caracteres de un string utf16 (no cuenta NULL)
+;; efi_strlen - cantidad de caracteres de un string utf16 (no cuenta NULL)
 ;;==============================================================================
 ;; Argumentos:
 ;; -- cadena por stack.
@@ -1117,7 +1068,7 @@ num2hexStr:
 ;; Altera unicamente rax, restantes registros los devuelve como los recibe.
 ;;==============================================================================
 
-strlenWord:
+efi_strlen:
 	push rbp
 	mov rbp, rsp
 
@@ -1146,7 +1097,7 @@ strlenWord:
 ;; Con la tecla 'n' se avanza.
 ;;==============================================================================
 
-prompt_step_mode:
+efi_prompt_step_mode:
 	cmp byte [STEP_MODE_FLAG], 0
 	je .fin
 	
@@ -1182,7 +1133,7 @@ prompt_step_mode:
 
 
 ;;==============================================================================
-;; num2strWord - convierte un entero en un string no null terminated
+;; efi_num2str - convierte un entero en un string no null terminated
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
@@ -1193,7 +1144,7 @@ prompt_step_mode:
 ;; Altera unicamente rax, restantes registros los devuelve como los recibe.
 ;;==============================================================================
 
-num2strWord:
+efi_num2str:
     push rbp
 	mov rbp, rsp
 
@@ -1236,315 +1187,7 @@ division_init:
 	ret
 
 
-;;==============================================================================
-;; num2str - convierte un entero en un string null terminated
-;;==============================================================================
-;; Argumentos:
-;; -- placeholder por stack, 1er push.
-;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
-;; Retorno:
-;; -- rax = cantidad de caracteres escritos.
-;;
-;; Altera unicamente rax, restantes registros los devuelve como los recibe.
-;;==============================================================================
-
-num2str:
-    push rbp
-	mov rbp, rsp
-
-	push rcx
-	push rdx	
-
-.division_init:
-	mov rcx, 10
-	mov rdx, 0  			;; En cero la parte mas significativa del acum.
-	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
-    push qword 0				;; Marca para dejar de popear durante write.
-
-.division:
-	div rcx
-	or dl, 0x30				;; Convierto el resto  menor a 10 a ASCII.
-	push rdx  
-	cmp rax, 0
-	jz .write_init
-	mov rdx, 0
-	jmp .division
-
-.write_init:
-	mov rax, 0				;; Contara chars copiados para valor de retorno.
-	mov rcx, [rbp + 8 * 3]	;; Placeholder.
-
-.write:
-    pop rdx
-	mov [rcx + rax], dl
-	cmp rdx, 0
-	je .end
-	inc rax
-    jmp .write
-
-.end:
-	;;add rsp, 8	;; El cero que marcaba fin, elimino para popear regs.
-	pop rdx
-	pop rcx
-
-	mov rsp, rbp
-	pop rbp	 
-	ret
-
-
-;;==============================================================================
-;; print - impresion utf8 a buffer de video luego de ExitBootSerivces()
-;;==============================================================================
-;; Argumentos:
-;; -- r9 = cadena fmt
-;; -- rsi = 2do argumento en caso de haber %.
-;; Retorno:
-;; -- rax = cursor (address fb) siguiente a la ultima posicion escrita.
-;;
-;; El comportamiento si la cadena de fmt tiene % huerfano (no hay ninguna de las
-;; siguientes a continuacion: d, h, c, s) es: ignora el % y sigue imprimiendo. S
-;; i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
-;; unico que recibe en rsi).
-;;
-;; El cursor para esta funcion, es la direccion del pixel superior izquierdo del
-;; bounding box del caracter de la fuente.
-;;==============================================================================
-
-print:
-	mov rax, [print_cursor]
-	mov rdi, [PPSL]
-	mov r8, 0	;; ix src str.
-	
-.loop_read_string_char:
-	push rax	;; FB cursor, apunta a inicio de char (pixel exactamente) a come
-				;; nzar imprimir.
-	mov rcx, 0	;; Blanqueo de parte alta para uso en resolucion de addrress en 
-				;; .print_next_font.
-	mov cl, [r9 + r8]
-	cmp cl, 0
-	je .string_flush_end
-
-	cmp cl, 0x0A
-	je .linefeed
-	cmp cl, '%'
-	jne .print_next_font
-	inc r8
-	mov cl, [r9 + r8]
-	mov [print_cursor], rax	;; Update cursor to current position.
-
-	cmp cl, 'd'
-	je .integer
-	cmp cl, 'h'
-	je .hexadecimal
-	cmp cl, 'c'
-	je .character
-	cmp cl, 's'
-	je .string
-		
-.print_next_font:
-	lea r10, [font_data + 8 * rcx]	;; r10 p2fontLine 16px chars.
-	lea r10, [r10 + 8 * rcx]
-	mov rdx, 0
-
-.loop_font_vertical_line:
-	cmp rdx, font_height
-	je .char_flush_end
-	mov rcx, 0
-	mov rbx, 0
-	mov bl, [r10 + rdx]
-
-.loop_font_horizontal_pixel:
-	cmp rcx, 8
-	je .next_line
-	bt rbx, rcx
-	jc .setPixel
-
-.resetPixel:
-	mov dword [rax + 4 * rcx], 0x00000000
-	jmp .nextPixel
-.setPixel:
-	mov dword [rax + 4 * rcx], 0x00E0E0E0
-.nextPixel:
-	inc rcx
-	jmp .loop_font_horizontal_pixel
-
-.next_line:
-	inc rdx
-	lea rax, [rax + 4 * rdi]
-	jmp .loop_font_vertical_line
-
-.char_flush_end:
-	add qword [rsp], 32	;; rax += 8px * 4bytes/px
-
-.avance_next_char:
-	pop rax
-	inc r8
-	jmp .loop_read_string_char
-
-.linefeed:
-	mov rdx, 0			;; rdx:rax = 0:rax
-	sub rax, [FB]
-	mov rbx, [PPSL]
-	lea rbx, [4 * rbx]	;; 4b/px * ppsl
-	div rbx				;; rdx = offset desde comienzo de linea.
-
-	sub [rsp], rdx		;; Carriage return.
-
-	mov rbx, [PPSL]
-	mov rax, 4 * 16		;; Bajar 16px.
-	mov rdx, 0
-	mul rbx				;; rax = offset_bytes
-	add [rsp], rax
-	jmp .avance_next_char
-
-.integer:
-	push rdi
-	push r8
-	push r9
-	
-	push volatile_placeholder
-	push rsi
-	call num2str
-	add rsp, 8 * 2
-	mov r9, volatile_placeholder
-	call print
-	pop r9
-	pop r8
-	pop rdi
-
-	mov [rsp], rax			;; Actualiza cursor.
-	jmp .avance_next_char
-
-.hexadecimal:
-	push rdi
-	push r8
-	push r9
-	
-	push volatile_placeholder
-	push rsi
-	call num2hexStr
-	add rsp, 8 * 2
-	mov r9, volatile_placeholder
-	call print
-	pop r9
-	pop r8
-	pop rdi
-
-	mov [rsp], rax			;; Actualiza cursor.
-	jmp .avance_next_char
-
-.character:
-	;; No necesario por el momento.
-
-.string:
-	push rdi
-	push r8
-	push r9
-	mov r9, msg_test8
-	call print
-	pop r9
-	pop r8
-	pop rdi
-
-	mov [rsp], rax			;; Actualiza cursor.
-	jmp .avance_next_char
-
-.string_flush_end:
-	add rsp, 8				;; Quita push de rax q se hace para cada caracter.
-	mov [print_cursor], rax	;; Update cursor to current position.
-	ret
-
-
-;;==============================================================================
-;; memsetFramebuffer
-;;==============================================================================
-;; Argumentos:
-;; -- rax = 0x00RRGGBB
-;;==============================================================================
-
-memsetFramebuffer:
-	mov rdi, [FB]
-	mov rcx, [FB_SIZE]
-	shr rcx, 2	;; FB_SIZE /= 4.
-	rep stosd
-	ret
-
-
-;;==============================================================================
-;; keyboard_command
-;;==============================================================================
-;; Argumentos:
-;; -- al = command
-;; -- ah = byte requerido por el comando (de ser necesario)
-;; -- bit 16 de rax = 0 si comando no requiere ah, 1 si comando requiere enviar 
-;;    ah a continuacion de al.
-;;==============================================================================
-
-keyboard_command:
-	push rbp
-	mov rbp, rsp
-
-	out 0x64, al
-	bt rax, 16
-	jnc .fin
-	mov al, ah
-	out 0x60, al
-
-.fin:
-	mov rsp, rbp
-	pop rbp
-	ret
-
-
-;;==============================================================================
-;; keyboard_get_key | Se queda esperando tecla 'n'.
-;;==============================================================================
-
-keyboard_get_key:
-	push rbp
-	mov rbp, rsp
-
-	cmp byte [STEP_MODE_FLAG], 0
-	je .fin
-
-	mov rax, 0
-.loop:
-	in al, 0x64
-	and al, 0x01
-	cmp al, 0
-	je .loop
-	in al, 0x60
-
-;; TODO: revisar por que en pc fgr escritorio, llega a bootloader y cualga o se queda aleatoriamente.
-;; Sin estas dos, pasa oka.
-	cmp al, 0x31	;; Scancode tecla 'n'.
-	jne .loop
-
-.fin:
-	mov rsp, rbp
-	pop rbp
-	ret
-
-
-;;==============================================================================
-;; emptyKbBuffer - Vacia el teclado, dejando ninguna tecla pendiente.
-;;==============================================================================
-
-emptyKbBuffer:
-	push rbp
-	mov rbp, rsp
-	mov rax, 0
-.loop:
-	in al, 0x64
-	and al, 0x01
-	cmp al, 1
-	jne .exit
-	in al, 0x60
-	jmp .loop
-.exit:
-	mov rsp, rbp
-	pop rbp
-	ret
+%include "../lib/lib.asm"
 
 
 ;;==============================================================================
@@ -1566,19 +1209,18 @@ EFI_IMG_RET_ADDR:	    dq 0
 EFI_BOOT_SERVICES:	    dq 0    ;; *BootServices
 RTS:				    dq 0	;; *RuntimeServices;
 CONFIG_TABLE:		    dq 0	;; *ConfigurationTable
-ACPI:				    dq 0	; ACPI table address
-CONOUT_INTERFACE:	    dq 0	; Output services
+ACPI:				    dq 0	;; ACPI table address
+CONOUT_INTERFACE:	    dq 0	;; Output services
 CONIN_INTERFACE_HANDLE:	dq 0	;; ConsoleInHandle
-CONIN_INTERFACE:	    dq 0	; Input services
-VIDEO_INTERFACE:	    dq 0	; Video services
+CONIN_INTERFACE:	    dq 0	;; Input services
+VIDEO_INTERFACE:	    dq 0	;; Video services
 EDID:				    dq 0    ;; [SizeOfEdid, *Edid]
-FB:					    dq 0	; Frame buffer base address
-FB_SIZE:			    dq 0	; Frame buffer size
-HR:					    dq 0	; Horizontal Resolution
-VR:					    dq 0	; Vertical Resolution
-PPSL:				    dq 0	; PixelsPerScanLine
-
-BPP:				dq 0		;; BitsPerPixel
+FB:					    dq 0	;; Frame buffer base address
+FB_SIZE:			    dq 0	;;
+HR:					    dq 0	;; Horizontal Resolution
+VR:					    dq 0	;; Vertical Resolution
+PPSL:				    dq 0	;; PixelsPerScanLine
+BPP:					dq 0	;; BitsPerPixel
 memmap:				dq 0x220000	;; Address donde quedara el mapa de memoria.
 memmapsize:			dq 32768	;; Tamano max del  buffer para memmap [bytes].
 memmapkey:			dq 0
@@ -1590,7 +1232,7 @@ vid_max:			dq 0
 vid_size:			dq 0
 vid_info:			dq 0
 
-;; Para localizar el device path del text input y ver si puedo hacer andar teclado en la otra pc.
+;; Para localizar el device path del text input.
 EFI_DEVICE_PATH_PROTOCOL_GUID:
 dd	0x09576e91
 dw	0x6d3f, 0x11d2
@@ -1658,7 +1300,7 @@ Num:						dw 0, 0
 newline:					dw 13, 10, 0
 
 hexConvert:					dw utf16("0123456789ABCDEF")
-hexConvert8:					db "0123456789ABCDEF"
+hexConvert8:				db "0123456789ABCDEF"
 
 
 ;; Some new messages.
@@ -1703,7 +1345,8 @@ msg_test8:	db "Test", 0
 
 fmt_memmap_cant_descriptors:	db	"Uefi returned a memory map "
 								db	"| Cant descriptors = %d", 13, 0xA, 0
-fmt_memmap_descriptor_size:		db "Memory map descriptor size = %d [bytes] (reported)", 13, 0xA, 0
+fmt_memmap_descriptor_size:		db	"Memory map descriptor size = %d [bytes]"
+								db	" (reported)", 13, 0xA, 0
 
 msg_acpi_err:		dw utf16("ACPI no encontrado."), 0
 
