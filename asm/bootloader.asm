@@ -11,7 +11,7 @@ BITS 64
 ORG 0x00008000
 
 start:
-	jmp bootmode	;; This command will be overwritten with 'NOP's before the AP's are started
+	jmp bootmode	;; Will be overwritten with 'NOP's before AP's are started.
 	nop
 	db "UEFIBOOT"	;; Marca para un simple chequeo de que hay payload.
 	nop
