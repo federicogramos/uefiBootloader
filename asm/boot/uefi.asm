@@ -1,5 +1,5 @@
 ;;==============================================================================
-;; UEFI bootloader
+;; UEFI bootloader | @file /asm/boot/uefi.asm
 ;;==============================================================================
 ;; Varios de los comentarios realizados estan basados en la informacion de: 
 ;; -- Extensible Firmware Interface Specification Version 1.10 December 1, 2002.
@@ -32,7 +32,6 @@ global FB
 global FB_SIZE
 global STEP_MODE_FLAG
 
-
 extern print_cursor
 extern num2hexStr
 extern num2str
@@ -41,7 +40,6 @@ extern memsetFramebuffer
 extern keyboard_command
 extern keyboard_get_key
 extern emptyKbBuffer
-
 
 %define utf16(x) __utf16__(x)
 
@@ -1209,7 +1207,7 @@ section .data
 
 
 DATA:
-EFI_IMAGE_HANDLE:	    dq 0	;; rcx at entry point.
+EFI_IMAGE_HANDLE:	    dq 0xDEFEDEFE	;; rcx at entry point.
 EFI_SYSTEM_TABLE:	    dq 0	;; rdx at entry point.
 EFI_IMG_RET_ADDR:	    dq 0
 EFI_BOOT_SERVICES:	    dq 0    ;; *BootServices

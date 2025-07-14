@@ -11,17 +11,16 @@ SECTIONS
 
 	.text ALIGN(0x200) :
 	{
-		/*. = ALIGN(0x200);*/
 		text = .;
 		*(.text)
 		endOfCode = .;
 
 	}
 
-	.data :
+	.data ALIGN(0x1000):
 	{
 		dataStart = .;
-		. = ALIGN(0x1000);
+		/*. = ALIGN(0x1000);*/
 		data = .;
 		*(.data)
 

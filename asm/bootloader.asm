@@ -1,5 +1,5 @@
 ;;==============================================================================
-;; Bootloader
+;; Bootloader | @file /asm/bootloader.asm
 ;;=============================================================================
 ;; Recibe la informacion del sistema. Hace configuraciones basicas del mismo. Co
 ;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
