@@ -37,7 +37,7 @@ ap_startup:
 	mov esp, 0x7000
 	jmp 0x0000:init_smp_ap
 
-%include "init/smp_ap.asm"	;; AP's will start execution at 0x8000 and fall through to this code
+%include "./asm/init/smp_ap.asm"	;; AP's will start execution at 0x8000 and fall through to this code
 
 ;;==============================================================================
 ;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored at 0x5FFF then we know it was a UEFI boot and can
@@ -48,7 +48,7 @@ bootmode:
 	je start64
 
 %ifdef BIOS
-%include "bios/bios_32_64.asm"
+%include "./asm/bios/bios_32_64.asm"
 %endif
 
 BITS 64
@@ -868,18 +868,18 @@ clear_regs:
 	jmp 0x00100000			; Done with bootloader, jump to the kernel
 
 
-%include "init/acpi.asm"
-%include "init/cpu.asm"
-%include "init/hpet.asm"
-%include "init/smp.asm"
+%include "./asm/init/acpi.asm"
+%include "./asm/init/cpu.asm"
+%include "./asm/init/hpet.asm"
+%include "./asm/init/smp.asm"
 
 %ifdef BIOS
-%include "bios/dma.asm"
-%include "bios/fdc_64.asm"
+%include "./asm/bios/dma.asm"
+%include "./asm/bios/fdc_64.asm"
 %endif
 
-%include "interrupts.asm"
-%include "sysvar.asm"
+%include "./asm/interrupts.asm"
+%include "./asm/sysvar.asm"
 
 
 ; -----------------------------------------------------------------------------

@@ -23,11 +23,11 @@
 ;;==============================================================================
 
 
+
 %define utf16(x) __utf16__(x)
 
 
-BITS 64
-ORG 0x00400000
+section .header
 
 START:
 PE:
@@ -73,7 +73,11 @@ MAGIC_NUMBER:				dw 0x020B ;; PE32+ (64-bit address space) PE format.
 MAJOR_LINKER_VERSION:		db 0
 MINOR_LINKER_VERSION:		db 0
 CODE_SIZE:					dd CODE_END - CODE	;; Text.
-INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
+
+;;INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
+INITIALIZED_DATA_SIZE:		dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)	;; Data.
+
+
 UNINITIALIZED_DATA_SIZE:	dd 0x00				;; Bss.
 ENTRY_POINT_ADDR:		dd EntryPoint - START	;; Entry point relative to img b
 												;; ase loaded in memory.
@@ -134,9 +138,9 @@ SECTION_CODE:
 
 SECTION_DATA:
 .name						db ".data", 0x00, 0x00, 0x00
-.virtual_size				dd DATA_END - DATA
+.virtual_size				dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)
 .virtual_address			dd DATA - START
-.size_of_raw_data			dd DATA_END - DATA
+.size_of_raw_data			dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)
 .pointer_to_raw_data		dd DATA - START
 .pointer_to_relocations		dd 0
 .pointer_to_line_numbers	dd 0
@@ -152,7 +156,7 @@ SECTION_DATA:
 ;; El header ocupo exactamente 0x160 bytes. Lo alineo a 0x200 para que termine o
 ;; cupando 512 bytes.
 HEADER_END:
-align 0x200
+;;align 0x200
 
 
 ;; Entry point prototype:
@@ -178,9 +182,11 @@ align 0x200
 ;; MM0-XMM5 volatile (not preserved by called function).
 ;; Note: EFI, for every supported architecture defines exact ABI.
 
-CODE:
-EntryPoint: ;; Ubicado en 0x400200 cuando imagen va en 0x400000
+section .text
 
+CODE:
+EntryPoint:
+	;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	;; UEFI entry point args and rerturn address.
 	mov [EFI_IMAGE_HANDLE], rcx
 	mov [EFI_SYSTEM_TABLE], rdx
@@ -726,18 +732,6 @@ get_memmap:
 	mov r9, newline8
 	call print
 
-
-
-
-
-
-
-
-
-
-
-
-
 exit_uefi_services:
 
 	;; Notificar a punto de salir, pero aqui no la puedo hacer con efi_print ya 
@@ -812,14 +806,6 @@ exit_uefi_services:
 	mov r9, msg_boot_services_exit_ok
 	call print
 
-
-
-
-
-
-
-
-
 ;;locate_device_path_protocol:
 ;;mov rcx, EFI_DEVICE_PATH_PROTOCOL_GUID	;; IN EFI_GUID *Protocol
 ;;	mov rdx, 0								;; IN VOID *Registration OPTIONAL
@@ -854,7 +840,8 @@ exit_uefi_services:
 
 	mov bl, 'U'
 
-	jmp 0x8000	;; Vamos a siguiente loader. Aprox 0x400702
+	mov rax, 0x8000
+	jmp rax	;; Vamos a siguiente loader. Aprox 0x400702
 
 
 ;;==============================================================================
@@ -1187,20 +1174,20 @@ division_init:
 	ret
 
 
-%include "../lib/lib.asm"
+%include "./asm/lib/lib.asm"
 
 
-;;==============================================================================
-
-times 4 * 1024 - ($ - $$)	db 0	;; Zero padding resto de .text
 CODE_END:
 
 
 ;;==============================================================================
-;; section .data
 ;; Cuidado con la posicion de estas tablas, no se pudede cambiar porque por el m
 ;; omento estan hardcodeadas las posiciones relativas de la misma donde bootload
 ;; er.asm busca, por ejemplo, ACPI.
+;;==============================================================================
+
+section .data
+
 
 DATA:
 EFI_IMAGE_HANDLE:	    dq 0	;; rcx at entry point.
@@ -1234,23 +1221,21 @@ vid_info:			dq 0
 
 ;; Para localizar el device path del text input.
 EFI_DEVICE_PATH_PROTOCOL_GUID:
-dd	0x09576e91
-dw	0x6d3f, 0x11d2
-db	0x8e, 0x39, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B
+	dd	0x09576e91
+	dw	0x6d3f, 0x11d2
+	db	0x8e, 0x39, 0x00, 0xA0, 0xC9, 0x69, 0x72, 0x3B
 
 EFI_DEVICE_PATH_PROTOCOL:   dq 0    ;; Voy a pedir el de conin.
 
-
 EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID:
-dd	0x387477c1
-dw	0x69c7, 0x11d2
-db 0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b
+	dd	0x387477c1
+	dw	0x69c7, 0x11d2
+	db 0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b
 
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
-dd	0x387477c2
-dw	0x69c7, 0x11d2
-db 0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b
-
+	dd	0x387477c2
+	dw	0x69c7, 0x11d2
+	db 0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b
 
 
 ;; typedef struct {
@@ -1267,27 +1252,27 @@ Horizontal_Resolution:	dd 1024
 Vertical_Resolution:	dd 768
 
 ACPI_TABLE_GUID:
-dd 0xeb9d2d30
-dw 0x2d88, 0x11d3
-db 0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d
+	dd 0xeb9d2d30
+	dw 0x2d88, 0x11d3
+	db 0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d
 
 ;; github.com/tianocore/edk2/blob/master/MdePkg/Include/Protocol/EdidActive.h
 EFI_EDID_ACTIVE_PROTOCOL_GUID:
-dd 0xbd8c1056
-dw 0x9f36, 0x44ec
-db 0x92, 0xa8, 0xa6, 0x33, 0x7f, 0x81, 0x79, 0x86
+	dd 0xbd8c1056
+	dw 0x9f36, 0x44ec
+	db 0x92, 0xa8, 0xa6, 0x33, 0x7f, 0x81, 0x79, 0x86
 
 EFI_EDID_DISCOVERED_PROTOCOL_GUID:
-dd 0x1c0c34f6
-dw 0xd380, 0x41fa
-db 0xa0, 0x49, 0x8a, 0xd0, 0x6c, 0x1a, 0x66, 0xaa
+	dd 0x1c0c34f6
+	dw 0xd380, 0x41fa
+	db 0xa0, 0x49, 0x8a, 0xd0, 0x6c, 0x1a, 0x66, 0xaa
 
 ;; https://github.com/tianocore/edk2/blob/master/MdePkg/Include/Protocol/Graphic
 ;; sOutput.h
 EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID:
-dd 0x9042a9de
-dw 0x23dc, 0x4a38
-db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
+	dd 0x9042a9de
+	dw 0x23dc, 0x4a38
+	db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 
 ;; UTF16 strings para bootservices.
 msg_uefi_boot:				dw utf16("UEFI boot"), 13, 0xA, 0
@@ -1368,7 +1353,6 @@ msg_boot_services_exit:			db "ExitBootSerivces()...", 0x0A, 0
 msg_boot_services_exit_ok:		db "Exit from UEFI services OK "
 								db "(ret val = EFI_SUCCESS).", 0x0A, 0
 
-
 msg_handlebuffer_err:		db "HandleBuffer() error.", 0x0A, 0
 msg_handlebuffer_ok:		db "HandleBuffer() returned EFI_SUCCESS"
 							db " | Number of handlers = %d", 0x0A, 0
@@ -1377,23 +1361,18 @@ msg_located_index			db " [%d] = ", 0
 msg_located_value			db "%h", 0
 newline8					db 0x0A, 0
 
-
 msg_handleprotocol_err:		db "HandleProtocol() error.", 0x0A, 0
 msg_handleprotocol_ok:		db "HandleProtocol() returned EFI_SUCCESS.", 0x0A, 0
-
 
 print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
 							;; til para establecer un mensaje distinto segun con
 							;; diciones e imprimir en 1 solo lugar el mensaje q
 							;; haya ocurrido.
+
 volatile_placeholder:
 times	64 dw 0x0000
 
 print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
-
-
-
-
 
 msg_reference	db "conin interface = %d", 0x0A, 0
 msg_located	db "located interface = %d", 0
@@ -1401,19 +1380,8 @@ auxiliar	dq 0
 aux_buffer dq 0
 aux_buf_size dq 128
 
-
-
-
-
-
-
-
-
 font_height	equ 16
 font_data:
-;; font8x8_basic[128][16]
-
-
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x00 uni0000
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x01 uni0001
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x02 uni0002
@@ -1543,20 +1511,27 @@ font_data:
 	dd 0x00000000, 0x00000000, 0x0000324C, 0x00000000 ;; 0x7e asciitilde
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x7f uni007F
 
-
-times 16 * 1024 - ($ - $$)	db 0
 DATA_RUNTIME_END:
 
 
-align 16 * 1024	;; Codigo + data de BOOT64.EFI ocupa primeros 8K. Luego, la payload.
-PAYLOAD:
+;;==============================================================================
+;; Here goes the payload
+;; =============================================================================
+
+section .payload
+
+PAYLOAD:	
+times 240 * 1024 db 0x00
 
 ;; Esto cambiarlo por 256K para mas payload.
-align 65536	; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
-RAMDISK:
+;;align 65536	; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;RAMDISK:
 
-;; Suficientes 0x00 para obtener un tamano de archivo de 1MiB.
-times 1048576 - ($ - $$)	db 0
+;; Suficientes 0x00 para obtener un tamano de archivo de 1MiB. Le resto tambien 
+;; los 16Kib que son el comienzo de la seccion, ocupada por header y code.
+times 1048576 - ($ - $$) - 16 * 1024	db 0
+
+
 DATA_END:
 END:
 
@@ -1592,7 +1567,6 @@ EFI_NOT_FOUND				equ 14
 ;;incompatible with a version requested by the caller.
 ;;EFI_SECURITY_VIOLATION 26 The function was not performed due to a security violation.
 ;;EFI_CRC_ERROR 27 A CRC error was detected.
-
 
 ;; EFI system table.
 ;; typedef struct {
@@ -1669,4 +1643,3 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT		equ 16
 EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE		equ 24
 
 EFI_RUNTIME_SERVICES_RESETSYSTEM		equ 104
-
