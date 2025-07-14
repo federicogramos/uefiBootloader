@@ -27,9 +27,9 @@
 ;; HAY QUE INDICARLE A UEFI QUE EL TAMANO ES MAS GRANDE (.TEXT) PORQUE SABE LO QUE
 ;; HAY EN ESTE ARCHIVO PERO NO SUME LOS BYTES DE LA LIB.ASM
 
-global PPSL
 global FB
 global FB_SIZE
+global PPSL
 global STEP_MODE_FLAG
 
 extern print_cursor
@@ -44,6 +44,7 @@ extern emptyKbBuffer
 %define utf16(x) __utf16__(x)
 
 
+;; Header archivo PE/COFF.
 section .header
 
 START:
@@ -93,7 +94,6 @@ CODE_SIZE:					dd CODE_END - CODE	;; Text.
 
 ;;INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
 INITIALIZED_DATA_SIZE:		dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)	;; Data.
-
 
 UNINITIALIZED_DATA_SIZE:	dd 0x00				;; Bss.
 ENTRY_POINT_ADDR:		dd EntryPoint - START	;; Entry point relative to img b
@@ -173,8 +173,6 @@ SECTION_DATA:
 ;; El header ocupo exactamente 0x160 bytes. Lo alineo a 0x200 para que termine o
 ;; cupando 512 bytes.
 HEADER_END:
-;;align 0x200
-
 
 ;; Entry point prototype:
 ;; EFI_STATUS main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
@@ -1207,7 +1205,7 @@ section .data
 
 
 DATA:
-EFI_IMAGE_HANDLE:	    dq 0xDEFEDEFE	;; rcx at entry point.
+EFI_IMAGE_HANDLE:	    dq 0	;; rcx at entry point.
 EFI_SYSTEM_TABLE:	    dq 0	;; rdx at entry point.
 EFI_IMG_RET_ADDR:	    dq 0
 EFI_BOOT_SERVICES:	    dq 0    ;; *BootServices
