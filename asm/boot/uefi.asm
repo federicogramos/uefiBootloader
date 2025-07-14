@@ -1079,11 +1079,11 @@ efi_strlen:
 	mov rax, 0
 	mov rsi, [rbp + 8 * 2]
 
-.test:
+.lookForNull:
 	cmp word [rsi + 2 * rax], 0
 	je .end
 	inc rax
-	jmp .test
+	jmp .lookForNull
 
 .end:
 	pop rsi
@@ -1252,7 +1252,6 @@ EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
 	dw	0x69c7, 0x11d2
 	db 0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b
 
-
 ;; typedef struct {
 ;; UINT16	ScanCode;
 ;; CHAR16	UnicodeChar;
@@ -1300,7 +1299,6 @@ Num:						dw 0, 0
 newline:					dw 13, 10, 0
 
 hexConvert:					dw utf16("0123456789ABCDEF")
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;hexConvert8:				db "0123456789ABCDEF"
 
 
 ;; Some new messages.
@@ -1338,9 +1336,7 @@ msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
 
 msg_notify_memmap_change: db "Memory map buffer size change: will request again.", 13, 0xA, 0
 
-txt_err_memmap:		dw utf16("get memmap feilure"), 0
-
-msg_test16:	dw utf16("Test"), 13, 0xA, 0
+txt_err_memmap:				dw utf16("get memmap feilure"), 0
 
 fmt_memmap_cant_descriptors:	db	"Uefi returned a memory map "
 								db	"| Cant descriptors = %d", 13, 0xA, 0
