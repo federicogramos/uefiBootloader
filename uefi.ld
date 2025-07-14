@@ -9,9 +9,9 @@ SECTIONS
 		endOfHeader = .;
 	}		
 
-	.text :
+	.text ALIGN(0x200) :
 	{
-		. = ALIGN(0x200);
+		/*. = ALIGN(0x200);*/
 		text = .;
 		*(.text)
 		endOfCode = .;
