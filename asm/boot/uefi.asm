@@ -44,7 +44,10 @@ extern emptyKbBuffer
 %define utf16(x) __utf16__(x)
 
 
+;;==============================================================================
 ;; Header archivo PE/COFF.
+;;==============================================================================
+
 section .header
 
 START:
@@ -1314,11 +1317,11 @@ efi_fmt_ppsl:					dw utf16("PPSL = %d"), 0
 efi_fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
 efi_fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
 
-fmt_resolution_horizontal:	db "Video resolution = %d", 0
-fmt_resolution_vertical:	db " x %d", 13, 0xA, 0
-fmt_ppsl:					db "PPSL = %d", 0
-fmt_fb_size:				db " | Framebuffer = %d bytes", 0
-fmt_fb_address:				db " | Address = 0x%h", 13, 0xA, 0
+fmt_resolution_horizontal:		db "Video resolution = %d", 0
+fmt_resolution_vertical:		db " x %d", 13, 0xA, 0
+fmt_ppsl:						db "PPSL = %d", 0
+fmt_fb_size:					db " | Framebuffer = %d bytes", 0
+fmt_fb_address:					db " | Address = 0x%h", 13, 0xA, 0
 
 msg_graphics_mode_info_match:	dw utf16("Graphics mode info match."), 13, 0xA
 								dw utf16("SetMode()..."), 13, 0xA, 0
@@ -1383,8 +1386,6 @@ print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
 volatile_placeholder:
 times	64 dw 0x0000
 
-;;;;;;;;;;;;;;;;;print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
-
 msg_reference	db "conin interface = %d", 0x0A, 0
 msg_located	db "located interface = %d", 0
 auxiliar	dq 0
@@ -1404,7 +1405,7 @@ PAYLOAD:
 times 240 * 1024 db 0x00
 
 ;; Esto cambiarlo por 256K para mas payload.
-;;align 65536	; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
+;;align 65536	;; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;RAMDISK:
 
 ;; Suficientes 0x00 para obtener un tamano de archivo de 1MiB. Le resto tambien 
@@ -1414,6 +1415,11 @@ times 1048576 - ($ - $$) - 16 * 1024	db 0
 
 DATA_END:
 END:
+
+
+;;==============================================================================
+;; A partir de aqui, definicion de constantes
+;;==============================================================================
 
 ;; EFI_STATUS Success Codes (High Bit Clear)
 EFI_SUCCESS					equ 0
