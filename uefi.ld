@@ -4,6 +4,7 @@ SECTIONS
 	. = 0x400000;
 	headerStart = .;
 	.header : {
+		aux = .;
 		header = .;
 		*(.header)
 	}
@@ -24,7 +25,7 @@ SECTIONS
 	. = ALIGN(0x1000);
 	dataStart = .;
 	dataOffset = dataStart - headerStart;
-	
+
 	.data : {
 		data = .;
 		*(.data)

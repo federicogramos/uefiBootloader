@@ -18,6 +18,9 @@ global keyboard_get_key
 global emptyKbBuffer
 
 
+section .text
+
+
 ;;==============================================================================
 ; num2hexStr - escribe el hexadecimal de un nro, dentro de un placeholder utf8
 ;;==============================================================================
@@ -29,8 +32,6 @@ global emptyKbBuffer
 ;;
 ;; Altera unicamente rax, restantes registros los devuelve como los recibe.
 ;;==============================================================================
-
-section .text
 
 num2hexStr:
     push rbp

@@ -23,11 +23,18 @@
 ;;==============================================================================
 
 
+%include "./asm/include/efi.inc"
+
+
 global FB
 global FB_SIZE
 global PPSL
 global STEP_MODE_FLAG
 
+;; efi vars.
+global CONOUT_INTERFACE
+global CONIN_INTERFACE
+global EFI_INPUT_KEY
 
 ;; uefi.ld.
 extern headerSize
@@ -46,6 +53,12 @@ extern memsetFramebuffer
 extern keyboard_command
 extern keyboard_get_key
 extern emptyKbBuffer
+
+;; lib_efi.asm
+extern efi_print
+extern ventana_modo_step
+extern efi_prompt_step_mode
+
 
 %define utf16(x) __utf16__(x)
 
@@ -66,7 +79,7 @@ PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - HEADER	;; File offset.
 DOS_STUB:				times 64 db 0				;; No program, zero fill.
 
 ;; Encabezado PE.
-PE_SIGNATURE:		db "PE", 0x00, 0x00
+PE_SIGNATURE:			db "PE", 0x00, 0x00
 
 ;; COFF File Header, 20 bytes.
 MACHINE_TYPE:		dw 0x8664		;; x86-64 machine.
@@ -83,7 +96,7 @@ OPT_HDR_SIZE:		dw OPT_HDR_END - OPT_HDR	;; Optional header. Section tabl
 												;; yte after headers. Make sure 
 												;; use size of optional header a
 												;; s specified in file header.
-CHARACTERISTICS:			dw 0x222E		;; Attributes of the file.
+CHARACTERISTICS:	dw 0x222E		;; Attributes of the file.
 ;; Flags:
 ;; IMG_DLL					0x2000
 ;; IMG_DEBUG_STRIPPED		0x0200	Debugging info removed from the image file.
@@ -271,7 +284,7 @@ entryPoint:
 
 	mov rcx, [CONOUT_INTERFACE]
 	mov rbx, [rcx + EFI_OUT_MODE]
-	mov rsi, [rbx]	;; Debo transformar a uint32.
+	mov rsi, [rbx]	;; Es uint32, voy a blanquearle parte alta.
 	push rsi
 	mov dword [rsp + 4], 0
 	pop rsi
@@ -287,37 +300,8 @@ entryPoint:
 	mov rdx, fmt_curr_txt_mode
 	call efi_print	;; Current video settings del modo texto con el q inicia.
 
-;; Ventana en la que se puede activar modo step.
-modo_step_window:
-	mov rcx, [CONIN_INTERFACE]
-	mov rdx, EFI_INPUT_KEY	
-	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
-	cmp eax, EFI_NOT_READY			;; No hubo ingreso, sigo normalmente. Descar
-									;; ta bit 63, de otro modo compararia mal
-	je .continue_no_step_mode
-
-	cmp rax, EFI_SUCCESS
-	je .get_key
-
-	mov rcx, [CONOUT_INTERFACE]	
-	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-	jmp .continue_no_step_mode			;; Sigo, a pesar del error.
-	
-.get_key:
-	mov dx, [EFI_INPUT_KEY + 2]
-	cmp dx, utf16('s')
-	jne .continue_no_step_mode
-	mov byte [STEP_MODE_FLAG], 1
-
-	mov rcx, [CONOUT_INTERFACE]	
-	mov rdx, msg_step_mode
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-
-.continue_no_step_mode:
-	mov rcx, [CONOUT_INTERFACE]	
-	lea rdx, [msg_uefi_boot]			
-	call [rcx + EFI_OUT_OUTPUTSTRING]
+;; Ventana en la que se puede activar modo step presionando 's'.
+call ventana_modo_step
 
 ;; Buscar info ACPI.
 acpi_get:
@@ -521,8 +505,8 @@ locate_gop_protocol:
 	mov rdx, msg_graphics_mode_info_match
 	call efi_print
 
-	call efi_prompt_step_mode	;; Ultima parada antes de que se borre pantalla y se
-							;; pase a usar framebuffer directo.
+	call efi_prompt_step_mode	;; Ultima parada antes de que se borre pantalla 
+								;; y se pase a usar framebuffer directo.
 
 .video_mode_set:
 	mov rcx, [VIDEO_INTERFACE]	;; IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This
@@ -910,289 +894,6 @@ halt:
 	jmp halt
 
 
-;;==============================================================================
-;; efi_print - impresion con formato (unicamente 1 solo %: %d, %h, %c, %s)
-;;==============================================================================
-;; Argumentos:
-;; -- rdx = cadena fmt
-;; -- rsi = 2do argumento en caso de haber %.
-;;
-;; El comportamiento si la cadena de fmt tiene % huerfano (no hay ninguna de las
-;; siguientes a continuacion: d, h, c, s) es: ignora el % y sigue imprimiendo. S
-;; i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
-;; unico que recibe en rsi).
-;;==============================================================================
-
-efi_print:
-	push rbp
-	mov rbp, rsp
-
-	mov rcx, 0	;; Ix fmt.
-	mov rdi, 0	;; Ix placeholder.
-
-.parse:
-	cmp word [rdx + 2 * rcx], 0x0000
-	je .end_placeholder
-	cmp word [rdx + 2 * rcx], utf16('%')
-	jne .copyChar
-	inc rcx
-
-	cmp word [rdx + 2 * rcx], utf16('d')
-	je .integer
-	cmp word [rdx + 2 * rcx], utf16('h')
-	je .hexadecimal
-	cmp word [rdx + 2 * rcx], utf16('c')
-	je .character
-	cmp word [rdx + 2 * rcx], utf16('s')
-	je .string
-	jmp .parse
-
-.integer:
-	inc rcx
-	lea rax, [volatile_placeholder + 2 * rdi]
-	push rax
-	push rsi
-	call efi_num2str
-	add rsp, 8 * 2
-	add rdi, rax
-	jmp .parse
-
-.hexadecimal:
-	inc rcx
-	lea rax, [volatile_placeholder + 2 * rdi]
-	push rax
-	push rsi
-	call efi_printhex
-	add rsp, 8 * 2
-	add rdi, rax
-	jmp .parse
-	
-.character:
-	inc rcx
-	jmp .parse
-
-.string:
-	inc rcx
-	push rsi
-	call efi_strlen
-	add rsp, 8
-
-.str_copy_init:
-	mov [rbp - 8], rax	;; Cantidad a copiar al stack.
-	mov rax, 0
-
-.str_copy:
-	cmp rax, [rbp - 8]
-	je .parse
-	mov bx, [rsi + 2 * rax]
-	mov [volatile_placeholder + 2 * rdi], bx
-	inc rax
-	inc rdi
-	jmp .str_copy
-
-.copyChar:
-	push word [rdx + 2 * rcx]
-	pop word [volatile_placeholder + 2 * rdi]
-	inc rcx
-	inc rdi
-	jmp .parse
-
-.end_placeholder:
-	mov word [volatile_placeholder + 2 * rdi], 0x0000
-	mov rdx, volatile_placeholder
-	mov rcx, [CONOUT_INTERFACE]
-
-	sub rsp, 8 * 4
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-	add rsp, 8 * 2
-
-	mov rsp, rbp
-	pop rbp
-	ret
-
-
-;;==============================================================================
-; efi_printhex - Display a 64-bit value in hex (string utf16)
-;;==============================================================================
-;; Argumentos:
-;; -- placeholder por stack, 1er push.
-;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
-;; Retorno:
-;; -- rax = cantidad de caracteres escritos.
-;;
-;; Altera unicamente rax, restantes registros los devuelve como los recibe.
-;;==============================================================================
-
-efi_printhex:
-    push rbp
-	mov rbp, rsp
-
-	push rcx
-	push rdx	
-
-.division_init:
-	mov rcx, 16
-	mov rdx, 0  			;; En cero la parte mas significativa del acum.
-	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
-    push word 0				;; Marca para dejar de popear durante write.
-
-.division:
-	div ecx
-	push word [hexConvert + 2 * rdx]  
-	cmp eax, 0
-	jz .write_init
-	mov rdx, 0
-	jmp .division
-
-.write_init:
-	mov rax, 0				;; Contara chars copiados para valor de retorno.
-	mov rcx, [rbp + 8 * 3]	;; Placeholder.
-
-.write:
-	cmp word [rsp], 0
-	je .end
-    pop word [rcx + 2 * rax]
-	inc rax
-    jmp .write
-
-.end:
-	add rsp, 2	;; El cero que marcaba fin, elimino para popear regs.
-	pop rdx
-	pop rcx
-
-	mov rsp, rbp
-	pop rbp	 
-	ret
-
-
-;;==============================================================================
-;; efi_strlen - cantidad de caracteres de un string utf16 (no cuenta NULL)
-;;==============================================================================
-;; Argumentos:
-;; -- cadena por stack.
-;; Retorno:
-;; -- rax = longitud.
-;;
-;; Altera unicamente rax, restantes registros los devuelve como los recibe.
-;;==============================================================================
-
-efi_strlen:
-	push rbp
-	mov rbp, rsp
-
-	push rsi
-
-	mov rax, 0
-	mov rsi, [rbp + 8 * 2]
-
-.lookForNull:
-	cmp word [rsi + 2 * rax], 0
-	je .end
-	inc rax
-	jmp .lookForNull
-
-.end:
-	pop rsi
-
-	mov rsp, rbp
-	pop rbp
-	ret
-
-
-;;==============================================================================
-;; Parada en el modo step.
-;;==============================================================================
-;; Con la tecla 'n' se avanza.
-;;==============================================================================
-
-efi_prompt_step_mode:
-	cmp byte [STEP_MODE_FLAG], 0
-	je .fin
-	
-.pedir_tecla:
-	mov rcx, [CONIN_INTERFACE]
-	mov rdx, EFI_INPUT_KEY	
-	sub rsp, 8 * 4
-	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
-	add rsp, 8 * 4
-	cmp eax, EFI_NOT_READY			;; No hubo ingreso, me quedo poleando.
-	je .pedir_tecla
-
-	cmp rax, EFI_SUCCESS
-	je .get_key
-
-	mov rcx, [CONOUT_INTERFACE]	
-	mov rdx, msg_efi_input_device_err	;; Notificar, rax = EFI_DEVICE_ERROR
-	sub rsp, 8 * 4
-	call [rcx + EFI_OUT_OUTPUTSTRING]
-	add rsp, 8 * 4
-	jmp .pedir_tecla
-
-;; EFI_INPUT_KEY
-;; UINT16	ScanCode;
-;; CHAR16	UnicodeChar;
-.get_key:
-	mov dx, [EFI_INPUT_KEY + 2]
-	cmp dx, utf16('n')
-	jne .pedir_tecla			;; Posible salida a siguiente paso.
-
-.fin:
-	ret
-
-
-;;==============================================================================
-;; efi_num2str - convierte un entero en un string no null terminated
-;;==============================================================================
-;; Argumentos:
-;; -- placeholder por stack, 1er push.
-;; -- el numero entero de 64 bit a convertir, pasado por stack (2do push)
-;; Retorno:
-;; -- rax = cantidad de caracteres escritos.
-;;
-;; Altera unicamente rax, restantes registros los devuelve como los recibe.
-;;==============================================================================
-
-efi_num2str:
-    push rbp
-	mov rbp, rsp
-
-	push rcx
-	push rdx	
-
-division_init:
-	mov rcx, 10
-	mov rdx, 0  			;; En cero la parte mas significativa del acum.
-	mov rax, [rbp + 8 * 2]  ;; Numero a convertir.
-    push word 0				;; Marca para dejar de popear durante write.
-
-.division:
-	div ecx
-	or dl, 0x30				;; Convierto el resto  menor a 10 a ASCII.
-	push dx  
-	cmp eax, 0
-	jz .write_init
-	mov rdx, 0
-	jmp .division
-
-.write_init:
-	mov rax, 0				;; Contara chars copiados para valor de retorno.
-	mov rcx, [rbp + 8 * 3]	;; Placeholder.
-
-.write:
-	cmp word [rsp], 0
-	je .end
-    pop word [rcx + 2 * rax]
-	inc rax
-    jmp .write
-
-.end:
-	add rsp, 2	;; El cero que marcaba fin, elimino para popear regs.
-	pop rdx
-	pop rcx
-
-	mov rsp, rbp
-	pop rbp	 
-	ret
 
 
 ;;==============================================================================
@@ -1287,7 +988,6 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID:
 	db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 
 ;; UTF16 strings para bootservices.
-msg_uefi_boot:				dw utf16("UEFI boot"), 13, 0xA, 0
 msg_error:					dw utf16("Error"), 0
 
 msg_badPayloadSignature:	db "Payload signature check failed.", 0
@@ -1296,7 +996,6 @@ msg_badPayloadSignature:	db "Payload signature check failed.", 0
 Num:						dw 0, 0
 newline:					dw 13, 10, 0
 
-hexConvert:					dw utf16("0123456789ABCDEF")
 
 
 ;; Some new messages.
@@ -1327,8 +1026,6 @@ msg_graphics_success: db "Cambio de modo de video ok | Nuevo modo = %d", 13, 0xA
 msg_por: dw utf16(" x "), 0
 msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
 msg_placeholder_len equ ($ - msg_placeholder)
-msg_step_mode: dw utf16("Step mode active, presione <n> para avanzar"), 13, 0xA, 0
-msg_efi_input_device_err: dw utf16("Input device hw error"), 13, 0xA, 0
 msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
 msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
 
@@ -1377,15 +1074,13 @@ print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
 							;; diciones e imprimir en 1 solo lugar el mensaje q
 							;; haya ocurrido.
 
-;; Hay otro con el mismo nombre en lib.asm pero ese pertenece a print.
-volatile_placeholder:
-times	64 dw 0x0000
 
 msg_reference	db "conin interface = %d", 0x0A, 0
 msg_located	db "located interface = %d", 0
 auxiliar	dq 0
 aux_buffer dq 0
 aux_buf_size dq 128
+
 
 
 
@@ -1454,114 +1149,6 @@ times 1048576 - ($ - $$) - 16 * 1024	db 0
 ;; A partir de aqui, definicion de constantes
 ;;==============================================================================
 
-;; EFI_STATUS Success Codes (High Bit Clear)
-EFI_SUCCESS					equ 0
-
-;; EFI_STATUS Error Codes (High Bit Set)
-EFI_LOAD_ERROR				equ 1
-EFI_INVALID_PARAMETER		equ 2
-EFI_UNSUPPORTED				equ 3
-EFI_BAD_BUFFER_SIZE			equ 4
-EFI_BUFFER_TOO_SMALL		equ 5
-EFI_NOT_READY				equ 6
-EFI_DEVICE_ERROR			equ 7
-EFI_WRITE_PROTECTED			equ 8
-EFI_OUT_OF_RESOURCES		equ 9
-EFI_VOLUME_CORRUPTED		equ 10
-EFI_VOLUME_FULL				equ 11
-EFI_NO_MEDIA				equ 12
-EFI_MEDIA_CHANGED			equ 13
-EFI_NOT_FOUND				equ 14
-;;EFI_ACCESS_DENIED 15 Access was denied.
-;;EFI_NO_RESPONSE 16 The server was not found or did not respond to the request.
-;;EFI_NO_MAPPING 17 A mapping to a device does not exist.
-;;EFI_TIMEOUT 18 The timeout time expired.
-;;EFI_NOT_STARTED 19 The protocol has not been started.
-;;EFI_ALREADY_STARTED 20 The protocol has already been started.
-;;EFI_ABORTED 21 The operation was aborted.
-;;EFI_ICMP_ERROR 22 An ICMP error occurred during the network operation.
-;;EFI_TFTP_ERROR 23 A TFTP error occurred during the network operation.
-;;EFI_PROTOCOL_ERROR 24 A protocol error occurred during the network operation.
-;;EFI_INCOMPATIBLE_VERSION 25 The function encountered an internal version that was
-;;incompatible with a version requested by the caller.
-;;EFI_SECURITY_VIOLATION 26 The function was not performed due to a security violation.
-;;EFI_CRC_ERROR 27 A CRC error was detected.
-
-;; EFI system table.
-;; typedef struct {
-;;		EFI_TABLE_HEADER				Hdr;					(8 * 3 bytes)
-;;		CHAR16							*FirmwareVendor;		(8 bytes)
-;;		UINT32							FirmwareRevision;		(8 bytes)
-;;		EFI_HANDLE						ConsoleInHandle;		(8 bytes)
-;;		SIMPLE_INPUT_INTERFACE			*ConIn;					(8 bytes)
-;;		EFI_HANDLE						ConsoleOutHandle;		(8 bytes)
-;;		SIMPLE_TEXT_OUTPUT_INTERFACE	*ConOut;				(8 bytes)
-;;		EFI_HANDLE						StandardErrorHandle;	(8 bytes)
-;;		SIMPLE_TEXT_OUTPUT_INTERFACE	*StdErr;				(8 bytes)
-;;		EFI_RUNTIME_SERVICES			*RuntimeServices;		(8 bytes)
-;;		EFI_BOOT_SERVICES				*BootServices;			(8 bytes)
-;;		UINTN							NumberOfTableEntries;	(8 bytes)
-;;		EFI_CONFIGURATION_TABLE			*ConfigurationTable;
-;; } EFI_SYSTEM_TABLE;
-
-EFI_SYSTEM_TABLE_FW_VENDOR				equ	24
-EFI_SYSTEM_TABLE_CONIN_HANDLE			equ 40
-EFI_SYSTEM_TABLE_CONIN					equ 48
-EFI_SYSTEM_TABLE_CONOUT					equ 64
-EFI_SYSTEM_TABLE_RUNTIMESERVICES		equ 88
-EFI_SYSTEM_TABLE_BOOTSERVICES			equ 96
-EFI_SYSTEM_TABLE_NUMBEROFENTRIES		equ 104
-EFI_SYSTEM_TABLE_CONFIGURATION_TABLE	equ 112
-
-;; typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
-;; EFI_INPUT_RESET						Reset;
-;; EFI_INPUT_READ_KEY					ReadKeyStroke;
-;; EFI_EVENT							WaitForKey;
-;; } EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
-EFI_INPUT_RESET							equ 0
-EFI_INPUT_READ_KEY						equ 8
-EFI_EVENT								equ 16
-
-;; typedef struct _EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
-;; EFI_TEXT_RESET						Reset;
-;; EFI_TEXT_STRING						OutputString;
-;; EFI_TEXT_TEST_STRING					TestString;
-;; EFI_TEXT_QUERY_MODE					QueryMode;
-;; EFI_TEXT_SET_MODE					SetMode;
-;; EFI_TEXT_SET_ATTRIBUTE				SetAttribute;
-;; EFI_TEXT_CLEAR_SCREEN				ClearScreen;
-;; EFI_TEXT_SET_CURSOR_POSITION			SetCursorPosition;
-;; EFI_TEXT_ENABLE_CURSOR				EnableCursor;
-;; SIMPLE_TEXT_OUTPUT_MODE				*Mode;
-;; } EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL;
-EFI_OUT_RESET							equ 0
-EFI_OUT_OUTPUTSTRING					equ 8
-EFI_OUT_TEST_STRING						equ 16
-EFI_OUT_QUERY_MODE						equ 24
-EFI_OUT_SET_MODE						equ 32
-EFI_OUT_SET_ATTRIBUTE					equ 40
-EFI_OUT_CLEAR_SCREEN					equ 48
-EFI_OUT_SET_CURSOR_POSITION				equ 56
-EFI_OUT_ENABLE_CURSOR					equ 64
-EFI_OUT_MODE							equ 72
-
-EFI_BOOT_SERVICES_GETMEMORYMAP			equ 56
-EFI_BOOT_SERVICES_HANDLEPROTOCOL		equ 152
-EFI_BOOT_SERVICES_LOCATEHANDLE			equ 176
-rEFI_BOOT_SERVICES_LOADIMAGE			equ 200
-EFI_BOOT_SERVICES_EXIT					equ 216
-EFI_BOOT_SERVICES_EXITBOOTSERVICES		equ 232
-EFI_BOOT_SERVICES_STALL					equ 248
-EFI_BOOT_SERVICES_SETWATCHDOGTIMER		equ 256
-EFI_LOCATE_HANDLE_BUFFER				equ	312
-EFI_BOOT_SERVICES_LOCATEPROTOCOL		equ 320
-
-EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE	equ 0
-EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE	equ 8
-EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT		equ 16
-EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE		equ 24
-
-EFI_RUNTIME_SERVICES_RESETSYSTEM		equ 104
 
 
 
