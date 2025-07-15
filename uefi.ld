@@ -1,45 +1,47 @@
 OUTPUT_FORMAT("binary")
 SECTIONS
 {
-	.header 0x400000:
-	{
-		loadAddressPosition = .;
+	. = 0x400000;
+	headerStart = .;
+	.header : {
 		header = .;
 		*(.header)
-		endOfHeader = .;
 	}
+
+	headerSize = . - headerStart;
 
 	. = ALIGN(0x200);
 	codeStart = .;
+	codeOffset = codeStart - headerStart;
 
-	.text :
-	{
+	.text :	{
 		text = .;
 		*(.text)
 	}
-	
-	codeEnd = .;
+
 	codeSize = . - codeStart;
 
-	.data ALIGN(0x1000):
-	{
-		dataStart = .;
+	. = ALIGN(0x1000);
+	dataStart = .;
+	dataOffset = dataStart - headerStart;
+	
+	.data : {
 		data = .;
 		*(.data)
 
 		. = ALIGN(0x4000);
 		payload = .;
 		*(.payload)
-
-		endOfData = .;
 	}
 
-	.bss ALIGN(0x1000) : AT(ADDR(.bss))
-	{
+	dataSize = . - dataStart;
+	. = ALIGN(0x1000);
+
+	.bss : {
 		bss = .;
 		*(.bss)
 		*(EXCLUDE_FILE (*.o) COMMON)
 	}
 
-	endOfUefi = .;
+	fileSize = . - headerStart;
 }

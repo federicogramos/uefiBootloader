@@ -23,22 +23,21 @@
 ;;==============================================================================
 
 
-;; TODO:
-;; HAY QUE INDICARLE A UEFI QUE EL TAMANO ES MAS GRANDE (.TEXT) PORQUE SABE LO QUE
-;; HAY EN ESTE ARCHIVO PERO NO SUME LOS BYTES DE LA LIB.ASM
-
-
-;; Linker symbols.
-extern codeStart
-extern codeEnd
-extern codeSize
-
-
 global FB
 global FB_SIZE
 global PPSL
 global STEP_MODE_FLAG
 
+
+;; uefi.ld.
+extern headerSize
+extern codeSize
+extern dataSize
+extern fileSize
+extern codeOffset
+extern dataOffset
+
+;; lib.asm
 extern print_cursor
 extern num2hexStr
 extern num2str
@@ -57,21 +56,17 @@ extern emptyKbBuffer
 
 section .header
 
-START:
-PE:
+
 HEADER:
-
-
-
 
 ;; Header DOS, 128 bytes.
 DOS_SIGNATURE:			db "MZ", 0x00, 0x00
-DOS_HDRS:				times 60-($-HEADER) db 0
-PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - START	;; File offset.
-DOS_STUB:				times 64 db 0			;; No program, zero fill.
+DOS_HDRS:				times 60 - ($ - HEADER) db 0
+PE_SIGNATURE_OFFSET:	dd PE_SIGNATURE - HEADER	;; File offset.
+DOS_STUB:				times 64 db 0				;; No program, zero fill.
 
 ;; Encabezado PE.
-PE_SIGNATURE:			db "PE", 0x00, 0x00
+PE_SIGNATURE:		db "PE", 0x00, 0x00
 
 ;; COFF File Header, 20 bytes.
 MACHINE_TYPE:		dw 0x8664		;; x86-64 machine.
@@ -88,7 +83,7 @@ OPT_HDR_SIZE:		dw OPT_HDR_END - OPT_HDR	;; Optional header. Section tabl
 												;; yte after headers. Make sure 
 												;; use size of optional header a
 												;; s specified in file header.
-CHARACTERISTICS:	dw 0x222E		;; Attributes of the file.
+CHARACTERISTICS:			dw 0x222E		;; Attributes of the file.
 ;; Flags:
 ;; IMG_DLL					0x2000
 ;; IMG_DEBUG_STRIPPED		0x0200	Debugging info removed from the image file.
@@ -104,16 +99,14 @@ MAGIC_NUMBER:				dw 0x020B ;; PE32+ (64-bit address space) PE format.
 MAJOR_LINKER_VERSION:		db 0
 MINOR_LINKER_VERSION:		db 0
 
-;;CODE_SIZE:					dd CODE_END - CODE	;; Text.
 CODE_SIZE:					dd codeSize	;; Text.
+INITIALIZED_DATA_SIZE:		dd dataSize	;; Data.
+UNINITIALIZED_DATA_SIZE:	dd 0x00		;; Bss.
 
-;;INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
-INITIALIZED_DATA_SIZE:		dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)	;; Data.
+ENTRY_POINT_ADDR:		dd codeOffset	;; Entry point relative to img base load
+										;; ed in memory.
+BASE_OF_CODE_ADDR:		dd codeOffset	;; Relative addr of base of code sect.
 
-UNINITIALIZED_DATA_SIZE:	dd 0x00				;; Bss.
-ENTRY_POINT_ADDR:		dd EntryPoint - START	;; Entry point relative to img b
-												;; ase loaded in memory.
-BASE_OF_CODE_ADDR:		dd CODE - START	;; Relative addr of base of code sect.
 IMAGE_BASE:				dq 0x400000		;; Where in memory we would prefer image
 										;; to be loaded at. Multiple of 64K.
 SECTION_ALIGNMENT:		dd 0x1000		;; Alignment [bytes] of sections when lo
@@ -126,12 +119,12 @@ MINOR_IMAGE_VERSION:	dw 0
 MAJOR_SUBSYS_VERSION:	dw 0
 MINOR_SUBSYS_VERSION:	dw 0
 WIN32_VERSION_VALUE:	dd 0			;; Reserved, must be 0.
-IMAGE_SIZE:				dd END - START	;; The size [bytes] of img loaded in mem
+IMAGE_SIZE:				dd fileSize		;; The size [bytes] of img loaded in mem
 										;; including all headers. Must be multip
 										;; le of SectionAlignment (?). Aparentem
 										;; ente no es mandatorio. 
 
-HEADERS_SIZE:			dd HEADER_END - HEADER	;; Size of all the headers.
+HEADERS_SIZE:			dd headerSize	;; Size of all the headers.
 CHECKSUM:				dd 0
 SUBSYSTEM:				dw 10		;; IMAGE_SUBSYSTEM_EFI_APPLICATION = 10, Ext
 									;; ensible Firmware Interface (EFI) app.
@@ -151,37 +144,32 @@ OPT_HDR_END:
 
 ;; Section Table (Section Headers)
 SECTION_HDRS:
-SECTION_CODE:
-.name						db ".text", 0x00, 0x00, 0x00
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;.virtual_size				dd CODE_END - CODE
-.virtual_size				dd codeSize
-
-.virtual_address			dd CODE - START
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;.size_of_raw_data			dd CODE_END - CODE
-.size_of_raw_data			dd codeSize
-.pointer_to_raw_data		dd CODE - START
-.pointer_to_relocations		dd 0
-.pointer_to_line_numbers	dd 0
-.number_of_relocations		dw 0
-.number_of_line_numbers		dw 0
-.characteristics			dd 0x70000020
+.text_name						db ".text", 0x00, 0x00, 0x00
+.text_virtual_size				dd codeSize
+.text_virtual_address			dd codeOffset
+.text_size_of_raw_data			dd codeSize
+.text_pointer_to_raw_data		dd codeOffset
+.text_pointer_to_relocations	dd 0
+.text_pointer_to_line_numbers	dd 0
+.text_number_of_relocations		dw 0
+.text_number_of_line_numbers	dw 0
+.text_characteristics			dd 0x70000020
 ;; Section flags:
-;; IMAGE_SCN_MEM_SHARED		0x10000000 Can be shared in memory.
-;; IMAGE_SCN_MEM_EXECUTE	0x20000000 Can be executed as code.
-;; IMAGE_SCN_MEM_READ		0x40000000 Can be read.
-;; IMAGE_SCN_CNT_CODE		0x00000020 Contains executable code.
+;; IMAGE_SCN_MEM_SHARED			0x10000000 Can be shared in memory.
+;; IMAGE_SCN_MEM_EXECUTE		0x20000000 Can be executed as code.
+;; IMAGE_SCN_MEM_READ			0x40000000 Can be read.
+;; IMAGE_SCN_CNT_CODE			0x00000020 Contains executable code.
 
-SECTION_DATA:
-.name						db ".data", 0x00, 0x00, 0x00
-.virtual_size				dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)
-.virtual_address			dd DATA - START
-.size_of_raw_data			dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)
-.pointer_to_raw_data		dd DATA - START
-.pointer_to_relocations		dd 0
-.pointer_to_line_numbers	dd 0
-.number_of_relocations		dw 0
-.number_of_line_numbers		dw 0
-.characteristics			dd 0xD0000040
+.data_name						db ".data", 0x00, 0x00, 0x00
+.data_virtual_size				dd dataSize
+.data_virtual_address			dd dataOffset
+.data_size_of_raw_data			dd dataSize
+.data_pointer_to_raw_data		dd dataOffset
+.data_pointer_to_relocations	dd 0
+.data_pointer_to_line_numbers	dd 0
+.data_number_of_relocations		dw 0
+.data_number_of_line_numbers	dw 0
+.data_characteristics			dd 0xD0000040
 ;; Section flags:
 ;; IMAGE_SCN_MEM_SHARED				0x10000000 Can be shared in memory.
 ;; IMAGE_SCN_MEM_READ				0x40000000 Can be read.
@@ -190,7 +178,9 @@ SECTION_DATA:
 
 ;; El header ocupo exactamente 0x160 bytes. Lo alineo a 0x200 para que termine o
 ;; cupando 512 bytes.
-HEADER_END:
+
+
+section .text
 
 ;; Entry point prototype:
 ;; EFI_STATUS main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
@@ -215,14 +205,8 @@ HEADER_END:
 ;; MM0-XMM5 volatile (not preserved by called function).
 ;; Note: EFI, for every supported architecture defines exact ABI.
 
-section .text
 
-CODE:
-
-
-
-
-EntryPoint:
+entryPoint:
 	;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	;; UEFI entry point args and rerturn address.
 	mov [EFI_IMAGE_HANDLE], rcx
@@ -1211,12 +1195,6 @@ division_init:
 	ret
 
 
-;;;;;;;;;;;;;;;;;%include "./asm/lib/lib.asm"
-
-
-CODE_END:
-
-
 ;;==============================================================================
 ;; Cuidado con la posicion de estas tablas, no se pudede cambiar porque por el m
 ;; omento estan hardcodeadas las posiciones relativas de la misma donde bootload
@@ -1225,8 +1203,6 @@ CODE_END:
 
 section .data
 
-
-DATA:
 EFI_IMAGE_HANDLE:	    dq 0	;; rcx at entry point.
 EFI_SYSTEM_TABLE:	    dq 0	;; rdx at entry point.
 EFI_IMG_RET_ADDR:	    dq 0
@@ -1453,7 +1429,6 @@ aux_buf_size dq 128
 
 
 
-DATA_RUNTIME_END:
 
 
 ;;==============================================================================
@@ -1473,27 +1448,6 @@ times 240 * 1024 db 0x00
 ;; los 16Kib que son el comienzo de la seccion, ocupada por header y code.
 times 1048576 - ($ - $$) - 16 * 1024	db 0
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-DATA_END:
-END:
 
 
 ;;==============================================================================
