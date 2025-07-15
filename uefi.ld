@@ -7,15 +7,19 @@ SECTIONS
 		header = .;
 		*(.header)
 		endOfHeader = .;
-	}		
+	}
 
-	.text ALIGN(0x200) :
+	. = ALIGN(0x200);
+	codeStart = .;
+
+	.text :
 	{
 		text = .;
 		*(.text)
-		endOfCode = .;
-
 	}
+	
+	codeEnd = .;
+	codeSize = . - codeStart;
 
 	.data ALIGN(0x1000):
 	{

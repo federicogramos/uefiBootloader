@@ -27,6 +27,13 @@
 ;; HAY QUE INDICARLE A UEFI QUE EL TAMANO ES MAS GRANDE (.TEXT) PORQUE SABE LO QUE
 ;; HAY EN ESTE ARCHIVO PERO NO SUME LOS BYTES DE LA LIB.ASM
 
+
+;; Linker symbols.
+extern codeStart
+extern codeEnd
+extern codeSize
+
+
 global FB
 global FB_SIZE
 global PPSL
@@ -53,6 +60,9 @@ section .header
 START:
 PE:
 HEADER:
+
+
+
 
 ;; Header DOS, 128 bytes.
 DOS_SIGNATURE:			db "MZ", 0x00, 0x00
@@ -93,7 +103,9 @@ OPT_HDR:
 MAGIC_NUMBER:				dw 0x020B ;; PE32+ (64-bit address space) PE format.
 MAJOR_LINKER_VERSION:		db 0
 MINOR_LINKER_VERSION:		db 0
-CODE_SIZE:					dd CODE_END - CODE	;; Text.
+
+;;CODE_SIZE:					dd CODE_END - CODE	;; Text.
+CODE_SIZE:					dd codeSize	;; Text.
 
 ;;INITIALIZED_DATA_SIZE:		dd DATA_END - DATA	;; Data.
 INITIALIZED_DATA_SIZE:		dd DATA_END - PAYLOAD + (DATA_RUNTIME_END - DATA)	;; Data.
@@ -141,9 +153,12 @@ OPT_HDR_END:
 SECTION_HDRS:
 SECTION_CODE:
 .name						db ".text", 0x00, 0x00, 0x00
-.virtual_size				dd CODE_END - CODE
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;.virtual_size				dd CODE_END - CODE
+.virtual_size				dd codeSize
+
 .virtual_address			dd CODE - START
-.size_of_raw_data			dd CODE_END - CODE
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;.size_of_raw_data			dd CODE_END - CODE
+.size_of_raw_data			dd codeSize
 .pointer_to_raw_data		dd CODE - START
 .pointer_to_relocations		dd 0
 .pointer_to_line_numbers	dd 0
@@ -203,6 +218,10 @@ HEADER_END:
 section .text
 
 CODE:
+
+
+
+
 EntryPoint:
 	;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	;; UEFI entry point args and rerturn address.
@@ -1192,7 +1211,7 @@ division_init:
 	ret
 
 
-;;%include "./asm/lib/lib.asm"
+;;;;;;;;;;;;;;;;;%include "./asm/lib/lib.asm"
 
 
 CODE_END:
@@ -1392,6 +1411,48 @@ auxiliar	dq 0
 aux_buffer dq 0
 aux_buf_size dq 128
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 DATA_RUNTIME_END:
 
 
@@ -1411,6 +1472,24 @@ times 240 * 1024 db 0x00
 ;; Suficientes 0x00 para obtener un tamano de archivo de 1MiB. Le resto tambien 
 ;; los 16Kib que son el comienzo de la seccion, ocupada por header y code.
 times 1048576 - ($ - $$) - 16 * 1024	db 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 DATA_END:
@@ -1529,3 +1608,7 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL_BLT		equ 16
 EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE		equ 24
 
 EFI_RUNTIME_SERVICES_RESETSYSTEM		equ 104
+
+
+
+
