@@ -1065,7 +1065,8 @@ fmt_err_fatal8:					db "Error fatal: %s", 0
 
 msg_boot_services_exit:			db "ExitBootSerivces()...", 0x0A, 0
 msg_boot_services_exit_ok:		db "Exit from UEFI services OK "
-								db "(ret val = EFI_SUCCESS).", 0x0A, 0
+								db "(ret val = EFI_SUCCESS)", 0x0A
+								db "[tecla 'n' para continuar]", 0x0A
 
 msg_handlebuffer_err:			db "HandleBuffer() error.", 0x0A, 0
 msg_handlebuffer_ok:			db "HandleBuffer() returned EFI_SUCCESS"
