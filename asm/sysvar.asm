@@ -33,7 +33,12 @@ IM_ActivedCoreIDs:	equ 0x0000000000005E00	;; 1by per entry. 1 = 1 core active.
 ;; Luego, durante el bootloader, la mantiene aqui, pero tambien copia al infoMap
 ;; 0x5080
 
-VBEModeInfoBlock:	equ 0x0000000000005F00	;; 256 bytes.
+VBEModeInfoBlock:
+FB:			equ 0x0000000000005F00	;; 256 bytes.
+FB_SIZE		equ 0x0000000000005F08	;; Frame buffer size (bytes)
+HR:			equ 0x0000000000005F10	;; Screen X
+VR:			equ 0x0000000000005F12	;; Screen Y
+PPSL:		equ 0x0000000000005F14	;; PixelsPerScanLine
 
 ;; DQ - Starting at offset 0, increments by 0x8
 p_ACPITableAddress:	equ SystemVariables + 0x00

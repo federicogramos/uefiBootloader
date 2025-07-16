@@ -20,7 +20,6 @@ $(UEFI_SYS): build
 	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o ./obj/uefi.elf ./obj/uefi.o ./obj/lib.o ./obj/lib_efi.o
 
 $(BOOTLOADER): $(UEFI)
-#	$(ASM) ./asm/bootloader.asm -o ./build/$(BOOTLOADER)
 	$(ASM) ./asm/bootloader.asm -o ./build/$(BOOTLOADER)
 
 

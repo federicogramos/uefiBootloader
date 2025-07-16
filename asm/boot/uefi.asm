@@ -750,13 +750,19 @@ exit_uefi_services:
 	jne get_memmap				;; Get mem map, then try to exit again.
 	cli							;; Ya afuera.
 
-	;; Payload al destino. Maximo tamano 256KiB y por eso cuando armamos imagen 
+	;; Payload al destino. Maximo tamano 240KiB y por eso cuando armamos imagen 
 	;; se deberia revisar que no sea mayor. Un posible payload es:
-	;; uefiBootloader.sys + kernel.bin + modulosUserland.bin
+	;;  +--------------------+----------------------------------+
+	;;  | uefiBootloader.sys | kernel.bin + modulosUserland.bin |
+	;;  +--------------------+----------------------------------+
+	;;  |<------ 6KiB ------>|<------------ 234KiB ------------>|
+	;;  |^                   |^                                 |^
+	;; 0x8000              0x9800                             0x44000          
 	mov rsi, PAYLOAD
 	mov rdi, 0x8000
-	mov rcx, (256 * 1024)	;; 256KiB a partir de 0x8000
-	rep movsb				;; Ultimo byte escrito = 0x8000 + (256 * 1024) - 1
+	mov rcx, (240 * 1024)	;; 240KiB a partir de 0x8000
+	rep movsb				;; Ultimo byte escrito = 0x8000 + (240 * 1024) - 1 =
+							;; 0x43FFF
 
 	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
 	;; qword [0x00005F00] = Frame buffer base

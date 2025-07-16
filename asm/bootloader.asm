@@ -40,11 +40,14 @@ ap_startup:
 %include "./asm/init/smp_ap.asm"	;; AP's will start execution at 0x8000 and fall through to this code
 
 ;;==============================================================================
-;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored at 0x5FFF then we know it was a UEFI boot and can
-; immediately proceed to start64. Otherwise we need to set up a minimal 64-bit environment.
+;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
+;; at 0x5FFF then we know it was a UEFI boot and can immediately proceed to star
+;; t64. Otherwise we need to set up a minimal 64-bit environment.
+
 BITS 32
+
 bootmode:
-	cmp bl, 'U'	;; If uefi boot: already in 64 bit mode.
+	cmp bl, 'U'	;; If uefi boot then already in 64 bit mode.
 	je start64
 
 %ifdef BIOS
@@ -52,21 +55,23 @@ bootmode:
 %endif
 
 BITS 64
+
 start64:
-	mov rsp, 0x8000	;; Init stack.
+	mov rsp, 0x8000		;; Init stack.
 
-	mov rdi, 0x5000	;; Clear the info map and system variable memory.
+	mov rdi, InfoMap	;; Beggining at 0x5000: clear mem for info map and syste
+						;; m variables.
 	xor rax, rax
-	mov rcx, 960	;; 3840 bytes (Range is 0x5000 - 0x5EFF)
-	rep stosd		;; Ciudado: en 0x5F00 hay datos de UEFI/BIOS.
+	mov rcx, 960		;; 3840 bytes (Range is 0x5000 - 0x5EFF)
+	rep stosd			;; Ciudado: en 0x5F00 hay datos de UEFI/BIOS.
 
+	;; Sysvars.
 	mov [p_BootMode], bl
-	mov [p_BootDisk], bh
-
-	mov ax, 0x03	;; Set flags for legacy ports (in case of no ACPI data)
+	mov [p_BootDisk], bh	
+	mov ax, 0x03		;; Set flags for legacy ports (in case of no ACPI data)
 	mov [p_IAPC_BOOT_ARCH], ax
 
-	; Mask all PIC interrupts
+	;; Mask all PIC interrupts
 	mov al, 0xFF
 	out 0x21, al
 	out 0xA1, al
@@ -93,13 +98,13 @@ start64:
 	mov al, 1
 	out 0xA1, al
 
-	; Disable NMIs
+	;; Disable NMIs
 	in al, 0x70
 	or al, 0x80
 	out 0x70, al
 	in al, 0x71
 
-	; Disable PIT
+	;; Disable PIT
 	mov al, 0x30			; Channel 0 (7:6), Access Mode lo/hi (5:4), Mode 0 (3:1), Binary (0)
 	out 0x43, al
 	mov al, 0x00
@@ -1130,6 +1135,67 @@ debug_progressbar:
 	ret
 ; -----------------------------------------------------------------------------
 %endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 BOOTLOADER_SIZE equ 0x1800	;; 6KiB
