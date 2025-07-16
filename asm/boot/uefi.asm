@@ -829,7 +829,7 @@ exit_uefi_services:
 	call emptyKbBuffer
 	call keyboard_get_key	;; Poleo para poder promptear ahora que hemos salido
 							;; de bootservices.
-
+step
 	xor rax, rax
 	xor rcx, rcx
 	xor rdx, rdx
@@ -959,7 +959,7 @@ EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
 ;; } EFI_INPUT_KEY;
 EFI_INPUT_KEY		dw 0, 0
 
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+STEP_MODE_FLAG		db 0	;; Lo activa presionar 's' al booteo.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.
