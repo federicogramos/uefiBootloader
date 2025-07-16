@@ -830,7 +830,7 @@ exit_uefi_services:
 	call emptyKbBuffer
 	call keyboard_get_key	;; Poleo para poder promptear ahora que hemos salido
 							;; de bootservices.
-
+step
 	xor rax, rax
 	xor rcx, rcx
 	xor rdx, rdx
@@ -963,7 +963,7 @@ EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
 ;; } EFI_INPUT_KEY;
 EFI_INPUT_KEY		dw 0, 0
 
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+STEP_MODE_FLAG		db 0	;; Lo activa presionar 's' al booteo.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.
@@ -1022,7 +1022,8 @@ efi_fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
 efi_fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
 
 msg_graphics_mode_info_match:	dw utf16("Graphics mode info match."), 13, 0xA
-								dw utf16("SetMode()..."), 13, 0xA, 0
+								dw utf16("SetMode()..."), 13, 0xA
+								dw utf16("[tecla 'n' para continuar]"), 13, 0xA, 0
 
 msg_acpi_err:					dw utf16("ACPI no encontrado."), 0
 fmt_err_fatal:					dw utf16("Error fatal: %s"), 0
@@ -1068,7 +1069,8 @@ fmt_err_fatal8:					db "Error fatal: %s", 0
 
 msg_boot_services_exit:			db "ExitBootSerivces()...", 0x0A, 0
 msg_boot_services_exit_ok:		db "Exit from UEFI services OK "
-								db "(ret val = EFI_SUCCESS).", 0x0A, 0
+								db "(ret val = EFI_SUCCESS)", 0x0A
+								db "[tecla 'n' para continuar]", 0x0A, 0
 
 msg_handlebuffer_err:			db "HandleBuffer() error.", 0x0A, 0
 msg_handlebuffer_ok:			db "HandleBuffer() returned EFI_SUCCESS"
