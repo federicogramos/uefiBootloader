@@ -24,6 +24,7 @@
 
 
 %include "./asm/include/efi.inc"
+%define utf16(x) __utf16__(x)
 
 
 global FB
@@ -58,9 +59,6 @@ extern emptyKbBuffer
 extern efi_print
 extern ventana_modo_step
 extern efi_prompt_step_mode
-
-
-%define utf16(x) __utf16__(x)
 
 
 ;;==============================================================================
@@ -434,7 +432,7 @@ get_EDID:
 	jmp locate_gop_protocol
 
 locate_edid_fail_use_default_resolution:
-	mov rdx, msg_locate_edid_fail_use_default_resolution
+	mov rdx, msg_locate_edid_fail_use_default_resol
 	call efi_print
 	jmp locate_gop_protocol
 
@@ -894,8 +892,6 @@ halt:
 	jmp halt
 
 
-
-
 ;;==============================================================================
 ;; Cuidado con la posicion de estas tablas, no se pudede cambiar porque por el m
 ;; omento estan hardcodeadas las posiciones relativas de la misma donde bootload
@@ -987,23 +983,27 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID:
 	dw 0x23dc, 0x4a38
 	db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 
+
+msg_placeholder dw 0,0,0,0,0,0,0,0	;; Reserve 8 words for the buffer.
+msg_placeholder_len equ ($ - msg_placeholder)
+
+print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
+							;; til para establecer un mensaje distinto segun con
+							;; diciones e imprimir en 1 solo lugar el mensaje q
+							;; haya ocurrido.
+aux_buffer dq 0
+aux_buf_size dq 128
+
+
 ;; UTF16 strings para bootservices.
-msg_error:					dw utf16("Error"), 0
+msg_error:								dw utf16("Error"), 0
+msg_locate_edid_fail_use_default_resol:	dw	utf16("Locate EDID fail: ")
+										dw	utf16("se usara resolucion ")
+										dw	utf16("por defecto"), 13, 0xA, 0
 
-msg_badPayloadSignature:	db "Payload signature check failed.", 0
-
-;;Hex:						db "0123456789ABCDEF"
-Num:						dw 0, 0
-newline:					dw 13, 10, 0
-
-
-
-;; Some new messages.
-msg_locate_edid_fail_use_default_resolution: dw utf16("Locate EDID fail: se usara resolucion por defecto"), 13, 0xA, 0
-
-fmt_edid_validation_fail: dw utf16("EDID validation failure = %s"), 13, 0xA, 0
-str_edid_size_err: dw utf16("error de tamano"), 0
-str_edid_hdr_err: dw utf16("error en el encabezado"), 0
+fmt_edid_validation_fail:	dw utf16("EDID validation failure = %s"), 13, 0xA, 0
+str_edid_size_err:			dw utf16("error de tamano"), 0
+str_edid_hdr_err:			dw utf16("error en el encabezado"), 0
 
 efi_fmt_resolution_horizontal:	dw utf16("Video resolution = %d"), 0
 efi_fmt_resolution_vertical:	dw utf16(" x %d"), 13, 0xA, 0
@@ -1011,41 +1011,14 @@ efi_fmt_ppsl:					dw utf16("PPSL = %d"), 0
 efi_fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
 efi_fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
 
-fmt_resolution_horizontal:		db "Video resolution = %d", 0
-fmt_resolution_vertical:		db " x %d", 13, 0xA, 0
-fmt_ppsl:						db "PPSL = %d", 0
-fmt_fb_size:					db " | Framebuffer = %d bytes", 0
-fmt_fb_address:					db " | Address = 0x%h", 13, 0xA, 0
-
 msg_graphics_mode_info_match:	dw utf16("Graphics mode info match."), 13, 0xA
 								dw utf16("SetMode()..."), 13, 0xA, 0
 
-msg_gop_no_mode_matches: db "Graphics mode: no mode matches.", 13, 0xA, 0
-msg_graphics_success: db "Cambio de modo de video ok | Nuevo modo = %d", 13, 0xA, 0
-
-msg_por: dw utf16(" x "), 0
-msg_placeholder dw 0,0,0,0,0,0,0,0 ; Reserve 8 words for the buffer
-msg_placeholder_len equ ($ - msg_placeholder)
-msg_efi_success: dw utf16("EFI success"), 13, 0xA, 0
-msg_efi_not_ready: dw utf16("EFI not ready"), 13, 0xA, 0
-
-msg_notify_memmap_change: db "Memory map buffer size change: will request again.", 13, 0xA, 0
-
-txt_err_memmap:				dw utf16("get memmap feilure"), 0
-
-fmt_memmap_cant_descriptors:	db	"Uefi returned a memory map "
-								db	"| Cant descriptors = %d", 13, 0xA, 0
-fmt_memmap_descriptor_size:		db	"Memory map descriptor size = %d [bytes]"
-								db	" (reported)", 13, 0xA, 0
-
-msg_acpi_err:		dw utf16("ACPI no encontrado."), 0
-
-fmt_err_fatal:		dw utf16("Error fatal: %s"), 0
-fmt_err_fatal8:		db "Error fatal: %s", 0
-
-fmt_max_txt_mode:	dw utf16("Max txt mode = %d"), 0
-fmt_curr_txt_mode:	dw utf16(" | Curr mode = %d"), 13, 0xA, 0
-fmt_fw_vendor:		dw utf16("FW vendor = %s"), 13, 0xA, 0
+msg_acpi_err:					dw utf16("ACPI no encontrado."), 0
+fmt_err_fatal:					dw utf16("Error fatal: %s"), 0
+fmt_max_txt_mode:				dw utf16("Max txt mode = %d"), 0
+fmt_curr_txt_mode:				dw utf16(" | Curr mode = %d"), 13, 0xA, 0
+fmt_fw_vendor:					dw utf16("FW vendor = %s"), 13, 0xA, 0
 
 str_edid_active_protocol:		dw utf16("active protocol"), 0
 str_edid_discovered_protocol:	dw utf16("discovered protocol"), 0
@@ -1053,77 +1026,53 @@ fmt_edid_protocol_located:		dw utf16("EDID protocol found = %s"), 13, 0xA, 0
 
 str_gop_protocol_fatal_err:		dw utf16("GOP protocol no localizado"), 0
 
+msg_por: 						dw utf16(" x "), 0
+msg_efi_success:				dw utf16("EFI success"), 13, 0xA, 0
+msg_efi_not_ready:				dw utf16("EFI not ready"), 13, 0xA, 0
+txt_err_memmap:					dw utf16("get memmap feilure"), 0
+
+
 ;; UTF8 strings para bootloader.
+msg_badPayloadSignature:		db "Payload signature check failed.", 0
+
+fmt_resolution_horizontal:		db "Video resolution = %d", 0
+fmt_resolution_vertical:		db " x %d", 13, 0xA, 0
+fmt_ppsl:						db "PPSL = %d", 0
+fmt_fb_size:					db " | Framebuffer = %d bytes", 0
+fmt_fb_address:					db " | Address = 0x%h", 13, 0xA, 0
+
+msg_gop_no_mode_matches:	db "Graphics mode: no mode matches.", 13, 0xA, 0
+msg_graphics_success:		db "Cambio de modo de video ok "
+							db "| Nuevo modo = %d", 13, 0xA, 0
+
+msg_notify_memmap_change:		db "Memory map buffer size change: "
+								db "will request again.", 13, 0xA, 0
+
+
+fmt_memmap_cant_descriptors:	db	"Uefi returned a memory map "
+								db	"| Cant descriptors = %d", 13, 0xA, 0
+fmt_memmap_descriptor_size:		db	"Memory map descriptor size = %d [bytes]"
+								db	" (reported)", 13, 0xA, 0
+
+fmt_err_fatal8:					db "Error fatal: %s", 0
+
 msg_boot_services_exit:			db "ExitBootSerivces()...", 0x0A, 0
 msg_boot_services_exit_ok:		db "Exit from UEFI services OK "
 								db "(ret val = EFI_SUCCESS).", 0x0A, 0
 
-msg_handlebuffer_err:		db "HandleBuffer() error.", 0x0A, 0
-msg_handlebuffer_ok:		db "HandleBuffer() returned EFI_SUCCESS"
-							db " | Number of handlers = %d", 0x0A, 0
-msg_conin_handle_value		db "Conin handle val = %h | Located: ", 0
-msg_located_index			db " [%d] = ", 0
-msg_located_value			db "%h", 0
-newline8					db 0x0A, 0
+msg_handlebuffer_err:			db "HandleBuffer() error.", 0x0A, 0
+msg_handlebuffer_ok:			db "HandleBuffer() returned EFI_SUCCESS"
+								db " | Number of handlers = %d", 0x0A, 0
+msg_conin_handle_value			db "Conin handle val = %h | Located: ", 0
+msg_located_index				db " [%d] = ", 0
+msg_located_value				db "%h", 0
+newline8						db 0x0A, 0
 
 msg_handleprotocol_err:		db "HandleProtocol() error.", 0x0A, 0
 msg_handleprotocol_ok:		db "HandleProtocol() returned EFI_SUCCESS.", 0x0A, 0
 
-print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
-							;; til para establecer un mensaje distinto segun con
-							;; diciones e imprimir en 1 solo lugar el mensaje q
-							;; haya ocurrido.
-
-
-msg_reference	db "conin interface = %d", 0x0A, 0
-msg_located	db "located interface = %d", 0
-auxiliar	dq 0
-aux_buffer dq 0
-aux_buf_size dq 128
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+msg_reference				db "conin interface = %d", 0x0A, 0
+msg_located					db "located interface = %d", 0
 
 
 ;;==============================================================================
@@ -1132,24 +1081,11 @@ aux_buf_size dq 128
 
 section .payload
 
-PAYLOAD:	
+PAYLOAD:
 times 240 * 1024 db 0x00
 
-;; Esto cambiarlo por 256K para mas payload.
-;;align 65536	;; 64KiB para BOOT64.EFI + payload (bootloader + PackedKernel).
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;RAMDISK:
-
-;; Suficientes 0x00 para obtener un tamano de archivo de 1MiB. Le resto tambien 
-;; los 16Kib que son el comienzo de la seccion, ocupada por header y code.
+;; Padeo con ceros. Suficientes 0x00 para obtener un tamano de archivo de 1MiB. 
+;; Le resto tambien los 16Kib que son el comienzo de la seccion, ocupada por hea
+;; der y code.
 times 1048576 - ($ - $$) - 16 * 1024	db 0
-
-
-
-;;==============================================================================
-;; A partir de aqui, definicion de constantes
-;;==============================================================================
-
-
-
-
 
