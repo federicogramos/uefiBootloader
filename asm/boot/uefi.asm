@@ -1018,7 +1018,8 @@ efi_fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
 efi_fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
 
 msg_graphics_mode_info_match:	dw utf16("Graphics mode info match."), 13, 0xA
-								dw utf16("SetMode()... [tecla 'n' para continuar]"), 13, 0xA, 0
+								dw utf16("SetMode()..."), 13, 0xA
+								dw utf16("[tecla 'n' para continuar]"), 13, 0xA, 0
 
 msg_acpi_err:					dw utf16("ACPI no encontrado."), 0
 fmt_err_fatal:					dw utf16("Error fatal: %s"), 0
