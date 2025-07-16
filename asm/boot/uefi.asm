@@ -759,7 +759,8 @@ exit_uefi_services:
 	;;  |^                   |^                                 |^
 	;; 0x8000              0x9800                             0x44000          
 	mov rsi, PAYLOAD
-	mov rdi, 0x8000
+;;	mov rdi, 0x8000
+	mov rdi, 0x200000
 	mov rcx, (240 * 1024)	;; 240KiB a partir de 0x8000
 	rep movsb				;; Ultimo byte escrito = 0x8000 + (240 * 1024) - 1 =
 							;; 0x43FFF
@@ -834,7 +835,8 @@ exit_uefi_services:
 	xor rcx, rcx
 	xor rdx, rdx
 	xor rbx, rbx
-	mov rsp, 0x8000
+;;	mov rsp, 0x8000
+	mov rsp, 0x400000
 	xor rbp, rbp
 	xor rsi, rsi
 	xor rdi, rdi
@@ -849,8 +851,10 @@ exit_uefi_services:
 
 	mov bl, 'U'
 
-	mov rax, 0x8000
-	jmp rax	;; Vamos a siguiente loader. Aprox 0x400702
+to_next_loader:
+;;	mov rax, 0x8000
+	mov rax, 0x200000
+	jmp rax
 
 
 ;;==============================================================================

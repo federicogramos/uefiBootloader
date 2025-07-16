@@ -35,7 +35,10 @@ function init_imgs {
 function build_all {
 
 	make clean -C .
-	make all -C .
+
+	#make all -C .
+	make_output=$(make all -C . 2>&1)
+	echo "$make_output" | grep --color=always -i "error" || echo "$make_output"
 
 	init_imgs $BMFS_SIZE
 

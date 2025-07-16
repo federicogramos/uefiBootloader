@@ -22,7 +22,6 @@ $(UEFI_SYS): build
 $(BOOTLOADER): $(UEFI)
 	$(ASM) ./asm/bootloader.asm -o ./build/$(BOOTLOADER)
 
-
 build:
 	mkdir build img out obj
 		

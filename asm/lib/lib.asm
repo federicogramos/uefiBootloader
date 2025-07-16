@@ -147,11 +147,17 @@ num2str:
 ;;
 ;; El cursor para esta funcion, es la direccion del pixel superior izquierdo del
 ;; bounding box del caracter de la fuente.
+;;
+;; Aclaracion: de la memoria de video usa PPSL el cual puede ser indistintamente
+;; qword (durante efi) o word (post-efi).
 ;;==============================================================================
 
 print:
 	mov rax, [print_cursor]
 	mov rdi, [PPSL]
+	and rdi, 0x0000FFFF	;; No necesario durante efi, pero si necesario durante 2
+						;; do loader puesto que en 0x5F00 queda  HR, VR y PPSL e
+						;; n tamanos de dato word.
 	mov r8, 0	;; ix src str.
 	
 .loop_read_string_char:
@@ -224,12 +230,15 @@ print:
 	mov rdx, 0			;; rdx:rax = 0:rax
 	sub rax, [FB]
 	mov rbx, [PPSL]
+	and rdi, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
 	lea rbx, [4 * rbx]	;; 4b/px * ppsl
 	div rbx				;; rdx = offset desde comienzo de linea.
 
 	sub [rsp], rdx		;; Carriage return.
 
 	mov rbx, [PPSL]
+	and rdi, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
+
 	mov rax, 4 * 16		;; Bajar 16px.
 	mov rdx, 0
 	mul rbx				;; rax = offset_bytes
