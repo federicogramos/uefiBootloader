@@ -230,14 +230,14 @@ print:
 	mov rdx, 0			;; rdx:rax = 0:rax
 	sub rax, [FB]
 	mov rbx, [PPSL]
-	and rdi, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
+	and rbx, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
 	lea rbx, [4 * rbx]	;; 4b/px * ppsl
 	div rbx				;; rdx = offset desde comienzo de linea.
 
 	sub [rsp], rdx		;; Carriage return.
 
 	mov rbx, [PPSL]
-	and rdi, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
+	and rbx, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
 
 	mov rax, 4 * 16		;; Bajar 16px.
 	mov rdx, 0
@@ -407,8 +407,9 @@ print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
 volatile_placeholder:
 times	64 dw 0x0000
 
-msg_test8:	db "Test", 0
-
+;;TODO: cuando genere la fuente, le recorte la linea inferior... o sea, por ejem
+;; plo la letra g miniscula, tiene un chiquito recortada la curvatura inferior.
+;; Regenerar la fuente.
 
 font_height	equ 16
 font_data:

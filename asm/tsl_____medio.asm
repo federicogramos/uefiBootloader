@@ -8,8 +8,8 @@
 
 
 BITS 64
-;;ORG 0x00008000
-ORG 0x0000200000
+ORG 0x00008000
+;;ORG 0x0000200000
 
 start:
 	jmp bootmode	;; Will be overwritten with 'NOP's before AP's are started.
@@ -59,8 +59,8 @@ BITS 64
 
 start64:
 
-;;	mov rsp, 0x8000		;; Init stack.
-	mov rsp, 0x200000		;; Init stack.
+	mov rsp, 0x8000		;; Init stack.
+;;	mov rsp, 0x200000		;; Init stack.
 
 
 	;; El cursor quedo en el anterior loader. Reseteo todo y borro pantalla.
@@ -73,8 +73,8 @@ start64:
 	mov r9, msg_second_bootloader_start
 	call print
 
-cli
-hlt
+;;cli
+;;hlt
 
 	mov rdi, InfoMap	;; Beggining at 0x5000: clear mem for info map and syste
 						;; m variables.
@@ -319,7 +319,8 @@ skip1GB:
 	xor esi, esi			; aka r6
 	xor edi, edi			; aka r7
 	xor ebp, ebp			; aka r5
-	mov esp, 0x200000			; aka r4
+;;	mov esp, 0x200000			; aka r4
+	mov esp, 0x8000			; aka r4
 	xor r8, r8
 	xor r9, r9
 	xor r10, r10
@@ -343,6 +344,14 @@ skip1GB:
 clearcs64:
 
 	lgdt [GDTR64]			; Reload the GDT
+
+
+
+	mov r9, msg_second_bootloader_start
+	call print
+
+cli
+hlt
 
 ; Visual Debug (2/4)
 	mov ebx, 2

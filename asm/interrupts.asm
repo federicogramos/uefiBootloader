@@ -7,6 +7,10 @@
 ; Default exception handler
 exception_gate:
 exception_gate_halt:
+
+	;;mov r9, msg_exception_occurred
+	;;call print
+
 	cli				; Disable interrupts
 	hlt				; Halt the system
 	jmp exception_gate_halt

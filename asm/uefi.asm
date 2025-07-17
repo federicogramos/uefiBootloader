@@ -1,5 +1,5 @@
 ;;==============================================================================
-;; UEFI bootloader | @file /asm/boot/uefi.asm
+;; UEFI loader | @file /asm/uefi.asm
 ;;==============================================================================
 ;; Varios de los comentarios realizados estan basados en la informacion de: 
 ;; -- Extensible Firmware Interface Specification Version 1.10 December 1, 2002.
@@ -759,8 +759,8 @@ exit_uefi_services:
 	;;  |^                   |^                                 |^
 	;; 0x8000              0x9800                             0x44000          
 	mov rsi, PAYLOAD
-;;	mov rdi, 0x8000
-	mov rdi, 0x200000
+	mov rdi, 0x8000
+;;	mov rdi, 0x200000
 	mov rcx, (240 * 1024)	;; 240KiB a partir de 0x8000
 	rep movsb				;; Ultimo byte escrito = 0x8000 + (240 * 1024) - 1 =
 							;; 0x43FFF
@@ -830,13 +830,12 @@ exit_uefi_services:
 	call emptyKbBuffer
 	call keyboard_get_key	;; Poleo para poder promptear ahora que hemos salido
 							;; de bootservices.
-step
 	xor rax, rax
 	xor rcx, rcx
 	xor rdx, rdx
 	xor rbx, rbx
-;;	mov rsp, 0x8000
-	mov rsp, 0x400000
+	mov rsp, 0x8000
+;;	mov rsp, 0x400000
 	xor rbp, rbp
 	xor rsi, rsi
 	xor rdi, rdi
@@ -851,9 +850,9 @@ step
 
 	mov bl, 'U'
 
-to_next_loader:
-;;	mov rax, 0x8000
-	mov rax, 0x200000
+to_transient_system:
+	mov rax, 0x8000
+;;	mov rax, 0x200000
 	jmp rax
 
 
@@ -961,9 +960,11 @@ EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
 ;; UINT16	ScanCode;
 ;; CHAR16	UnicodeChar;
 ;; } EFI_INPUT_KEY;
-EFI_INPUT_KEY		dw 0, 0
+EFI_INPUT_KEY	dw 0, 0
 
-STEP_MODE_FLAG		db 0	;; Lo activa presionar 's' al booteo.
+STEP_MODE_FLAG	db STEP_MODE_INIT_VAL	;; Lo activa presionar 's' al booteo. El
+										;; valor inicial es asignado durante la 
+										;; compilacion.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.

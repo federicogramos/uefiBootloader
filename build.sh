@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 
+# El unico argumento que recibe build.sh es -d o --debug que fuerza a que el boo
+# teo sea con el "modo step" el cual promptea para avanzar y permite leer los me
+# nsajes de inicializacion. Si se arma sin flag, entonces el modo step aun se pu
+# ede usar, y acciona presionando tecla 's' durante el arranque. 
+
 set +e
 
 
-# see if BMFS_SIZE was defined for custom disk sizes
+# See if BMFS_SIZE was defined for custom disk sizes.
 if [ "x$BMFS_SIZE" = x ]; then
 	BMFS_SIZE=128
 fi
@@ -31,25 +36,37 @@ function init_imgs {
 }
 
 
-# Build the source code and create the software files
+# Build the source code and create the software files.
 function build_all {
 
 	make clean -C .
 
-	#make all -C .
-	make_output=$(make all -C . 2>&1)
+	if [ "$1" = "-d" -o "$1" = "--debug" ]; then
+		make_output=$(make FORCE_STEP_MODE=1 all -C . 2>&1)
+	else
+		make_output=$(make all -C . 2>&1)
+	fi
+
 	echo "$make_output" | grep --color=always -i "error" || echo "$make_output"
+
+	if [ ! -f "./build/uefi.sys" ]; then # Simple check of files generated ok.
+		echo -e "\e[1;31m Error: uefi.sys no generado!\e[0m"
+		exit 1
+	elif [ ! -f "./build/tsl.sys" ]; then
+		echo -e "\e[1;31m Error: tsl.sys no generado!\e[0m"
+		exit 1
+	fi
 
 	init_imgs $BMFS_SIZE
 
-	cat ./build/bootloader.sys ./sys/kernel.bin > ./out/payload.sys
+	cat ./build/tsl.sys ./sys/kernel.bin > ./out/payload.sys
 	payload_size=$(wc -c <./out/payload.sys)
 	if [ $payload_size -gt 32768 ]; then
 		echo "Warning - payload binary is larger than 32768 bytes!"
 	fi
 
-	## Prepara UEFI loader (uefi += bootloader + kernel + userland). Fijate q se colo
-	## ca en la posicion indicada en uefi.asm 
+	# Prepara UEFI loader (uefi += bootloader + kernel + userland). Colocar en 
+	# la posicion indicada en uefi.asm 
 	cp ./build/uefi.sys ./out/BOOTX64.EFI
 	dd if=./out/payload.sys of=./out/BOOTX64.EFI bs=16384 seek=1 conv=notrunc > /dev/null 2>&1
 
@@ -65,7 +82,7 @@ function build_all {
 # Dejar lista imagen de disco.
 function img_install {
 
-	# Copy UEFI boot to disk image
+	# Copy UEFI boot to disk image.
 	if [ -x "$(command -v mcopy)" ]; then
 		mcopy -oi ./img/fat32.img ./out/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI > /dev/null 2>&1
 		retVal=$?
@@ -86,4 +103,4 @@ function convert_img {
 }
 
 
-build_all
+build_all $1
