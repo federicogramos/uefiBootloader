@@ -8,8 +8,9 @@
 
 
 BITS 64
-ORG 0x00008000
-;;ORG 0x0000200000
+
+TSL_BASE_ADDRESS equ 0x8000
+ORG TSL_BASE_ADDRESS
 
 start:
 	jmp bootmode	;; Will be overwritten with 'NOP's before AP's are started.
@@ -38,7 +39,7 @@ ap_startup:
 	mov esp, 0x7000
 	jmp 0x0000:init_smp_ap
 
-%include "./asm/init/smp_ap.asm"	;; AP's will start execution at 0x8000 and fall through to this code
+%include "./asm/init/smp_ap.asm"	;; AP's will start execution at TSL_BASE_ADDRESS and fall through to this code
 
 ;;==============================================================================
 ;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
@@ -59,8 +60,7 @@ BITS 64
 
 start64:
 
-	mov rsp, 0x8000		;; Init stack.
-;;	mov rsp, 0x200000		;; Init stack.
+	mov rsp, TSL_BASE_ADDRESS		;; Init stack.
 
 
 	;; El cursor quedo en el anterior loader. Reseteo todo y borro pantalla.
@@ -416,7 +416,7 @@ skip1GB:
 	xor rsi, rsi			; aka r6
 	xor rdi, rdi			; aka r7
 	xor rbp, rbp			; aka r5
-	mov rsp, 0x8000			; aka r4
+	mov rsp, TSL_BASE_ADDRESS			; aka r4
 	xor r8, r8
 	xor r9, r9
 	xor r10, r10
@@ -533,7 +533,7 @@ make_interrupt_gates: 			; make gates for the other interrupts
 	mov r9, msg_ready
 	call print
 	
-; Patch bootloader AP code	; The AP's will be told to start execution at 0x8000
+; Patch bootloader AP code	; The AP's will be told to start execution at TSL_BASE_ADDRESS
 	mov edi, start			; We need to remove the BSP Jump call to get the AP's
 	mov rax, 0x9090909090909090		; to fall through to the AP Init code
 	stosq
@@ -794,7 +794,7 @@ pde_end:
 
 	call init_smp			; Init of SMP, deactivate interrupts
 
-; Reset the stack to the proper location (was set to 0x8000 previously)
+; Reset the stack to the proper location (was set to TSL_BASE_ADDRESS previously)
 	mov rsi, [p_LocalAPICAddress]	; We would call p_smp_get_id here but the stack is not ...
 	add rsi, 0x20			; ... yet defined. It is safer to find the value directly.
 	lodsd				; Load a 32-bit value. We only want the high 8 bits
@@ -950,7 +950,7 @@ lfb_wc_end:
 	wbinvd				; Flush Cache
 
 ; Move the trailing binary to its final location
-	mov esi, 0x8000+BOOTLOADER_SIZE	; Memory offset to end of bootloader.sys
+	mov esi, TSL_BASE_ADDRESS + BOOTLOADER_SIZE	; Memory offset to end of bootloader.sys
 	
 ;; esto es la direccion a la cual nuestro kernel se copia, tal como luego comienza ejecutando en _start en 100000
 	mov edi, 0x100000		; Destination address at the 1MiB mark

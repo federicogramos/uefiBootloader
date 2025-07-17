@@ -22,7 +22,7 @@
 ;; 0        512B    4KiB     16KiB        22KiB       256KiB       1MiB-1
 ;;==============================================================================
 
-
+TSL_BASE_ADDRESS equ 0x8000
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
 
@@ -851,8 +851,7 @@ exit_uefi_services:
 	mov bl, 'U'
 
 to_transient_system:
-	mov rax, 0x8000
-;;	mov rax, 0x200000
+	mov rax, TSL_BASE_ADDRESS
 	jmp rax
 
 
