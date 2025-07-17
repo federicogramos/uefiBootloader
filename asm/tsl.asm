@@ -809,11 +809,9 @@ lfb_wc_end:
 
 	;; Kernel to its final location.
 	mov esi, TSL_BASE_ADDRESS + BOOTLOADER_SIZE	;; Offset to end of tsl.sys
-	
-	;; La direccion a la cual el kernel se copia, tal como luego comienza ejecut
-	;; ando en _start en 0x100000
-	mov rdi, 0x100000		;; Final Destination.
-	mov rcx, ((32768 - BOOTLOADER_SIZE) / 8)
+	mov rdi, 0x100000							;; Kernel final destination.
+	;;mov rcx, ((32768 - BOOTLOADER_SIZE) / 8)
+	mov rcx, (((232 * 1024) - BOOTLOADER_SIZE) / 8)	;; 232KiB Kernel + Userland
 	rep movsq
 
 %ifdef BIOS
@@ -888,44 +886,15 @@ debug_progressbar:
 %endif
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
+;;==============================================================================
 ;;==============================================================================
 ;; @file /asm/lib/lib.asm
 ;;==============================================================================
@@ -1491,65 +1460,15 @@ msg_idt_load	db "load... ", 0
 msg_exception_occurred db "An exception has occurred in the system.", 0x0A, 0
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 BOOTLOADER_SIZE equ 0x2000	;; 8KiB
 
 
-;;;;;;;;;;; para generar un loop y dejar q se vea mensaje antes de ir a bootloader
-;;; sacar, no va
-;;;time_delay dq 800000
 
 EOF:
 	db 0xDE, 0xAD, 0xC0, 0xDE
 
-; Pad to an even KB file
+;; Pad to an even KB file
 times BOOTLOADER_SIZE-($-$$) db 0x90
-
-
-
-
-
-
-
-
-
 
 
 ; =============================================================================
