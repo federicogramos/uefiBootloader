@@ -60,18 +60,13 @@ BITS 64
 
 start64:
 
-	mov rsp, TSL_BASE_ADDRESS		;; Init stack.
+	mov rsp, TSL_BASE_ADDRESS
 
-
-	;; El cursor quedo en el anterior loader. Reseteo todo y borro pantalla.
+	;; El cursor quedo en el anterior loader.
 	mov rax, [FB]
-	mov [print_cursor], rax	;; Inicializacion del cursor.
-
+	mov [print_cursor], rax	;; Inicializar cursor.
 	mov rax, 0x00000000
-	call memsetFramebuffer
-
-
-	;;call keyboard_get_key	;; Poleo para poder promptear ahora que hemos salido
+	call memsetFramebuffer	;; Borrar pantalla.
 
 
 	mov rdi, InfoMap	;; Begins at 0x5000: clr mem for info map and sys vars.
@@ -79,9 +74,10 @@ start64:
 	mov rcx, 960		;; 3840 bytes (Range is 0x5000 - 0x5EFF)
 	rep stosd			;; Ciudado: en 0x5F00 hay datos de UEFI/BIOS.
 
-	;;mov r9, msg_transient_sys_load
-	;;call print
-
+	push rbx
+	mov r9, msg_transient_sys_load
+	call print
+	pop rbx
 
 
 	;; Sysvars.
@@ -90,19 +86,13 @@ start64:
 	mov ax, 0x03		;; Set flags for legacy ports (in case of no ACPI data)
 	mov [p_IAPC_BOOT_ARCH], ax
 
-
-	;;mov r9, msg_transient_sys_load
-	;;call print
+	mov r9, msg_setup_pic_and_irq
+	call print
 
 	;; Mask all PIC interrupts
 	mov al, 0xFF
 	out 0x21, al
 	out 0xA1, al
-
-
-
-	mov r9, msg_setup_pic_and_irq
-	call print
 
 	; Initialize and remap PIC IRQ's
 	; ICW1
@@ -126,11 +116,6 @@ start64:
 	mov al, 1
 	out 0xA1, al
 
-
-
-
-
-
 	;; Disable NMIs
 	in al, 0x70
 	or al, 0x80
@@ -143,39 +128,11 @@ start64:
 	mov al, 0x00
 	out 0x40, al
 
-
-
 	mov r9, msg_ready
 	call print
 
-
-
-	;; Clear screen
-	;;xor eax, eax
-	;;xor ecx, ecx
-	;;xor edx, edx
-	;;mov ax, [0x00005F10]	;; Sx
-	;;mov cx, [0x00005F12]	;; Sy
-	;;mul ecx
-	;;mov ecx, eax
-	;;mov rdi, [0x00005F00]	;; Framebuffer
-	;;mov eax, 0x00404040		;; Color
-	;;rep stosd
-
-; Visual Debug (1/4)
-;;	mov ebx, 0
-;;	call debug_block
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov ebx, 9
-;;	call debug_block_r
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 	mov r9, msg_clearing_space_sys_tables
 	call print
-
-
 
 ; Clear out the first 20KiB of memory. This will store the 64-bit IDT, GDT, PML4, PDP Low, and PDP High
 	mov ecx, 5120
@@ -188,11 +145,8 @@ start64:
 	mov ecx, 81920
 	rep stosd			; Write 320KiB
 
-
 	mov r9, msg_ready
 	call print
-
-;;	call keyboard_get_key	;; Poleo para poder promptear ahora que hemos salido
 
 
 	mov r9, msg_gdt
@@ -220,9 +174,6 @@ start64:
 	mov r9, msg_ready
 	call print
 
-;;cli
-;;hlt
-
 ; Check to see if the system supports 1 GiB pages
 ; If it does we will use that for identity mapping the lower memory
 	mov r9, msg_support_1g_pages	;; Comienza aviso de soporte.
@@ -233,32 +184,15 @@ start64:
 	bt edx, 26			; Page1GB
 
 jc pdpte_1GB
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;jc pdpte_1GB
 
 	mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
 	call print
 
 
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;jc pdpte_1GB
 
-;; 2MiB pages.
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov ebx, 13
-;;	call debug_block
-;;	mov ebx, 14
-;;	call debug_block_g
-;;	mov ebx, 15
-;;	call debug_block_g
-;;	mov ebx, 16
-;;	call debug_block_g
-;;hlt;;;;;;;;;;aqui no ha llegado.. parece que mov cr3 jode ;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+	;; 2MiB pages.
 	mov r9, msg_pdpt
 	call print
-
 
 ; Create the Low Page-Directory-Pointer-Table Entries (PDPTE)
 ; PDPTE starts at 0x0000000000003000, create the first entry there
@@ -281,9 +215,6 @@ pdpte_low:
 	mov r9, msg_pd
 	call print
 
-
-
-
 ; Create the Low Page-Directory Entries (PDE)
 ; A single PDE can map 2MiB of RAM
 ; A single PDE is 8 bytes in length
@@ -296,15 +227,10 @@ pde_low:				; Create a 2MiB page
 ;;	dec ecx
 ;;	jnz pde_low
 
-
 	mov r9, msg_ready
 	call print
 
-
-
-
 	jmp skip1GB
-
 
 ; 1GiB Pages
 ; Create the Low Page-Directory-Pointer Table Entries (PDPTE)
@@ -320,21 +246,6 @@ pdpte_1GB:
 	call print
 
 ;; TODO: revisar esta rama.
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov ebx, 13
-;;	call debug_block
-;;	mov ebx, 14
-;;	call debug_block_r
-;;	mov ebx, 15
-;;	call debug_block_r
-;;	mov ebx, 16
-;;	call debug_block_r
-;;hlt;;;;;;;;;;aqui no ha llegado.. parece que mov cr3 jode ;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 	mov byte [p_1GPages], 1
 
 ; Overwrite the original PML4 entry for physical memory
@@ -357,37 +268,13 @@ pdpte_low_1GB:				; Create a 1GiB page
 	jnz pdpte_low_1GB
 
 skip1GB:
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov ebx, 17
-;;	call debug_block
-;;;;;;;;;;;;;;;;    hlt;;;;;;;;;fgr hasta este ha llegado bien ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 	mov r9, msg_load_gdt
 	call print
-
-;;cli
-;;hlt
-
-
-
-; Load the GDT
 	lgdt [GDTR64]
-
 	mov r9, msg_ready
 	call print
 
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov ebx, 18
-;;	call debug_block_b
-;;;;;;;;;;;;;;;;;;;;;hlt;;;;;;;;;fgr hasta este ha llegado bien ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ; Point cr3 at PML4
@@ -402,21 +289,17 @@ skip1GB:
 ;; ahora, comento esto de cr3 y funciona en todo.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;	mov ebx, 19
-;;	call debug_block_g
 ;;hlt;;;;;;;;;;aqui no ha llegado.. parece que mov cr3 jode ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
-	xor rax, rax			; aka r0
-	xor rbx, rbx			; aka r3
-	xor rcx, rcx			; aka r1
-	xor rdx, rdx			; aka r2
-	xor rsi, rsi			; aka r6
-	xor rdi, rdi			; aka r7
-	xor rbp, rbp			; aka r5
-	mov rsp, TSL_BASE_ADDRESS			; aka r4
+	xor rax, rax
+	xor rbx, rbx
+	xor rcx, rcx
+	xor rdx, rdx
+	xor rsi, rsi
+	xor rdi, rdi
+	xor rbp, rbp
+	mov rsp, TSL_BASE_ADDRESS
 	xor r8, r8
 	xor r9, r9
 	xor r10, r10
@@ -426,28 +309,23 @@ skip1GB:
 	xor r14, r14
 	xor r15, r15
 
-	mov ax, 0x10			; TODO Is this needed?
+	mov ax, 0x10	;; TODO Is this needed?
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
 	mov fs, ax
 	mov gs, ax
 
-	; Set CS with a far return
+	;; Set CS with a far return
 	push SYS64_CODE_SEL
 	push clearcs64
 	retfq
 clearcs64:
 
-	lgdt [GDTR64]			; Reload the GDT
-
-; Visual Debug (2/4)
-;;	mov ebx, 2
-;;	call debug_block
+	lgdt [GDTR64]	;; Reload the GDT
 
 	mov r9, msg_idt
 	call print
-
 	xor rdi, rdi	;; IDT at linear address 0x0000000000000000.
 
 	;; TODO: modificar print para que no modifique registros.
@@ -458,23 +336,23 @@ clearcs64:
 
 	mov rcx, 32
 
-make_exception_gates: 			; make gates for exception handlers
+load_exception_gates:
 	mov rax, exception_gate
-	push rax			; save the exception gate to the stack for later use
-	stosw				; store the low word (15:0) of the address
+	push rax				;; Save exception gate for later use.
+	stosw					;; A15..A0
 	mov ax, SYS64_CODE_SEL
-	stosw				; store the segment selector
+	stosw					;; Segment Selector.
 	mov ax, 0x8E00
-	stosw				; store exception gate marker
-	pop rax				; get the exception gate back
+	stosw					;; Exception gate marker.
+	pop rax
 	shr rax, 16
-	stosw				; store the high word (31:16) of the address
+	stosw					;; A31..A16
 	shr rax, 16
-	stosd				; store the extra high dword (63:32) of the address.
+	stosd					;; A63..A32
 	xor rax, rax
-	stosd				; reserved
+	stosd					;; Reserved.
 	dec rcx
-	jnz make_exception_gates
+	jnz load_exception_gates
 
 	push rdi
 	mov r9, msg_idt_irqs
@@ -482,48 +360,48 @@ make_exception_gates: 			; make gates for exception handlers
 	pop rdi
 
 	mov rcx, 256-32
-make_interrupt_gates: 			; make gates for the other interrupts
-	mov rax, interrupt_gate
-	push rax			; save the interrupt gate to the stack for later use
-	stosw				; store the low word (15:0) of the address
-	mov ax, SYS64_CODE_SEL
-	stosw				; store the segment selector
-	mov ax, 0x8F00
-	stosw				; store interrupt gate marker
-	pop rax				; get the interrupt gate back
-	shr rax, 16
-	stosw				; store the high word (31:16) of the address
-	shr rax, 16
-	stosd				; store the extra high dword (63:32) of the address.
-	xor eax, eax
-	stosd				; reserved
-	dec rcx
-	jnz make_interrupt_gates
 
-	; Set up the exception gates for all of the CPU exceptions
-	; The following code depends on exception gates being below 16MB
-	mov word [0x00*16], exception_gate_00	; #DE
-	mov word [0x01*16], exception_gate_01	; #DB
-	mov word [0x02*16], exception_gate_02
-	mov word [0x03*16], exception_gate_03	; #BP
-	mov word [0x04*16], exception_gate_04	; #OF
-	mov word [0x05*16], exception_gate_05	; #BR
-	mov word [0x06*16], exception_gate_06	; #UD
-	mov word [0x07*16], exception_gate_07	; #NM
-	mov word [0x08*16], exception_gate_08	; #DF
-	mov word [0x09*16], exception_gate_09	; #MF
-	mov word [0x0A*16], exception_gate_10	; #TS
-	mov word [0x0B*16], exception_gate_11	; #NP
-	mov word [0x0C*16], exception_gate_12	; #SS
-	mov word [0x0D*16], exception_gate_13	; #GP
-	mov word [0x0E*16], exception_gate_14	; #PF
-	mov word [0x0F*16], exception_gate_15
-	mov word [0x10*16], exception_gate_16	; #MF
-	mov word [0x11*16], exception_gate_17	; #AC
-	mov word [0x12*16], exception_gate_18	; #MC
-	mov word [0x13*16], exception_gate_19	; #XM
-	mov word [0x14*16], exception_gate_20	; #VE
-	mov word [0x15*16], exception_gate_21	; #CP
+load_interrupt_gates:
+	mov rax, interrupt_gate
+	push rax				;; Later use.
+	stosw					;; A15..A0
+	mov ax, SYS64_CODE_SEL
+	stosw					;; Segment selector.
+	mov ax, 0x8F00
+	stosw					;; Interrupt gate marker.
+	pop rax
+	shr rax, 16
+	stosw					;; A31..A16
+	shr rax, 16
+	stosd					;; A63..A32
+	xor eax, eax
+	stosd					;; Reserved
+	dec rcx
+	jnz load_interrupt_gates
+
+	;; Set up the exception gates for all of the CPU exceptions.
+	mov word [0x00 * 16], exception_gate_00	;; #DE
+	mov word [0x01 * 16], exception_gate_01	;; #DB
+	mov word [0x02 * 16], exception_gate_02
+	mov word [0x03 * 16], exception_gate_03	;; #BP
+	mov word [0x04 * 16], exception_gate_04	;; #OF
+	mov word [0x05 * 16], exception_gate_05	;; #BR
+	mov word [0x06 * 16], exception_gate_06	;; #UD
+	mov word [0x07 * 16], exception_gate_07	;; #NM
+	mov word [0x08 * 16], exception_gate_08	;; #DF
+	mov word [0x09 * 16], exception_gate_09	;; #MF
+	mov word [0x0A * 16], exception_gate_10	;; #TS
+	mov word [0x0B * 16], exception_gate_11	;; #NP
+	mov word [0x0C * 16], exception_gate_12	;; #SS
+	mov word [0x0D * 16], exception_gate_13	;; #GP
+	mov word [0x0E * 16], exception_gate_14	;; #PF
+	mov word [0x0F * 16], exception_gate_15
+	mov word [0x10 * 16], exception_gate_16	;; #MF
+	mov word [0x11 * 16], exception_gate_17	;; #AC
+	mov word [0x12 * 16], exception_gate_18	;; #MC
+	mov word [0x13 * 16], exception_gate_19	;; #XM
+	mov word [0x14 * 16], exception_gate_20	;; #VE
+	mov word [0x15 * 16], exception_gate_21	;; #CP
 
 	mov r9, msg_idt_load
 	call print
@@ -532,127 +410,131 @@ make_interrupt_gates: 			; make gates for the other interrupts
 
 	mov r9, msg_ready
 	call print
-	
-; Patch bootloader AP code	; The AP's will be told to start execution at TSL_BASE_ADDRESS
-	mov edi, start			; We need to remove the BSP Jump call to get the AP's
-	mov rax, 0x9090909090909090		; to fall through to the AP Init code
-	stosq
-	stosq				; Overwrite the 'far jump' and marker.
+
+; AP's will be told to start execution at TSL_BASE_ADDRESS.
+patch_ap_code:
+	mov edi, start
+	mov rax, 0x9090909090909090
+	stosq						;; Remove code between start and ap_startup, so
+	stosq						;; they can reach their starting code.
 
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;esto 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Parse the memory map provided by UEFI
 %ifdef UEFI
-; Parse the memory map provided by UEFI
-uefi_memmap:
-; Stage 1 - Process the UEFI memory map to find all usable memory
-; Types 1-7 are ok to use once Boot Services were exited. Anything else should be considered unusable.
-; Build an usable memory map at 0x200000
+
+parse_memmap:
+	;; Find all usable memory. Types 1-7 are ok to use once Boot Services has exited.
+	;; Anything else not usable.
 	xor r9, r9
 	xor ebx, ebx
-	mov esi, 0x00220000 - 48	; The start of the UEFI map minus 48 bytes for the loop start
-	mov edi, 0x00200000		; Where to build the clean map
-uefi_memmap_next:
-	add esi, 48			; Skip to start of next record
-	mov rax, [rsi+24]		; Check for end of records
-	cmp rax, 0			; If there are 0 pages we are at the end of the list
-	je uefi_memmap_end
-	mov rax, [rsi+8]
-	cmp rax, 0x100000		; Test if the Physical Address less than 0x100000
-	jb uefi_memmap_next		; If so, skip it
+	mov esi, 0x00220000 - 48	;; UEFI map - 48 bytes for the loop start.
+	mov edi, 0x00200000			;; Memory map at 0x200000
+
+.next_entry:
+	add esi, 48
+	mov rax, [rsi + 24]	;; Next entry.
+	cmp rax, 0			;; If 0 pages, then we have finished.
+	je .finish
+	mov rax, [rsi + 8]
+	cmp rax, 0x100000	;; Test if the Physical Address less than 0x100000.
+	jb .next_entry		;; If so, skip it.
 	mov rax, [rsi]
-	cmp rax, 0			; EfiReservedMemoryType (Not usable)
-	je uefi_memmap_next
-	cmp rax, 7			; EfiConventionalMemory (Free)
-	jbe uefi_memmap_usable
+	cmp rax, 0			;; EfiReservedMemoryType (Not usable)
+	je .next_entry
+	cmp rax, 7			;; EfiConventionalMemory (Free)
+	jbe .usable
 	mov bl, 0
-	jmp uefi_memmap_next
-uefi_memmap_usable:
+	jmp .next_entry
+
+.usable:
 	cmp bl, 1
-	je uefi_memmap_usable_contiguous
-	mov rax, [rsi+8]
-	stosq				; Store Physical Start
-	mov rax, [rsi+24]
-	stosq				; Store NumberOfPages
-uefi_memmap_usable_contiguous_next:
+	je .usable_contiguous
+	mov rax, [rsi + 8]
+	stosq				;; Physical Start.
+	mov rax, [rsi + 24]
+	stosq				;; Number of pages.
+
+.usable_contiguous_next:
 	mov r9, rax
-	shl r9, 12			; Quick multiply by 4096
-	add r9, [rsi+8]			; R9 should match the physical address of the next record if they are contiguous
-	mov bl, 0			; Non-contiguous
-	cmp r9, [rsi+56]		; Check R9 against the next Physical Start
-	jne uefi_memmap_next
-	mov bl, 1			; Contiguous
-	jmp uefi_memmap_next
-uefi_memmap_usable_contiguous:
+	shl r9, 12			;; r9 * 2^12
+	add r9, [rsi + 8]	;; r9 should match the physical address of the next reco
+						;; rd if they are contiguous.
+	mov bl, 0			;; Non-contiguous.
+	cmp r9, [rsi + 56]	;; r9 against the next Physical Start.
+	jne .next_entry
+	mov bl, 1			;; Contiguous.
+	jmp .next_entry
+
+.usable_contiguous:
 	sub rdi, 8
-	mov rax, [rsi+24]
+	mov rax, [rsi + 24]
 	add rax, [rdi]
 	stosq
-	mov rax, [rsi+24]
-	jmp uefi_memmap_usable_contiguous_next
-uefi_memmap_end:
-	xor eax, eax			; Store a blank record
+	mov rax, [rsi + 24]
+	jmp .usable_contiguous_next
+
+.finish:
+	xor eax, eax	;; Blank record at the end.
 	stosq
 	stosq
 
-; Stage 2 - Clear entries less than 3MiB in length
-	mov esi, 0x00200000		; Start at the beginning of the records
-	mov edi, 0x00200000
-uefi_purge:
+	;; Clear entries < 3MiB.
+	mov rsi, 0x00200000		;; Memory map at 0x200000
+	mov rdi, 0x00200000
+clear_small:
 	lodsq
 	cmp rax, 0
-	je uefi_purge_end
+	je .finish
 	stosq
 	lodsq
 	cmp rax, 0x300
-	jb uefi_purge_remove
+	jb .remove
 	stosq
-	jmp uefi_purge
-uefi_purge_remove:
-	sub edi, 8
-	jmp uefi_purge
-uefi_purge_end:
-	xor eax, eax			; Store a blank record
+	jmp clear_small
+.remove:
+	sub rdi, 8
+	jmp clear_small
+.finish:
+	xor rax, rax	;; Blank record.
 	stosq
 	stosq
 
-; Stage 3 - Round up Physical Address to next 2MiB boundary if needed and convert 4KiB pages to 1MiB pages
-	mov esi, 0x00200000 - 16	; Start at the beginning of the records
-	xor ecx, ecx			; MiB counter
+;; Round up Physical Address to next 2MiB boundary if needed and convert 4KiB pa
+;; ges to 1MiB pages.
+	mov esi, 0x00200000 - 16	;; Memory map at 0x200000
+	xor ecx, ecx				;; MiB counter.
 uefi_round:
 	add esi, 16
-	mov rax, [rsi]			; Load the Physical Address
-	cmp rax, 0			; Is it zero? (End of list)
-	je uefi_round_end		; If so, bail out
-	mov rbx, rax			; Copy Physical Address to RBX
-	and rbx, 0x1FFFFF		; Check if any bits between 20-0 are set
-	cmp rbx, 0			; If not, RBX should be 0
-	jz uefi_convert
-	; At this point one of the bits between 20 and 0 in the starting address are set
-	; Round the starting address up to the next 2MiB
+	mov rax, [rsi]	;; Physical Address.
+	cmp rax, 0
+	je .finish
+	mov rbx, rax		;; Physical Address to rbx.
+	and rbx, 0x1FFFFF	;; Check if any bits between 20-0 are set.
+	cmp rbx, 0			;; If not, rbx should be 0.
+	jz .convert
+
+	;; At this point one of the bits between 20 and 0 in the starting address ar
+	;; e set. Round the starting address up to the next 2MiB.
 	shr rax, 21
 	shl rax, 21
 	add rax, 0x200000
 	mov [rsi], rax
-	mov rax, [rsi+8]
-	shr rax, 8			; Convert 4K blocks to MiB
-	sub rax, 1			; Subtract 1MiB
-	mov [rsi+8], rax
-	add rcx, rax			; Add to MiB counter
+	mov rax, [rsi + 8]
+	shr rax, 8			;; 4K blocks to MiB.
+	sub rax, 1			;; Subtract 1MiB
+	mov [rsi + 8], rax
+	add rcx, rax		;; Add to MiB counter.
 	jmp uefi_round
-uefi_convert:
-	mov rax, [rsi+8]
-	shr rax, 8			; Convert 4K blocks to MiB
-	mov [rsi+8], rax
-	add rcx, rax			; Add to MiB counter
+.convert:
+	mov rax, [rsi + 8]
+	shr rax, 8			;; 4K blocks to MiB
+	mov [rsi + 8], rax
+	add rcx, rax		;; Add to MiB counter
 	jmp uefi_round
-uefi_round_end:
+.finish:
 	sub ecx, 2
 	mov dword [p_mem_amount], ecx
-	xor eax, eax			; Store a blank record
+	xor eax, eax		;; Blank record.
 	stosq
 	stosq
 	jmp memmap_end
@@ -721,89 +603,86 @@ memmap_saniend:
 
 memmap_end:
 
-; Create the High Page-Directory-Pointer-Table Entries (PDPTE)
-; High PDPTE is stored at 0x0000000000004000, create the first entry there
-; A single PDPTE can map 1GiB with 2MiB pages
-; A single PDPTE is 8 bytes in length
+;; Create the High Page-Directory-Pointer-Table Entries (PDPTE). High PDPTE is s
+;; tored at 0x0000000000004000, create the first entry there. A single PDPTE can
+;; map 1GiB with 2MiB pages. A single PDPTE is 8 bytes in length.
 	mov ecx, dword [p_mem_amount]
-	shr ecx, 10			; MBs -> GBs
-	add rcx, 1			; Add 1. This is the number of PDPE's to make
-	mov edi, 0x00004000		; location of high PDPE
-	mov eax, 0x00020003		; location of first high PD. Bits 0 (P) and 1 (R/W) set
+	shr ecx, 10				;; MB to GB.
+	add rcx, 1				;; Add 1. This is the number of PDPE's to make.
+	mov edi, 0x00004000		;; Location of high PDPE.
+	mov eax, 0x00020003		;; Location of first high PD. Bits 0 (P) and 1 (R/W)
+							;; set.
 create_pdpe_high:
 	stosq
-	add rax, 0x00001000		; 4K later (512 records x 8 bytes)
+	add rax, 0x00001000		;; 4K later (512 records x 8 bytes).
 	dec ecx
 	cmp ecx, 0
 	jne create_pdpe_high
 
-; Create the High Page-Directory Entries (PDE).
-; A single PDE can map 2MiB of RAM
-; A single PDE is 8 bytes in length
-	mov esi, 0x00200000		; Location of the available memory map
-	mov edi, 0x00020000		; Location of first PDE
+	;; Create the High Page-Directory Entries (PDE). A single PDE can map 2MiB o
+	;; f RAM. A single PDE is 8 bytes in length.
+	mov esi, 0x00200000		;; Memory map.
+	mov edi, 0x00020000		;; Location of first PDE.
 pde_next_range:
-	lodsq				; Load the base
+	lodsq					;; Base
 	xchg rax, rcx
-	lodsq				; Load the length
+	lodsq					;; Length
 	xchg rax, rcx
-	cmp rax, 0			; Check if at end of records
-	je pde_end			; Bail out if so
+	cmp rax, 0				;; End of records.
+	je .finish
 	cmp rax, 0x00200000
-	ja skipfirst4mb
+	ja .skipfirst4mb
 	add rax, 0x00200000		; Add 2 MiB to the base
 	sub rcx, 2			; Subtract 2 MiB from the length
-skipfirst4mb:
+.skipfirst4mb:
 	shr ecx, 1			; Quick divide by 2 for 2 MB pages
 	add rax, 0x00000083		; Bits 0 (P), 1 (R/W), and 7 (PS) set
-pde_high:				; Create a 2MiB page
+.pde_high:				; Create a 2MiB page
 	stosq
 	add rax, 0x00200000		; Increment by 2MiB
 	cmp ecx, 0
 	je pde_next_range
 	dec ecx
 	cmp ecx, 0
-	jne pde_high
+	jne .pde_high
 	jmp pde_next_range
-pde_end:
+.finish:
 
-; Read APIC Address from MSR and enable it (if not done so already)
+;; Read APIC Address from MSR and enable it (if not done so already).
 	mov ecx, IA32_APIC_BASE
-	rdmsr				; Returns APIC in EDX:EAX
-	bts eax, 11			; APIC Global Enable
+	rdmsr				;; Returns APIC in edx:eax
+	bts eax, 11			;; APIC Global Enable.
 	wrmsr
-	and eax, 0xFFFFF000		; Clear lower 12 bits
-	shl rdx, 32			; Shift lower 32 bits to upper 32 bits
+	and eax, 0xFFFFF000	;; Clear lower 12 bits.
+	shl rdx, 32			;; Shift lower 32 bits to upper 32 bits.
 	add rax, rdx
 	mov [p_LocalAPICAddress], rax
 
-; Check for x2APIC support
+;; Check for x2APIC support.
 	mov eax, 1
-	cpuid				; x2APIC is supported if bit 21 is set
+	cpuid					;; x2APIC is supported if bit 21 is set.
 	shr ecx, 21
 	and cl, 1
 	mov byte [p_x2APIC], cl
 
-	call init_acpi			; Find and process the ACPI tables
-	call init_cpu			; Configure the BSP CPU
-	call init_hpet			; Configure the HPET
-
-; Visual Debug (3/4)
-;;	mov ebx, 4
-;;	call debug_block
+	call init_acpi			;; Find and process the ACPI tables
+	call init_cpu			;; Configure the BSP CPU
+	call init_hpet			;; Configure the HPET
 
 	call init_smp			; Init of SMP, deactivate interrupts
 
-; Reset the stack to the proper location (was set to TSL_BASE_ADDRESS previously)
-	mov rsi, [p_LocalAPICAddress]	; We would call p_smp_get_id here but the stack is not ...
-	add rsi, 0x20			; ... yet defined. It is safer to find the value directly.
-	lodsd				; Load a 32-bit value. We only want the high 8 bits
-	shr rax, 24			; Shift to the right and AL now holds the CPU's APIC ID
-	shl rax, 10			; shift left 10 bits for a 1024byte stack
-	add rax, 0x0000000000050400	; stacks decrement when you "push", start at 1024 bytes in
-	mov rsp, rax			; leave 0x50000-0x9FFFF free so we use that
+;; Reset rsp the proper location (was set to TSL_BASE_ADDRESS previously).
+	mov rsi, [p_LocalAPICAddress]	;; We would call p_smp_get_id here but stack
+									;; not yet defined. It is safer to find the 
+									;; value directly.
+	add rsi, 0x20
+	lodsd				;; Load a 32-bit value. We only want the high 8 bits.
+	shr rax, 24			;; Shift to the right and AL now holds the CPU's APIC ID
+	shl rax, 10			;; shift left 10 bits for a 1024 byte stack.
+	add rax, 0x0000000000050400
+	mov rsp, rax		;; Leave 0x50000-0x9FFFF free to use.
 
-; Build the InfoMap
+;; Build the InfoMap
 	xor edi, edi
 	mov di, 0x5000
 	mov rax, [p_ACPITableAddress]
@@ -830,8 +709,6 @@ pde_end:
 	mov al, [p_IOAPICIntSourceC]
 	stosb
 
-
-
 	mov di, 0x5040
 	mov rax, [p_HPET_Address]
 	stosq
@@ -846,136 +723,113 @@ pde_end:
 	mov rax, [p_LocalAPICAddress]
 	stosq
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Copy the data we received from UEFI/BIOS
+	;; Copy data received from UEFI.
 	mov di, 0x5080
-	mov rax, [0x00005F00]		; Base address of video memory
+	mov rax, [0x00005F00]			;; Video memory.
 	stosq
-	mov eax, [0x00005F00 + 0x10]	; X and Y resolution (16-bits each)
+	mov eax, [0x00005F00 + 0x10]	;; X and Y resolution (16-bits each)
 	stosd
-	mov eax, [0x00005F00 + 0x14]	; Pixels per scan line
+	mov eax, [0x00005F00 + 0x14]	;; Pixels per scan line.
 	stosw
-	mov ax, 32;;;;;;;;;;;;;;;;;; hardcodeado, igual que tambien el uefi.sys
+	mov ax, 32						;; Hardcodeado, idem que el uefi.sys
 	stosw
 
-; Store the PCI(e) data
+;; PCI(e) data.
 	mov di, 0x5090
 	mov ax, [p_PCIECount]
 	stosw
 	mov ax, [p_IAPC_BOOT_ARCH]
 	stosw
 
-; Store miscellaneous flags
+;; Miscellaneous flags.
 	mov di, 0x50E0
 	mov al, [p_1GPages]
 	stosb
 	mov al, [p_x2APIC]
 	stosb
 
-;;;;;; setea atributos de paginas que contienen buffer
-; Set the Linear Frame Buffer to use write-combining
+;; Atributos de paginas que contienen buffer de video (use write-combining).
 	mov eax, 0x80000001
 	cpuid
-	bt edx, 26			; Page1GB
+	bt edx, 26	;; Pages 1GB?
+	jnc lfb_wc_2mb
 
-jnc lfb_wc_2MB ;; pruebo de dejarlo
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	jnc lfb_wc_2MB
-	;;jmp lfb_wc_2MB
+;; Set the 1GB page the frame buffer is in to WC - PAT = 1, PCD = 0, PWT = 1 (WC
+;; = write combining), PAT (Page Attribute Table), PWT (Page Write-Through, need
+;; ed, not to be catched), PCD (Page Cache Disable).
 
-
-
-
-
-
-
-
-; Set the 1GB page the frame buffer is in to WC - PAT = 1, PCD = 0, PWT = 1
-;;;; WC = write combining
-;;;;; PAT (Page Attribute Table)
-;;;;;;;;;PWT (Page Write-Through, needed, not to be catched)
-;;;PCD (Page Cache Disable)
-
-lfb_wc_1GB:
-	mov rax, [0x00005F00]		; Base address of video memory
-	mov rbx, 0x100000000		; Compare to 4GB
+lfb_wc_1gb:
+	mov rax, [0x00005F00]		;; FB
+	mov rbx, 0x100000000		;; Compare to 4GB
 	cmp rax, rbx
-	jbe lfb_wc_end			; If less, don't set WC
+	jbe lfb_wc_end				;; If less, don't set WC.
 
 	mov rbx, rax
-	mov rcx, 0xFFFFFFFFC0000000 ;; 7*4+2=30 ceros, 2^30 = 1GB (los ceros), directorios y nros de pagina
-	and rax, rcx;;;;;;; upper bits
-	mov rcx, 0x000000003FFFFFFF;; primer GB, es el offset dentro de la pagina
-	and rbx, rcx;;;;;;; offset
-	;;;; hasta aqui separa el address del framebuffer en 2 partes tomando como umbral el 1er GB
+	mov rcx, 0xFFFFFFFFC0000000 ;; 7 * 4 + 2 = 30 ceros, 2^30 = 1GB (los ceros),
+								;; directorios y nros de pagina.
+	and rax, rcx				;; Upper bits.
+	mov rcx, 0x000000003FFFFFFF	;; Primer GB, es el offset dentro de la pagina.
+	and rbx, rcx				;; offset. Hasta aqui separa el address del fram
+								;; ebuffer en 2 partes tomando como umbral el 1e
+								;; r GB.
 	
-	;; atributos:
-	mov ax, 0x108B			; P (0), R/W (1), PWT (3), PS (7), PAT (12)
+	;; Atributos:
+	mov ax, 0x108B				;; P (0), R/W (1), PWT (3), PS (7), PAT (12)
 	mov rdi, 0x1FFF8
-	mov [rdi], rax			; Write updated PDPTE
+	mov [rdi], rax				;; Write updated PDPTE
 
-	mov rax, 0x000007FFC0000000	; 8191GiB
-	add rax, rbx			; Add offset within 1GiB page
-	mov [0x00005080], rax		;;;;;;;;;; Write out new virtual address to LFB
+	mov rax, 0x000007FFC0000000	;; 8191GiB
+	add rax, rbx				;; Add offset within 1GiB page.
+	mov [0x00005080], rax		;; Write out new virtual address to FB.
 
 	jmp lfb_wc_end
 
+;; Set the relevant 2MB pages the frame buffer is in to WC
+lfb_wc_2mb:
 
-; Set the relevant 2MB pages the frame buffer is in to WC
-lfb_wc_2MB:
-
-
-	mov ecx, 4			; 4 2MiB pages - TODO only set the pages needed
+	mov ecx, 4				;; 4 2MiB pages - TODO only set the pages needed
 	mov edi, 0x00010000
-	mov rax, [0x00005F00]		; Base address of video memory
+	mov rax, [0x00005F00]	;; Base address of video memory
 	shr rax, 18
 	add rdi, rax
 
-
-lfb_wc_2MB_nextpage:
-	mov eax, [edi]			; Load the 8-byte value
-	or ax, 0x1008			; Set bits 12 (PAT) and 3 (PWT)
-	and ax, 0xFFEF			; Clear bit 4 (PCD)
-	mov [edi], eax			; Write it back
+.next_page:
+	mov eax, [edi]			;; Load the 8-byte value.
+	or ax, 0x1008			;; Set bits 12 (PAT) and 3 (PWT).
+	and ax, 0xFFEF			;; Clear bit 4 (PCD).
+	mov [edi], eax			;; Write it back.
 	add edi, 8
 	sub ecx, 1
-	jnz lfb_wc_2MB_nextpage
-
-
-
+	jnz .next_page
 
 lfb_wc_end:
 	mov rax, cr3			; Flush TLB
 	mov cr3, rax
 	wbinvd				; Flush Cache
 
-; Move the trailing binary to its final location
-	mov esi, TSL_BASE_ADDRESS + BOOTLOADER_SIZE	; Memory offset to end of bootloader.sys
+	;; Kernel to its final location.
+	mov esi, TSL_BASE_ADDRESS + BOOTLOADER_SIZE	;; Offset to end of tsl.sys
 	
-;; esto es la direccion a la cual nuestro kernel se copia, tal como luego comienza ejecutando en _start en 100000
-	mov edi, 0x100000		; Destination address at the 1MiB mark
-	mov ecx, ((32768 - BOOTLOADER_SIZE) / 8)
-	rep movsq			; Copy 8 bytes at a time
-
-; Visual Debug (4/4)
-	mov ebx, 6
-	call debug_block
+	;; La direccion a la cual el kernel se copia, tal como luego comienza ejecut
+	;; ando en _start en 0x100000
+	mov rdi, 0x100000		;; Final Destination.
+	mov rcx, ((32768 - BOOTLOADER_SIZE) / 8)
+	rep movsq
 
 %ifdef BIOS
-	cmp byte [p_BootDisk], 'F'	; Check if sys is booted from floppy?
+	cmp byte [p_BootDisk], 'F'	;; Check if sys is booted from floppy?
 	jnz clear_regs
-	call read_floppy		; Then load whole floppy at memory
+	call read_floppy		;; Then load whole floppy at memory
 %endif
 
-; Clear all registers (skip the stack pointer)
 clear_regs:
-	xor eax, eax			; These 32-bit calls also clear the upper bits of the 64-bit registers
-	xor ebx, ebx
-	xor ecx, ecx
-	xor edx, edx
-	xor esi, esi
-	xor edi, edi
-	xor ebp, ebp
+	xor rax, rax
+	xor rbx, rbx
+	xor rcx, rcx
+	xor rdx, rdx
+	xor rsi, rsi
+	xor rdi, rdi
+	xor rbp, rbp
 	xor r8, r8
 	xor r9, r9
 	xor r10, r10
@@ -985,37 +839,12 @@ clear_regs:
 	xor r14, r14
 	xor r15, r15
 
-
-
-
-
-
-;;;; sacar esto, es solo para debug
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;hago_tiempo:
-;;    dec qword[time_delay]
-;;    jz sigo
-;;    jmp hago_tiempo
-
-;;sigo:
-;;;;;;;;;;;;;;;;;;
-
-
-
-
-
-
 	mov r9, msg_system_setup_ready
 	call print
 
-	call keyboard_get_key	;; Poleo para poder promptear ahora que hemos salido
+	call keyboard_get_key
 
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;hlt;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	jmp 0x00100000			; Done with bootloader, jump to the kernel
+	jmp 0x00100000	;; Jump to kernel.
 
 
 %include "./asm/init/acpi.asm"
@@ -1031,229 +860,6 @@ clear_regs:
 %include "./asm/interrupts.asm"
 %include "./asm/sysvar.asm"
 
-
-; -----------------------------------------------------------------------------
-; debug_block - Create a block of colour on the screen
-; IN:	EBX = Index #
-debug_block:
-	push rax
-	push rbx
-	push rcx
-	push rdx
-	push rdi
-
-	; Calculate parameters
-	push rbx
-	push rax
-	xor edx, edx
-	xor eax, eax
-	xor ebx, ebx
-	mov ax, [0x00005F00 + 0x12]	; Screen Y
-	sub ax, 16			; Upper row
-	shr ax, 1			; Quick divide by 2
-	mov bx, [0x00005F00 + 0x10]	; Screen X
-	shl ebx, 2			; Quick multiply by 4
-	mul ebx				; Multiply EDX:EAX by EBX
-	mov rdi, [0x00005F00]		; Frame buffer base
-	add rdi, rax			; Offset is ((screeny - 8) / 2 + screenx * 4)
-	pop rax
-	pop rbx
-	xor edx, edx
-	mov dx, [0x00005F00 + 0x14]	; PixelsPerScanLine
-	shl edx, 2			; Quick multiply by 4 for line offset
-	xor ecx, ecx
-	mov cx, [0x00005F00 + 0x10]	; Screen X
-	shr cx, 4			; CX = total amount of 8-pixel wide blocks
-	sub cx, 4
-	add ebx, ecx
-    shl ebx, 5			; Quick multiply by 32 (8 pixels by 4 bytes each)
-
-	add rdi, rbx
-
-	; Draw the 8x8 pixel block
-	mov ebx, 8			; 8 pixels tall
-	mov eax, 0x00F7CA54		; Return Infinity Yellow/Orange
-nextline:
-	mov ecx, 8			; 8 pixels wide
-	rep stosd
-	add rdi, rdx			; Add line offset
-	sub rdi, 8*4			; 8 pixels by 4 bytes each
-	dec ebx
-	jnz nextline
-
-	pop rdi
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
-	ret
-; -----------------------------------------------------------------------------
-
-; -----------------------------------------------------------------------------
-; debug_block - Create a block of colour on the screen
-; IN:	EBX = Index #
-debug_block_r:
-	push rax
-	push rbx
-	push rcx
-	push rdx
-	push rdi
-
-	; Calculate parameters
-	push rbx
-	push rax
-	xor edx, edx
-	xor eax, eax
-	xor ebx, ebx
-	mov ax, [0x00005F00 + 0x12]	; Screen Y
-	sub ax, 16			; Upper row
-	shr ax, 1			; Quick divide by 2
-	mov bx, [0x00005F00 + 0x10]	; Screen X
-	shl ebx, 2			; Quick multiply by 4
-	mul ebx				; Multiply EDX:EAX by EBX
-	mov rdi, [0x00005F00]		; Frame buffer base
-	add rdi, rax			; Offset is ((screeny - 8) / 2 + screenx * 4)
-	pop rax
-	pop rbx
-	xor edx, edx
-	mov dx, [0x00005F00 + 0x14]	; PixelsPerScanLine
-	shl edx, 2			; Quick multiply by 4 for line offset
-	xor ecx, ecx
-	mov cx, [0x00005F00 + 0x10]	; Screen X
-	shr cx, 4			; CX = total amount of 8-pixel wide blocks
-	sub cx, 4
-	add ebx, ecx
-	shl ebx, 5			; Quick multiply by 32 (8 pixels by 4 bytes each)
-	add rdi, rbx
-
-	; Draw the 8x8 pixel block
-	mov ebx, 8			; 8 pixels tall
-	mov eax, 0x00FF0000		; Return Infinity Yellow/Orange
-.nextline:
-	mov ecx, 8			; 8 pixels wide
-	rep stosd
-	add rdi, rdx			; Add line offset
-	sub rdi, 8*4			; 8 pixels by 4 bytes each
-	dec ebx
-	jnz .nextline
-
-	pop rdi
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
-	ret
-; -----------------------------------------------------------------------------
-
-; -----------------------------------------------------------------------------
-; debug_block - Create a block of colour on the screen
-; IN:	EBX = Index #
-debug_block_g:
-	push rax
-	push rbx
-	push rcx
-	push rdx
-	push rdi
-
-	; Calculate parameters
-	push rbx
-	push rax
-	xor edx, edx
-	xor eax, eax
-	xor ebx, ebx
-	mov ax, [0x00005F00 + 0x12]	; Screen Y
-	sub ax, 16			; Upper row
-	shr ax, 1			; Quick divide by 2
-	mov bx, [0x00005F00 + 0x10]	; Screen X
-	shl ebx, 2			; Quick multiply by 4
-	mul ebx				; Multiply EDX:EAX by EBX
-	mov rdi, [0x00005F00]		; Frame buffer base
-	add rdi, rax			; Offset is ((screeny - 8) / 2 + screenx * 4)
-	pop rax
-	pop rbx
-	xor edx, edx
-	mov dx, [0x00005F00 + 0x14]	; PixelsPerScanLine
-	shl edx, 2			; Quick multiply by 4 for line offset
-	xor ecx, ecx
-	mov cx, [0x00005F00 + 0x10]	; Screen X
-	shr cx, 4			; CX = total amount of 8-pixel wide blocks
-	sub cx, 4
-	add ebx, ecx
-	shl ebx, 5			; Quick multiply by 32 (8 pixels by 4 bytes each)
-	add rdi, rbx
-
-	; Draw the 8x8 pixel block
-	mov ebx, 8			; 8 pixels tall
-	mov eax, 0x0000FF00		; Return Infinity Yellow/Orange
-.nextline:
-	mov ecx, 8			; 8 pixels wide
-	rep stosd
-	add rdi, rdx			; Add line offset
-	sub rdi, 8*4			; 8 pixels by 4 bytes each
-	dec ebx
-	jnz .nextline
-
-	pop rdi
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
-	ret
-; -----------------------------------------------------------------------------
-; -----------------------------------------------------------------------------
-; debug_block - Create a block of colour on the screen
-; IN:	EBX = Index #
-debug_block_b:
-	push rax
-	push rbx
-	push rcx
-	push rdx
-	push rdi
-
-	; Calculate parameters
-	push rbx
-	push rax
-	xor edx, edx
-	xor eax, eax
-	xor ebx, ebx
-	mov ax, [0x00005F00 + 0x12]	; Screen Y
-	sub ax, 16			; Upper row
-	shr ax, 1			; Quick divide by 2
-	mov bx, [0x00005F00 + 0x10]	; Screen X
-	shl ebx, 2			; Quick multiply by 4
-	mul ebx				; Multiply EDX:EAX by EBX
-	mov rdi, [0x00005F00]		; Frame buffer base
-	add rdi, rax			; Offset is ((screeny - 8) / 2 + screenx * 4)
-	pop rax
-	pop rbx
-	xor edx, edx
-	mov dx, [0x00005F00 + 0x14]	; PixelsPerScanLine
-	shl edx, 2			; Quick multiply by 4 for line offset
-	xor ecx, ecx
-	mov cx, [0x00005F00 + 0x10]	; Screen X
-	shr cx, 4			; CX = total amount of 8-pixel wide blocks
-	sub cx, 4
-	add ebx, ecx
-	shl ebx, 5			; Quick multiply by 32 (8 pixels by 4 bytes each)
-	add rdi, rbx
-
-	; Draw the 8x8 pixel block
-	mov ebx, 8			; 8 pixels tall
-	mov eax, 0x000000FF		; Return Infinity Yellow/Orange
-.nextline:
-	mov ecx, 8			; 8 pixels wide
-	rep stosd
-	add rdi, rdx			; Add line offset
-	sub rdi, 8*4			; 8 pixels by 4 bytes each
-	dec ebx
-	jnz .nextline
-
-	pop rdi
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
-	ret
 ; -----------------------------------------------------------------------------
 %ifdef BIOS
 ; -----------------------------------------------------------------------------
@@ -1863,7 +1469,7 @@ STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; estos son agregados por poder imprimir aqui adentro
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-msg_transient_sys_load	db "Transient system load starting now", 0x0A, 0
+msg_transient_sys_load	db "Transient system load starting", 0x0A, 0
 msg_system_setup_ready	db "System setup ready: jumping to kernel...", 0x0A
 						db "[press 'n' to continue...]", 0x0A, 0
 msg_clearing_space_sys_tables db "Clearing space for system tables... ", 0
