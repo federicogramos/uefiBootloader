@@ -22,7 +22,7 @@
 ;; 0        512B    4KiB     16KiB        22KiB       256KiB       1MiB-1
 ;;==============================================================================
 
-TSL_BASE_ADDRESS equ 0x8000
+TSL_BASE_ADDRESS equ 0x800000
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
 
@@ -759,10 +759,9 @@ exit_uefi_services:
 	;;  |^                   |^                                 |^
 	;; 0x8000              0x9800                             0x44000          
 	mov rsi, PAYLOAD
-	mov rdi, 0x8000
-;;	mov rdi, 0x200000
-	mov rcx, (240 * 1024)	;; 240KiB a partir de 0x8000
-	rep movsb				;; Ultimo byte escrito = 0x8000 + (240 * 1024) - 1 =
+	mov rdi, TSL_BASE_ADDRESS
+	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS
+	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1024) - 1 =
 							;; 0x43FFF
 
 	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
@@ -834,8 +833,7 @@ exit_uefi_services:
 	xor rcx, rcx
 	xor rdx, rdx
 	xor rbx, rbx
-	mov rsp, 0x8000
-;;	mov rsp, 0x400000
+	mov rsp, TSL_BASE_ADDRESS
 	xor rbp, rbp
 	xor rsi, rsi
 	xor rdi, rdi
