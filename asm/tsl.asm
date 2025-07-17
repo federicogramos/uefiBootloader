@@ -94,23 +94,23 @@ start64:
 	out 0x21, al
 	out 0xA1, al
 
-	; Initialize and remap PIC IRQ's
-	; ICW1
-	mov al, 0x11;			; Initialize PIC 1, init (bit 4) and ICW4 (bit 0)
+	;; Initialize and remap PIC IRQ's
+	;; ICW1
+	mov al, 0x11;			;; Initialize PIC 1, init (bit 4) and ICW4 (bit 0).
 	out 0x20, al
-	mov al, 0x11;			; Initialize PIC 2, init (bit 4) and ICW4 (bit 0)
+	mov al, 0x11;			;; Initialize PIC 2, init (bit 4) and ICW4 (bit 0).
 	out 0xA0, al
-	; ICW2
-	mov al, 0x20			; IRQ 0-7: interrupts 20h-27h
+	;; ICW2
+	mov al, 0x20			;; IRQ 0-7: interrupts 20h-27h
 	out 0x21, al
-	mov al, 0x28			; IRQ 8-15: interrupts 28h-2Fh
+	mov al, 0x28			;; IRQ 8-15: interrupts 28h-2Fh
 	out 0xA1, al
-	; ICW3
+	;; ICW3
 	mov al, 4
 	out 0x21, al
 	mov al, 2
 	out 0xA1, al
-	; ICW4
+	;; ICW4
 	mov al, 1
 	out 0x21, al
 	mov al, 1
@@ -123,9 +123,20 @@ start64:
 	in al, 0x71
 
 	;; Disable PIT
-	mov al, 0x30			; Channel 0 (7:6), Access Mode lo/hi (5:4), Mode 0 (3:1), Binary (0)
+	;;mov al, 0x30			; Channel 0 (7:6), Access Mode lo/hi (5:4), Mode 0 (3:1), Binary (0)
+	;;out 0x43, al
+	;;mov al, 0x00
+	;;out 0x40, al
+
+set_pit_initial_mode:
+	mov al, 0x36	;; [00] select counter 0, [11] r/w LSB then MSB, [011] mode 
+					;; 3, [0] binary counter.
 	out 0x43, al
-	mov al, 0x00
+
+set_pit_initial_freq:
+	mov ax, 0xFFFF	;; Initial setting is 55ms.
+	out 0x40, al
+	mov al, ah
 	out 0x40, al
 
 	mov r9, msg_ready
@@ -147,7 +158,6 @@ start64:
 
 	mov r9, msg_ready
 	call print
-
 
 	mov r9, msg_gdt
 	call print
