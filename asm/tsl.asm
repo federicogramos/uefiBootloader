@@ -483,24 +483,32 @@ parse_uefi_memmap:
 	mov rdi, 0x00200000	;; Our cleaned memmap at 0x200000.
 
 .parse:
-	mov rax, [rsi + 24]	;; Number of 4KiB pages inside this memmap entry.
-	cmp rax, 0			;; The 0 pages mark leaved in uefi.asm at the tail.
-	je .finish			;; If so, we have finished.
+	mov rax, [rsi + 24]		;; Number of 4KiB pages inside this memmap entry.
+	cmp rax, 0				;; The 0 pages mark leaved in uefi.asm at the tail.
+	je .finish				;; If so, we have finished.
 
 	;; What if the descriptor is system one and includes 0x100000 address?
 	mov rax, [rsi + 8]
-	cmp rax, 0x100000	;; Test if the Physical Address less than 0x100000.
-	jb .next_entry		;; If so, directly skip.
+	cmp rax, 0x100000		;; Test if the Physical Address less than 0x100000.
+	jb .next_entry			;; If so, directly skip.
 
-	mov rax, [rsi]		;; Here is the efi type.
-	cmp rax, 0			;; EfiReservedMemoryType (Not usable)
+	mov rax, [rsi]					;; Here is the efi type.
+	cmp rax, EfiReservedMemoryType	;; Not usable.
 	je .next_entry
-	cmp rax, 7			;; EfiConventionalMemory (Free)
+	
+	cmp rax, EfiConventionalMemory	;; This att and below, is usable.
 	jbe .usable
-	xor rbx, rbx		;; Reset flag to keep track of contiguous blocks.
+	xor rbx, rbx			;; Reset flag to keep track of contiguous blocks.
 	jmp .next_entry
 
 .usable:
+
+	;;mov r9, msg_test_hex
+	;;mov rsi, rax
+	;;call print
+	;;cli 
+	;;hlt
+
 	cmp rbx, 1
 	je .parse_as_usable_contiguous_to_prev
 	mov rax, [rsi + 8]
@@ -1469,6 +1477,8 @@ msg_setting_memmap:		db "Setting up memmap...", 0
 msg_cr3_at_this_point:				db "CR3 at this point = 0x%h", 0x0A, 0
 msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
 msg_patch:					db "Patching code for AP... ", 0x0A, 0
+
+msg_test_hex:				db "Value = 0x%h", 0x0A, 0
 
 
 BOOTLOADER_SIZE equ 0x2000	;; 8KiB
