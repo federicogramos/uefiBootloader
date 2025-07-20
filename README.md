@@ -38,6 +38,8 @@ Ver /boot/src/boot.cpp
 
 ### Info extra varia
 
+[Buen resumen de todo lo necesario para uso de UEFI](https://uefi.org/specs/UEFI/2.10/02_Overview.html)
+
 [Introduction to UEFI](http://x86asm.net/articles/introduction-to-uefi/index.html)
 Util lectura para introducirse en el tema.
 
