@@ -6,6 +6,7 @@
 ;; el en 0x100000.
 ;;=============================================================================
 
+%include "./asm/include/tsl.inc"
 
 BITS 64
 
@@ -452,57 +453,85 @@ patch_ap_code:
 	mov r9, msg_setting_memmap
 	call print
 
+;; The memory map left in address 0x200000 is composed of all usable memory:
+;;          +----------------------+          \
+;; 0x200000 | physical block start | 8 bytes  |
+;;          +----------------------+           > 1st entry
+;;          |   number of pages    | 8 bytes  |
+;;          +----------------------+          /
+;;          |         ...          |
+;;          +----------------------+
+;;          |         ...          |
+;;          +----------------------+          \
+;;          |          0           | 8 bytes  |
+;;          +----------------------+           > last entry
+;;          |          0           | 8 bytes  |
+;;          +----------------------+          /
+;;
+;; -- Below 0x100000 we have system data, not available to the user, not added.
+;; -- Reserved system memory marked by uefi is also not included.
 parse_uefi_memmap:
 	;; Find all usable memory. Types 1-7 are ok to use once Boot Services has exited.
 	;; Anything else not usable.
+	xor r8, r8			;; Usable memory accum to inform. Will count num pages.
+	xor r10, r10		;; Number of descriptors in usable memmap.
 	xor r9, r9
-	xor rbx, rbx
+	xor rbx, rbx		;; A flag to keep track of contiguous blocks. Zero means
+						;; the block being currently parsed is contiguous with t
+						;; he one before. If so, we could merge.
 	mov rsi, 0x00220000	;; UEFI memmap.
 	mov rdi, 0x00200000	;; Our cleaned memmap at 0x200000.
 
 .parse:
-	mov rax, [rsi + 24]	;; Number of 4KiB pages this entry has.
-	cmp rax, 0			;; The 0 pages mark leaved in uefi.asm.
+	mov rax, [rsi + 24]	;; Number of 4KiB pages inside this memmap entry.
+	cmp rax, 0			;; The 0 pages mark leaved in uefi.asm at the tail.
 	je .finish			;; If so, we have finished.
+
+	;; What if the descriptor is system one and includes 0x100000 address?
 	mov rax, [rsi + 8]
 	cmp rax, 0x100000	;; Test if the Physical Address less than 0x100000.
-	jb .next_entry		;; If so, skip it.
-	mov rax, [rsi]
+	jb .next_entry		;; If so, directly skip.
+
+	mov rax, [rsi]		;; Here is the efi type.
 	cmp rax, 0			;; EfiReservedMemoryType (Not usable)
 	je .next_entry
 	cmp rax, 7			;; EfiConventionalMemory (Free)
 	jbe .usable
-	mov bl, 0
+	xor rbx, rbx		;; Reset flag to keep track of contiguous blocks.
 	jmp .next_entry
 
 .usable:
-	cmp bl, 1
-	je .usable_contiguous
+	cmp rbx, 1
+	je .parse_as_usable_contiguous_to_prev
 	mov rax, [rsi + 8]
-	stosq				;; Physical Start.
+	stosq				;; Physical start.
 	mov rax, [rsi + 24]
-	stosq				;; Number of pages.
+	stosq				;; Number of pages. Watch: prev instruction leaves rax =
+						;; physical start (to use next).
 
-.usable_contiguous_next:
+.test_next_for_contiguous:
 	mov r9, rax
-	shl r9, 12			;; r9 * 2^12
-	add r9, [rsi + 8]	;; r9 should match the physical address of the next reco
-						;; rd if they are contiguous.
-	mov bl, 0			;; Non-contiguous.
-	cmp r9, [rsi + 56]	;; r9 against the next Physical Start.
+	shl r9, 12			;; numberOfPages * 2^12 = total offset to the end.
+	add r9, [rsi + 8]	;; Physical address of the next contiguous block.
+	xor rbx, rbx		;; Initialize flag as non-contiguous (refers the next to
+						;; parse vs the current one).
+	cmp r9, [rsi + 56]	;; Physical Start, next needed for continuity == actual 
+						;; next.
 	jne .next_entry
-	mov bl, 1			;; Contiguous.
+	mov rbx, 1			;; Set contiguous.
 	jmp .next_entry
 
-.usable_contiguous:
-	sub rdi, 8
-	mov rax, [rsi + 24]
+.parse_as_usable_contiguous_to_prev:
+	sub rdi, 8			;; Prev usable memmap entry number of pages. Will merge.
+	mov rax, [rsi + 24]	;; Pages.
 	add rax, [rdi]
-	stosq
-	mov rax, [rsi + 24]
-	jmp .usable_contiguous_next
+	stosq				;; Merged.
+	mov rax, [rsi + 24]	;; Leaves rax = physical start (to use next).
+	jmp .test_next_for_contiguous
 
 .next_entry:
+	;; TODO: update to use memmapdescsize.
+	;; add rsi, [memmapdescsize]	;; Needed for future compatibility.
 	add rsi, 48
 	jmp .parse
 
