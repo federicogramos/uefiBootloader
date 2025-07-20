@@ -19,19 +19,25 @@ extern CONIN_INTERFACE
 extern EFI_INPUT_KEY
 
 
-
-
 section .text
 
 
 ;;==============================================================================
 ;; Muestrea buscando si apretaron 's' (senalizacion  inicio modo step)
 ;;==============================================================================
+;; Ojo usando servicios uefi dentro de una rutina, siempre armar stack frame.
+;;==============================================================================
 
 ventana_modo_step:
+	push rbp
+	mov rbp, rsp
+
 	mov rcx, [CONIN_INTERFACE]
-	mov rdx, EFI_INPUT_KEY	
+	mov rdx, EFI_INPUT_KEY
+	sub rsp, 8 * 4
 	call [rcx + EFI_INPUT_READ_KEY]	;; SIMPLE_INPUT.ReadKeyStroke()
+	add rsp, 8 * 2
+	
 	cmp eax, EFI_NOT_READY			;; No hubo ingreso, sigo normalmente. Descar
 									;; ta bit 63, de otro modo compararia mal
 	je .continue_no_step_mode
@@ -41,7 +47,9 @@ ventana_modo_step:
 
 	mov rcx, [CONOUT_INTERFACE]	
 	lea rdx, [msg_efi_input_device_err]	;; Notificar, rax = EFI_DEVICE_ERROR
+	sub rsp, 8 * 4
 	call [rcx + EFI_OUT_OUTPUTSTRING]
+	add rsp, 8 * 2
 	jmp .continue_no_step_mode			;; Sigo, a pesar del error.
 	
 .get_key:
@@ -52,13 +60,22 @@ ventana_modo_step:
 
 	mov rcx, [CONOUT_INTERFACE]	
 	lea rdx, [msg_step_mode]
+	sub rsp, 8 * 4
 	call [rcx + EFI_OUT_OUTPUTSTRING]
+	add rsp, 8 * 2
+	jmp .fin
 
 .continue_no_step_mode:
 	mov rcx, [CONOUT_INTERFACE]	
 	lea rdx, [msg_uefi_boot]			
+	sub rsp, 8 * 4
 	call [rcx + EFI_OUT_OUTPUTSTRING]
+	add rsp, 8 * 2
 
+.fin:
+	mov rsp, rbp
+	pop rbp
+	ret
 
 ;;==============================================================================
 ;; efi_print - impresion con formato (unicamente 1 solo %: %d, %h, %c, %s)

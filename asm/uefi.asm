@@ -218,6 +218,7 @@ section .text
 
 
 entryPoint:
+
 	;; Ubicado en 0x400200 cuando imagen va en 0x400000
 	;; UEFI entry point args and rerturn address.
 	mov [EFI_IMAGE_HANDLE], rcx
@@ -252,7 +253,7 @@ entryPoint:
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONIN_HANDLE]
 	mov [CONIN_INTERFACE_HANDLE], rax
 	
-    mov rax, [EFI_SYSTEM_TABLE]
+	mov rax, [EFI_SYSTEM_TABLE]
 	mov rax, [rax + EFI_SYSTEM_TABLE_CONIN]
 	mov [CONIN_INTERFACE], rax
 
@@ -802,6 +803,7 @@ exit_uefi_services:
 	stosq
 
 	;; Append 2 blank entries to end of UEFI memory map (uncomment if necessary)
+	;; We just need one so to mark the end of the entries.
 	 mov rdi, [memmap]
 	 add rdi, [memmapsize]
 	 mov rcx, [memmapdescsize]
@@ -905,7 +907,6 @@ halt:
 ;;==============================================================================
 
 section .data
-
 EFI_IMAGE_HANDLE:	    dq 0	;; rcx at entry point.
 EFI_SYSTEM_TABLE:	    dq 0	;; rdx at entry point.
 EFI_IMG_RET_ADDR:	    dq 0
@@ -1019,7 +1020,7 @@ efi_fmt_ppsl:					dw utf16("PPSL = %d"), 0
 efi_fmt_fb_size:				dw utf16(" | Framebuffer = %d bytes"), 0
 efi_fmt_fb_address:				dw utf16(" | Address = 0x%h"), 13, 0xA, 0
 
-msg_graphics_mode_info_match:	dw utf16("Graphics mode info match."), 13, 0xA
+msg_graphics_mode_info_match:	dw utf16("Graphics mode info match"), 13, 0xA
 								dw utf16("SetMode()..."), 13, 0xA
 								dw utf16("[tecla 'n' para continuar]"), 13, 0xA, 0
 
@@ -1073,16 +1074,20 @@ msg_boot_services_exit_ok:		db "Exit from UEFI services OK "
 msg_handlebuffer_err:			db "HandleBuffer() error.", 0x0A, 0
 msg_handlebuffer_ok:			db "HandleBuffer() returned EFI_SUCCESS"
 								db " | Number of handlers = %d", 0x0A, 0
-msg_conin_handle_value			db "Conin handle val = %h | Located: ", 0
+msg_conin_handle_value			db "Conin handle val = 0x%h | Located: ", 0
 msg_located_index				db " [%d] = ", 0
-msg_located_value				db "%h", 0
+msg_located_value				db "0x%h", 0
 newline8						db 0x0A, 0
 
 msg_handleprotocol_err:		db "HandleProtocol() error.", 0x0A, 0
 msg_handleprotocol_ok:		db "HandleProtocol() returned EFI_SUCCESS.", 0x0A, 0
 
-msg_reference				db "conin interface = %d", 0x0A, 0
-msg_located					db "located interface = %d", 0
+msg_reference:				db "conin interface = %d", 0x0A, 0
+msg_located:				db "located interface = %d", 0
+
+fmt_test:					dw utf16("test step = %d"), 13, 0x0A, 0
+fmt_test_hex:				dw utf16("test step = 0x%h"), 13, 0x0A, 0
+fmt_test_uefi:				dw utf16("test uefi"), 13, 0x0A, 0
 
 
 ;;==============================================================================

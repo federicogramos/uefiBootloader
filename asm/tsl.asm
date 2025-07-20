@@ -39,7 +39,8 @@ ap_startup:
 	mov esp, 0x7000
 	jmp 0x0000:init_smp_ap
 
-%include "./asm/init/smp_ap.asm"	;; AP's will start execution at TSL_BASE_ADDRESS and fall through to this code
+%include "./asm/init/smp_ap.asm"	;; AP's will start execution at TSL_BASE_ADD
+									;; RESS and fall through to this code.
 
 ;;==============================================================================
 ;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
@@ -68,17 +69,15 @@ start64:
 	mov rax, 0x00000000
 	call memsetFramebuffer	;; Borrar pantalla.
 
-
-	mov rdi, InfoMap	;; Begins at 0x5000: clr mem for info map and sys vars.
-	xor rax, rax
-	mov rcx, 960		;; 3840 bytes (Range is 0x5000 - 0x5EFF)
-	rep stosd			;; Ciudado: en 0x5F00 hay datos de UEFI/BIOS.
-
 	push rbx
 	mov r9, msg_transient_sys_load
 	call print
 	pop rbx
 
+	mov rdi, InfoMap	;; Begins at 0x5000: clr mem for info map and sys vars.
+	xor rax, rax
+	mov rcx, 960		;; 3840 bytes (Range is 0x5000 - 0x5EFF)
+	rep stosd			;; Ciudado: en 0x5F00 hay datos de UEFI/BIOS.
 
 	;; Sysvars.
 	mov [p_BootMode], bl
@@ -122,12 +121,6 @@ start64:
 	out 0x70, al
 	in al, 0x71
 
-	;; Disable PIT
-	;;mov al, 0x30			; Channel 0 (7:6), Access Mode lo/hi (5:4), Mode 0 (3:1), Binary (0)
-	;;out 0x43, al
-	;;mov al, 0x00
-	;;out 0x40, al
-
 set_pit_initial_mode:
 	mov al, 0x36	;; [00] select counter 0, [11] r/w LSB then MSB, [011] mode 
 					;; 3, [0] binary counter.
@@ -145,19 +138,29 @@ set_pit_initial_freq:
 	mov r9, msg_clearing_space_sys_tables
 	call print
 
-; Clear out the first 20KiB of memory. This will store the 64-bit IDT, GDT, PML4, PDP Low, and PDP High
-	mov ecx, 5120
 	xor eax, eax
+
+	mov ecx, 5120	;; 20KiB for IDT, GDT, PML4, PDP Low, and PDP High.
 	mov edi, eax
 	rep stosd
 
-; Clear memory for the Page Descriptor Entries (0x10000 - 0x5FFFF)
+	mov ecx, 81920	;; 320KiB for Page Descriptor Entries (0x10000 - 0x5FFFF)
 	mov edi, 0x00010000
-	mov ecx, 81920
-	rep stosd			; Write 320KiB
+	rep stosd		
 
 	mov r9, msg_ready
 	call print
+
+	;; CR4 info
+	;;mov rax, cr4
+	;;bt rax, 5
+	;;lahf
+	;;mov al, ah
+	;;and rax, 0x0000000000000001
+	;;mov rsi, rax
+	;;mov r9, fmt_pae
+	;;call print
+
 
 	mov r9, msg_gdt
 	call print
@@ -170,54 +173,52 @@ set_pit_initial_freq:
 	mov r9, msg_pml4
 	call print
 
-;; Complete Page Map Level 4 table (PML4)
-;; PML4 is stored at 0x0000000000002000, create the first entry there
-;; A single PML4 entry can map 512GiB ----- ver tema paginas 2M 1G
-;; A single PML4 entry is 8 bytes in length
-	mov edi, 0x00002000		; Create a PML4 entry for physical memory
-	mov eax, 0x00003003		; Bits 0 (P), 1 (R/W), location of low PDP (4KiB aligned)
-	stosq
-	mov edi, 0x00002800		; Create a PML4 entry for higher half (starting at 0xFFFF800000000000)
-	mov eax, 0x00004003		; Bits 0 (P), 1 (R/W), location of high PDP (4KiB aligned)
-	stosq
+;; Write Page Map Level 4 table (PML4). Starts at 0x0000000000002000. An entry m
+;; aps 512GiB (when 4KiB pages).
+pml4_2mb:
+	mov edi, 0x00002000		;; PML4 entry for physical mem, canonical low.
+	mov eax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	stosq					;;    1     |   1    |
+	mov edi, 0x00002800		;; PML4 entry for canonical high start address of 0x
+							;; FFFF800000000000
+	mov eax, 0x00004003		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
+	stosq					;;    1     |   1    |
 
 	mov r9, msg_ready
 	call print
 
-; Check to see if the system supports 1 GiB pages
-; If it does we will use that for identity mapping the lower memory
+pag_1gb_support:
 	mov r9, msg_support_1g_pages	;; Comienza aviso de soporte.
 	call print
 
 	mov eax, 0x80000001
 	cpuid
 	bt edx, 26			; Page1GB
-
-jc pdpte_1GB
+	jc support_1gb_pages
 
 	mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
 	call print
 
+;; 2MiB pages.
+	mov r9, msg_pages_will_be_2mib
+	call print
 
-
-	;; 2MiB pages.
 	mov r9, msg_pdpt
 	call print
 
-; Create the Low Page-Directory-Pointer-Table Entries (PDPTE)
-; PDPTE starts at 0x0000000000003000, create the first entry there
-; A single PDPTE can map 1GiB
-; A single PDPTE is 8 bytes in length
-; A PDPTE points to 4KiB of memory which contains 512 PDEs
-; FIXME - This will completely fill the 64K set for the low PDE (only 16GiB identity mapped)
-	mov ecx, 16			; number of PDPE's to make.. each PDPE maps 1GiB of physical memory
-	mov edi, 0x00003000		; location of low PDPE
-	mov eax, 0x00010003		; Bits 0 (P), 1 (R/W), location of first low PD (4KiB aligned)
-pdpte_low:
+;; Canonical Low Page Directory Pointer Table (PDPT). At 0x0000000000003000. A s
+;; ingle PDPTE can map 1GiB (in 4KiB pages).
+pdpt_low:
+	mov ecx, 16				;; number of PDPE's to make. Each maps 1GiB of physi
+							;; cal memory
+	mov edi, 0x00003000		;; Location of low PDPE.
+	mov eax, 0x00010003		;; Bits 0 (P), 1 (R/W), location of first low PD (4K
+							;; iB aligned)
+.pdpt_entry_low_2mb:
 	stosq
-	add rax, 0x00001000		; 4KiB later (512 records x 8 bytes)
+	add rax, 0x00001000		;; 4KiB later (512 records x 8 bytes).
 	dec ecx
-	jnz pdpte_low
+	jnz .pdpt_entry_low_2mb
 
 	mov r9, msg_ready
 	call print
@@ -225,72 +226,78 @@ pdpte_low:
 	mov r9, msg_pd
 	call print
 
-; Create the Low Page-Directory Entries (PDE)
-; A single PDE can map 2MiB of RAM
-; A single PDE is 8 bytes in length
-;;	mov edi, 0x00010000		; Location of first PDE
-;;	mov eax, 0x00000083		; Bits 0 (P), 1 (R/W), and 7 (PS) set
-;;	mov ecx, 8192			; Create 8192 2MiB page maps
-pde_low:				; Create a 2MiB page
-;;	stosq
-;;	add rax, 0x00200000		; Increment by 2MiB
-;;	dec ecx
-;;	jnz pde_low
+	;; Create the Low Page-Directory Entries (PDE)
+	;; A single PDE can map 2MiB of RAM
+	;; A single PDE is 8 bytes in length
+	mov edi, 0x00010000		;; Location of first PDE
+	mov eax, 0x00000083		;; Bits 0 (P), 1 (R/W), and 7 (PS) set
+	mov ecx, 8192			;; Create 8192 2MiB page maps
+
+pde_low:					;; Create a 2MiB page
+	stosq
+	add rax, 0x00200000		;; Increment by 2MiB
+	dec ecx
+	jnz pde_low
 
 	mov r9, msg_ready
 	call print
 
-	jmp skip1GB
+	jmp skip_1gb
 
-; 1GiB Pages
-; Create the Low Page-Directory-Pointer Table Entries (PDPTE)
-; PDPTE starts at 0x0000000000010000, create the first entry there
-; A single PDPTE can map 1GiB
-; A single PDPTE is 8 bytes in length
-; A PDPTE points to 4KiB of memory which contains 512 PDEs
-; 8191 entries are created to map the first 8191GiB of RAM
-; The last entry is reserved for the virtual LFB address
-pdpte_1GB:
+;; 1GiB Pages. Create the Low Page-Directory-Pointer Table Entries (PDPTE). PDPT
+;; E starts at 0x0000000000010000, create the first entry there. A single PDPTE 
+;; can map 1GiB. A single PDPTE is 8 bytes in length. A PDPTE points to 4KiB of 
+;; memory which contains 512 PDEs 8191 entries are created to map the first 8191
+;; GiB of RAM. The last entry is reserved for the virtual LFB address.
+support_1gb_pages:
 
-	mov r9, msg_support_1g_pages_yes	;; Completa: no soporta pags 1GB.
+	mov r9, msg_support_1g_pages_yes	;; Completa: soporta pags 1GB.
 	call print
 
 ;; TODO: revisar esta rama.
-	mov byte [p_1GPages], 1
+	mov byte [p_1gb_pages], 1
 
-; Overwrite the original PML4 entry for physical memory
+;; Overwrite the original PML4 entry for physical memory.
+pml4_1g:
 	mov ecx, 16
-	mov edi, 0x00002000		; Create a PML4 entry for physical memory
-	mov eax, 0x00010003		; Bits 0 (P), 1 (R/W), location of low PDP (4KiB aligned)
-pml4_low_1GB:
+	mov edi, 0x00002000		;; Create a PML4 entry for physical memory
+	mov eax, 0x00010003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+							;;    1     |    1   |
+pml4_low_entry_1gb:
 	stosq
-	add rax, 0x00001000		; 4KiB later (512 records x 8 bytes)
+	add rax, 0x00001000		;; Next pdpt 4KiB later.
 	dec ecx
-	jnz pml4_low_1GB
+	jnz pml4_low_entry_1gb
 
-	mov ecx, 8191			; number of PDPE's to make.. each PDPE maps 1GiB of physical memory
-	mov edi, 0x00010000		; location of low PDPE
-	mov eax, 0x00000083		; Bits 0 (P), 1 (R/W), 7 (PS)
-pdpte_low_1GB:				; Create a 1GiB page
+pdpt_low_1gb:
+	mov ecx, 8191			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
+	mov edi, 0x00010000		;; location of low PDPE
+	mov eax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
+							;;    1    |    1     |   1    |
+
+pdpt_entry_low_1gb:			;; Create a 1GiB page.
 	stosq
-	add rax, 0x40000000		; Increment by 1GiB
+	add rax, 0x40000000		;; Increment by 1GiB.
 	dec ecx
-	jnz pdpte_low_1GB
+	jnz pdpt_entry_low_1gb
 
-skip1GB:
+skip_1gb:
+
 	mov r9, msg_load_gdt
 	call print
 	lgdt [GDTR64]
 	mov r9, msg_ready
 	call print
 
+	mov rsi, cr3
+	mov r9, msg_cr3_at_this_point
+	call print
 
 
-
-; Point cr3 at PML4
-;	mov rax, 0x00002008		; Write-thru enabled (Bit 3)
-;	mov cr3, rax
-;;;;;;;;;;;;;;;;;;; exito: comentando esto bootea el SO exitosamente, ahora el problema
+;; Point cr3 at PML4
+	mov rax, 0x00002008		;;; Write-thru enabled (Bit 3).
+	mov cr3, rax
+;; comentando esto bootea el SO exitosamente, ahora el problema
 ;; se traslada a arreglar la memoria de video, que queda cambiada.
 ;; actualizacion 20250516 esto esta bien lo dejo asi habilitado.
 ;; 20250516 2337 confirmo lo siguiente basado en pruebas:
@@ -298,9 +305,14 @@ skip1GB:
 ;; mismo usb en br1100 no bootea, sino resetea idem otra tb con pantalla 1377 * 768
 ;; ahora, comento esto de cr3 y funciona en todo.
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;fgr;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;hlt;;;;;;;;;;aqui no ha llegado.. parece que mov cr3 jode ;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	mov r9, msg_cr3_load
+	call print
+
+	mov rsi, cr3
+	mov r9, msg_cr3_at_this_point
+	call print
+
 
 	xor rax, rax
 	xor rbx, rbx
@@ -330,6 +342,7 @@ skip1GB:
 	push SYS64_CODE_SEL
 	push clearcs64
 	retfq
+
 clearcs64:
 
 	lgdt [GDTR64]	;; Reload the GDT
@@ -416,35 +429,41 @@ load_interrupt_gates:
 	mov r9, msg_idt_load
 	call print
 
-	lidt [IDTR64]			; load IDT register
+	lidt [IDTR64]
 
 	mov r9, msg_ready
 	call print
 
-; AP's will be told to start execution at TSL_BASE_ADDRESS.
+;; TODO: revisar que este pisando bien.
+;; AP's will be told to start execution at TSL_BASE_ADDRESS.
+
 patch_ap_code:
-	mov edi, start
+	mov r9, msg_patch
+	call print
+
+	mov rdi, start
 	mov rax, 0x9090909090909090
 	stosq						;; Remove code between start and ap_startup, so
-	stosq						;; they can reach their starting code.
+								;; they can reach their starting code.
 
+	mov r9, msg_ready
+	call print
 
-;; Parse the memory map provided by UEFI
-%ifdef UEFI
+	mov r9, msg_setting_memmap
+	call print
 
-parse_memmap:
+parse_uefi_memmap:
 	;; Find all usable memory. Types 1-7 are ok to use once Boot Services has exited.
 	;; Anything else not usable.
 	xor r9, r9
-	xor ebx, ebx
-	mov esi, 0x00220000 - 48	;; UEFI map - 48 bytes for the loop start.
-	mov edi, 0x00200000			;; Memory map at 0x200000
+	xor rbx, rbx
+	mov rsi, 0x00220000	;; UEFI memmap.
+	mov rdi, 0x00200000	;; Our cleaned memmap at 0x200000.
 
-.next_entry:
-	add esi, 48
-	mov rax, [rsi + 24]	;; Next entry.
-	cmp rax, 0			;; If 0 pages, then we have finished.
-	je .finish
+.parse:
+	mov rax, [rsi + 24]	;; Number of 4KiB pages this entry has.
+	cmp rax, 0			;; The 0 pages mark leaved in uefi.asm.
+	je .finish			;; If so, we have finished.
 	mov rax, [rsi + 8]
 	cmp rax, 0x100000	;; Test if the Physical Address less than 0x100000.
 	jb .next_entry		;; If so, skip it.
@@ -483,6 +502,10 @@ parse_memmap:
 	mov rax, [rsi + 24]
 	jmp .usable_contiguous_next
 
+.next_entry:
+	add rsi, 48
+	jmp .parse
+
 .finish:
 	xor eax, eax	;; Blank record at the end.
 	stosq
@@ -511,9 +534,10 @@ clear_small:
 
 ;; Round up Physical Address to next 2MiB boundary if needed and convert 4KiB pa
 ;; ges to 1MiB pages.
+uefi_round:
 	mov esi, 0x00200000 - 16	;; Memory map at 0x200000
 	xor ecx, ecx				;; MiB counter.
-uefi_round:
+.next:
 	add esi, 16
 	mov rax, [rsi]	;; Physical Address.
 	cmp rax, 0
@@ -534,88 +558,30 @@ uefi_round:
 	sub rax, 1			;; Subtract 1MiB
 	mov [rsi + 8], rax
 	add rcx, rax		;; Add to MiB counter.
-	jmp uefi_round
+	jmp .next
 .convert:
 	mov rax, [rsi + 8]
 	shr rax, 8			;; 4K blocks to MiB
 	mov [rsi + 8], rax
 	add rcx, rax		;; Add to MiB counter
-	jmp uefi_round
+	jmp .next
 .finish:
 	sub ecx, 2
 	mov dword [p_mem_amount], ecx
 	xor eax, eax		;; Blank record.
 	stosq
 	stosq
-	jmp memmap_end
-%endif
 
-%ifdef BIOS
-; Parse the memory map provided by BIOS
-bios_memmap:
-; Stage 1 - Process the E820 memory map to find all possible 2MiB pages that are free to use
-; Build an available memory map at 0x200000
-	xor ecx, ecx
-	xor ebx, ebx			; Running counter of available MiBs
-	mov esi, 0x00006000		; E820 Map location
-	mov edi, 0x00200000		; 2MiB
-bios_memmap_nextentry:
-	add esi, 16			; Skip ESI to type marker
-	mov eax, [esi]			; Load the 32-bit type marker
-	cmp eax, 0			; End of the list?
-	je bios_memmap_end820
-	cmp eax, 1			; Is it marked as free?
-	je bios_memmap_processfree
-	add esi, 16			; Skip ESI to start of next entry
-	jmp bios_memmap_nextentry
-bios_memmap_processfree:
-	; TODO Check ACPI 3.0 Extended Attributes - Bit 0 should be set
-	sub esi, 16
-	mov rax, [rsi]			; Physical start address
-	add esi, 8
-	mov rcx, [rsi]			; Physical length
-	add esi, 24
-	shr rcx, 20			; Convert bytes to MiB
-	cmp rcx, 0			; Do we have at least 1 page?
-	je bios_memmap_nextentry
-	stosq
-	mov rax, rcx
-	stosq
-	add ebx, ecx
-	jmp bios_memmap_nextentry
-bios_memmap_end820:
+	mov r9, msg_ready
+	call print
 
-; Stage 2 - Sanitize the records
-	mov esi, 0x00200000
-memmap_sani:
-	mov rax, [rsi]
-	cmp rax, 0
-	je memmap_saniend
-	bt rax, 20
-	jc memmap_itsodd
-	add esi, 16
-	jmp memmap_sani
-memmap_itsodd:
-	add rax, 0x100000
-	mov [rsi], rax
-	mov rax, [rsi+8]
-	sub rax, 1
-	mov [rsi+8], rax
-	add esi, 16
-	jmp memmap_sani
-memmap_saniend:
-	sub ebx, 2			; Subtract 2MiB for the CPU stacks
-	mov dword [p_mem_amount], ebx
-	xor eax, eax
-	stosq
-	stosq
-%endif
+	;;call keyboard_get_key
 
-memmap_end:
 
 ;; Create the High Page-Directory-Pointer-Table Entries (PDPTE). High PDPTE is s
 ;; tored at 0x0000000000004000, create the first entry there. A single PDPTE can
 ;; map 1GiB with 2MiB pages. A single PDPTE is 8 bytes in length.
+pdpt_h:
 	mov ecx, dword [p_mem_amount]
 	shr ecx, 10				;; MB to GB.
 	add rcx, 1				;; Add 1. This is the number of PDPE's to make.
@@ -753,7 +719,7 @@ pde_next_range:
 
 ;; Miscellaneous flags.
 	mov di, 0x50E0
-	mov al, [p_1GPages]
+	mov al, [p_1gb_pages]
 	stosb
 	mov al, [p_x2APIC]
 	stosb
@@ -816,6 +782,7 @@ lfb_wc_end:
 	mov rax, cr3			; Flush TLB
 	mov cr3, rax
 	wbinvd				; Flush Cache
+
 
 	;; Kernel to its final location.
 	mov esi, TSL_BASE_ADDRESS + BOOTLOADER_SIZE	;; Offset to end of tsl.sys
@@ -1448,26 +1415,31 @@ STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; estos son agregados por poder imprimir aqui adentro
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-msg_transient_sys_load	db "Transient system load starting", 0x0A, 0
-msg_system_setup_ready	db "System setup ready: jumping to kernel...", 0x0A
+msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
+msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
 						db "[press 'n' to continue...]", 0x0A, 0
-msg_clearing_space_sys_tables db "Clearing space for system tables... ", 0
-msg_setup_pic_and_irq db "Init PIC, masks and IRQs... ", 0
-msg_ready db "ready", 0x0A, 0
-msg_entries db "entries... ", 0
-msg_gdt		db "Setting up GDT... ", 0
-msg_pml4	db "PML4... ", 0
-msg_pdpt	db "PDPT... ", 0
-msg_pd		db "PD... ", 0
+msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
+msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
+msg_ready: 				db "ready", 0x0A, 0
+msg_entries:			db "entries... ", 0
+msg_gdt:				db "Setting up GDT... ", 0
+msg_pml4:				db "PML4... ", 0
+msg_pdpt:				db "PDPT... ", 0
+msg_pd:					db "PD... ", 0
 msg_support_1g_pages:	db "Support for 1GB pages = ", 0
 msg_support_1g_pages_yes:	db "yes", 0x0A, 0
 msg_support_1g_pages_no:	db "no", 0x0A, 0
-msg_load_gdt db "Load gdt... ", 0
-msg_idt	db "Setting up IDT... ", 0
-msg_idt_exceptions	db "exceptions... ", 0
-msg_idt_irqs db "irqs ", 0
-msg_idt_load	db "load... ", 0
-msg_exception_occurred db "An exception has occurred in the system.", 0x0A, 0
+msg_load_gdt:				db "Load gdt... ", 0
+msg_idt:					db "Setting up IDT... ", 0
+msg_idt_exceptions:			db "exceptions... ", 0
+msg_idt_irqs:				db "irqs ", 0
+msg_idt_load:				db "load... ", 0
+msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
+msg_pages_will_be_2mib: db "Page size = 2MiB", 0x0A, 0
+msg_setting_memmap:		db "Setting up memmap...", 0
+msg_cr3_at_this_point:				db "CR3 at this point = 0x%h", 0x0A, 0
+msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
+msg_patch:					db "Patching code for AP... ", 0x0A, 0
 
 
 BOOTLOADER_SIZE equ 0x2000	;; 8KiB
