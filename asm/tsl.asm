@@ -473,9 +473,14 @@ patch_ap_code:
 parse_uefi_memmap:
 	;; Find all usable memory. Types 1-7 are ok to use once Boot Services has exited.
 	;; Anything else not usable.
-	xor r8, r8			;; Usable memory accum to inform. Will count num pages.
-	xor r10, r10		;; Number of descriptors in usable memmap.
-	xor r9, r9
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;xor r9, r9
+.info_mem:
+	sub rsp, 8 * EfiMaxMemoryType	;; Space for an information array.
+	mov rdi, rsp
+	mov rax, 0
+	mov rcx, EfiMaxMemoryType
+	rep stosq			;; Clear automatic array in stack.
+
 	xor rbx, rbx		;; A flag to keep track of contiguous blocks. Zero means
 						;; the block being currently parsed is contiguous with t
 						;; he one before. If so, we could merge.
@@ -487,7 +492,46 @@ parse_uefi_memmap:
 	cmp rax, 0				;; The 0 pages mark leaved in uefi.asm at the tail.
 	je .finish				;; If so, we have finished.
 
-	;; What if the descriptor is system one and includes 0x100000 address?
+	;; For every descriptor: get info to inform.
+
+.info_array_add:
+	mov rax, [rsi]				;; EFI type.
+	mov rcx, [rsi + 24]			;; Cant pages.
+	add [rsp + 8 * rax], rcx	;; Add pages to corresponding element.
+
+
+;;									jmp .finish
+
+;;									mov rax, [rsi]				;; EFI type.
+;;									push rax
+;;									mov rax, [rsi + 24]			;; Cant pages.
+;;									push rax
+;;									mov rax, [rsi + 8]			;; phy add
+;;									push rax
+;;									mov rax, [rsi + 16]			;; virt add.
+;;									push rax
+;;
+;;									mov r9, msg_test_num
+;;									pop rsi
+;;									call print
+;;
+;;									mov r9, msg_test_num
+;;									pop rsi
+;;									call print
+;;
+;;									mov r9, msg_test_hex;; ph
+;;									pop rsi
+;;									call print
+;;
+;;									mov r9, msg_test_hex;; vir
+;;									pop rsi
+;;									call print
+;;
+;;									cli
+;;									hlt
+
+
+.continue_parse:
 	mov rax, [rsi + 8]
 	cmp rax, 0x100000		;; Test if the Physical Address less than 0x100000.
 	jb .next_entry			;; If so, directly skip.
@@ -502,13 +546,6 @@ parse_uefi_memmap:
 	jmp .next_entry
 
 .usable:
-
-	;;mov r9, msg_test_hex
-	;;mov rsi, rax
-	;;call print
-	;;cli 
-	;;hlt
-
 	cmp rbx, 1
 	je .parse_as_usable_contiguous_to_prev
 	mov rax, [rsi + 8]
@@ -548,10 +585,40 @@ parse_uefi_memmap:
 	stosq
 	stosq
 
-	;; Clear entries < 3MiB.
+	mov r9, msg_ready
+	call print
+
+	mov r9, msg_mm_info
+	call print
+
+
+;; Habiando terminado de parser todo el mapa de memoria, imprimir la info.
+.info_out:
+	mov r9, fmt_mm_info_array
+	mov rcx, 0
+
+.out_loop:
+	mov rsi, [rsp + 8 * rcx]
+	push r9
+	push rcx
+	call print
+	pop rcx
+	pop r9
+	lea r9, [r9 + fmt_mm_info_siz]	;; Siguiente elemento (fmt string).
+	inc rcx
+	cmp rcx, EfiMaxMemoryType
+	jb .out_loop
+
+	add rsp, 8 * EfiMaxMemoryType	;; Devuvelvo space for an information array.
+
+cli
+hlt
+
+;; Clear entries < 3MiB.
+clear_small:
 	mov rsi, 0x00200000		;; Memory map at 0x200000
 	mov rdi, 0x00200000
-clear_small:
+.loop:
 	lodsq
 	cmp rax, 0
 	je .finish
@@ -560,10 +627,10 @@ clear_small:
 	cmp rax, 0x300
 	jb .remove
 	stosq
-	jmp clear_small
+	jmp .loop
 .remove:
 	sub rdi, 8
-	jmp clear_small
+	jmp .loop
 .finish:
 	xor rax, rax	;; Blank record.
 	stosq
@@ -822,10 +889,10 @@ lfb_wc_end:
 
 
 	;; Kernel to its final location.
-	mov esi, TSL_BASE_ADDRESS + BOOTLOADER_SIZE	;; Offset to end of tsl.sys
+	mov esi, TSL_BASE_ADDRESS + TSL_SIZE	;; Offset to end of tsl.sys
 	mov rdi, 0x100000							;; Kernel final destination.
-	;;mov rcx, ((32768 - BOOTLOADER_SIZE) / 8)
-	mov rcx, (((232 * 1024) - BOOTLOADER_SIZE) / 8)	;; 232KiB Kernel + Userland
+	;;mov rcx, ((32768 - TSL_SIZE) / 8)
+	mov rcx, (((232 * 1024) - TSL_SIZE) / 8)	;; 232KiB Kernel + Userland
 	rep movsq
 
 %ifdef BIOS
@@ -1474,14 +1541,41 @@ msg_idt_load:				db "load... ", 0
 msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
 msg_pages_will_be_2mib: db "Page size = 2MiB", 0x0A, 0
 msg_setting_memmap:		db "Setting up memmap...", 0
-msg_cr3_at_this_point:				db "CR3 at this point = 0x%h", 0x0A, 0
+msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
 msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
 msg_patch:					db "Patching code for AP... ", 0x0A, 0
 
+msg_mm_info:				db "Memory map consists of the following regions (number of 4KiB pages):"
+							db 0x0A, 0
+
+;; El orden importa. Es un arreglo.
+fmt_mm_info_array:
+fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
+fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
+fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
+fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
+fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
+fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
+fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
+fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
+fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
+fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
+fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
+
+
 msg_test_hex:				db "Value = 0x%h", 0x0A, 0
+msg_test_num:				db "Value = 0x%d", 0x0A, 0
 
 
-BOOTLOADER_SIZE equ 0x2000	;; 8KiB
+
+
+
+
+TSL_SIZE equ 0x3000	;; 8KiB
 
 
 
@@ -1489,7 +1583,7 @@ EOF:
 	db 0xDE, 0xAD, 0xC0, 0xDE
 
 ;; Pad to an even KB file
-times BOOTLOADER_SIZE-($-$$) db 0x90
+times TSL_SIZE - ($ - $$) db 0x90
 
 
 ; =============================================================================

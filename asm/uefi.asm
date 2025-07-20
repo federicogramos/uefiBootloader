@@ -14,8 +14,8 @@
 ;; luego de agregado el payload queda:
 ;;  +--------------------------+-------------------------+------------+
 ;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
-;;  |         |        |       | bootloader | packed     | 0x00 hasta |
-;;  | Encabez | Codigo | Datos |            | Kernel.bin | el fin     |
+;;  |         |        |       | transient  | packed     | 0x00 hasta |
+;;  | Encabez | Codigo | Datos | system     | Kernel.bin | el fin     |
 ;;  +---------+--------+-------+------------+------------+------------+
 ;;  |^        |^       |^      |^           |^           |^          ^|
 ;; 0x0      0x200   0x1000   0x4000      0x5800      0x40000      0xFFFFF
