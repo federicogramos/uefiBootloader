@@ -164,21 +164,40 @@ set_pit_initial_freq:
 
 ;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
 ;; te va a quedar:
-;;																| table(s) total
-;;																| initilized
-;;																| mem mapping
-;; -------------------------------------------------------------+---------------
-;; [0x00000000 - 0x00000FFF]  1 * 4KiB | idt					|
-;; [0x00001000 - 0x00001FFF]  1 * 4KiB | gdt					|
-;; [0x00002000 - 0x00002FFF]  1 * 4KiB | pml4					|
-;; [0x00003000 - 0x00003FFF]  1 * 4KiB | pdpt canonical low		| 1st 512GiB
-;; [0x00004000 - 0x00004FFF]  1 * 4KiB | pdpt canonical high	|
-;; [0x00005000 - 0x00007FFF]  3 * 4KiB | system data			|
-;; [0x00008000 - 0x0000FFFF]  8 * 4KiB | disponible				|
-;; [0x00010000 - 0x0001FFFF] 16 * 4KiB | pd low					| 1st 16GiB
-;; [0x00020000 - 0x0005FFFF] 64 * 4KiB | pd high
-;; [0x00060000 - 0x0009FFFF] 64 * 4KiB | disponible
-
+;;            |      |           | if     |if   |mapped| 				| table(s) total
+;;            |4KiB	 |           | 1Mib	  |1GiB |per   |			| initilized
+;;            |blocks|			 | pages  |pages|entry |				| mem mapping
+;; -----------+------+-----------+--------+-------+--------------+---------------
+;; 0x00000000 |  1   | idt		 |		  |	    |	   |
+;; 0x00000FFF |      |           |        |     |	   |
+;; -----------------------------------------------------------------------------
+;; 0x00001000 |  1   | gdt		 |		  |	    |	   |
+;; 0x00001FFF |      |           |        |     |	   |
+;; -----------------------------------------------------------------------------
+;; 0x00002000 |  1   | pml4		 |		  |	    |	   |
+;; 0x00002FFF |      |           |        |     |      |           |       |
+;; -----------------------------------------------------------------------------
+;; 0x00003000 |  1   | pdpt cano | 16     |512  | 1GiB |
+;; 0x00003FFF |      | nical low | entr.  |entr.|	   |
+;; -----------------------------------------------------------------------------
+;; 0x00004000 |  1   | pdpt cano |	      |     |	   |
+;; 0x00004FFF |      | nical hig |        |     |	   |
+;; ----------------------------------------------------------------------------
+;; 0x00005000 |  3   | system    |        |     | 	   |		|
+;; 0x00007FFF |      |  data     |        |     |      |
+;; -----------------------------------------------------------------------------
+;; 0x00008000 |  8   | dispo     |        |     |	   |
+;; 0x0000FFFF |      |  nible    |        |     |      |
+;; -----------------------------------------------------------------------------
+;; 0x00010000 |  16  | pd low    |16 pag *| sin |2MiB  |
+;; 0x0001FFFF |      |           |512 entr| uso |      |
+;; -----------------------------------------------------------------------------
+;; 0x00020000 |  64  | pd high   |        | sin |	   |
+;; 0x0005FFFF |      |           |        | uso |	   |
+;; ----------------------------------------------------------------------------
+;; 0x00060000 |  64  | dispo     |	      |     |	   |	     |
+;; 0x0009FFFF |      | nible	 |	      |     |	   |	     |
+;; -----------------------------------------------------------------------------
 	mov r9, msg_gdt
 	call print
 
@@ -191,7 +210,7 @@ set_pit_initial_freq:
 	call print
 
 ;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
-pml4_2mb:
+pml4:
 	mov edi, 0x00002000		;; PML4 entry for physical mem, canonical low.
 	mov eax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
@@ -257,7 +276,7 @@ pag_1gb_support:
 	mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
 	call print
 
-;; 2MiB pages.
+	;; 2MiB pages.
 	mov r9, msg_pages_will_be_2mib
 	call print
 
@@ -350,7 +369,7 @@ pd_low_2mb:
 	mov r9, msg_ready
 	call print
 
-	jmp skip_1gb
+	jmp load_gdt
 
 ;; 1GiB Pages. Create the Low Page-Directory-Pointer Table Entries (PDPTE). PDPT
 ;; E starts at 0x0000000000010000, create the first entry there. A single PDPTE 
@@ -366,31 +385,32 @@ support_1gb_pages:
 	mov byte [p_1gb_pages], 1
 
 ;; Overwrite the original PML4 entry for physical memory.
-pml4_1g:
-	mov ecx, 16
-	mov edi, 0x00002000		;; Create a PML4 entry for physical memory
-	mov eax, 0x00010003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+;;pml4_1g:
+;;	mov ecx, 16
+;;	mov edi, 0x00002000		;; Create a PML4 entry for physical memory
+;;	mov eax, 0x00010003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 							;;    1     |    1   |
-pml4_low_entry_1gb:
-	stosq
-	add rax, 0x00001000		;; Next pdpt 4KiB later.
-	dec ecx
-	jnz pml4_low_entry_1gb
+;;pml4_low_entry_1gb:
+;;	stosq
+;;	add rax, 0x00001000		;; Next pdpt 4KiB later.
+;;	dec ecx
+;;	jnz pml4_low_entry_1gb
 
 pdpt_low_1gb:
-	mov ecx, 8191			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
-	mov edi, 0x00010000		;; location of low PDPE
+	mov ecx, 512			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
+	mov edi, 0x00003000		;; location of low PDPE
 	mov eax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
 							;;    1    |    1     |   1    |
 
 pdpt_entry_low_1gb:			;; Create a 1GiB page.
+	dec ecx
+	jz pdpt_entry_low_1gb
 	stosq
 	add rax, 0x40000000		;; Increment by 1GiB.
-	dec ecx
-	jnz pdpt_entry_low_1gb
+	jmp pdpt_entry_low_1gb
 
-skip_1gb:
 
+load_gdt:
 	mov r9, msg_load_gdt
 	call print
 	lgdt [GDTR64]
@@ -731,8 +751,8 @@ patch_ap_code:
 	call print
 
 
-cli 
-hlt
+;;cli 
+;;hlt
 
 	mov r9, msg_setting_memmap
 	call print
