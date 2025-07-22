@@ -139,14 +139,14 @@ set_pit_initial_freq:
 	mov r9, msg_clearing_space_sys_tables
 	call print
 
-	xor eax, eax
+	xor rax, rax
 
-	mov ecx, 5120	;; 20KiB for IDT, GDT, PML4, PDP Low, and PDP High.
-	mov edi, eax
+	mov rcx, 5120	;; 20KiB for IDT, GDT, PML4, PDP Low, and PDP High.
+	mov rdi, rax
 	rep stosd
 
-	mov ecx, 81920	;; 320KiB for Page Descriptor Entries (0x10000 - 0x5FFFF)
-	mov edi, 0x00010000
+	mov rcx, 81920	;; 320KiB for Page Descriptor Entries (0x10000 - 0x5FFFF)
+	mov rdi, 0x00010000
 	rep stosd		
 
 	mov r9, msg_ready
@@ -162,20 +162,35 @@ set_pit_initial_freq:
 	;;mov r9, fmt_pae
 	;;call print
 
+;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
+;; te va a quedar:
+;;																| table(s) total
+;;																| initilized
+;;																| mem mapping
+;; -------------------------------------------------------------+---------------
+;; [0x00000000 - 0x00000FFF]  1 * 4KiB | idt					|
+;; [0x00001000 - 0x00001FFF]  1 * 4KiB | gdt					|
+;; [0x00002000 - 0x00002FFF]  1 * 4KiB | pml4					|
+;; [0x00003000 - 0x00003FFF]  1 * 4KiB | pdpt canonical low		| 1st 512GiB
+;; [0x00004000 - 0x00004FFF]  1 * 4KiB | pdpt canonical high	|
+;; [0x00005000 - 0x00007FFF]  3 * 4KiB | system data			|
+;; [0x00008000 - 0x0000FFFF]  8 * 4KiB | disponible				|
+;; [0x00010000 - 0x0001FFFF] 16 * 4KiB | pd low					| 1st 16GiB
+;; [0x00020000 - 0x0005FFFF] 64 * 4KiB | pd high
+;; [0x00060000 - 0x0009FFFF] 64 * 4KiB | disponible
 
 	mov r9, msg_gdt
 	call print
 
-	mov esi, gdt64
-	mov edi, 0x00001000			;; GDT address.
-	mov ecx, gdt64_end - gdt64
+	mov rsi, gdt64
+	mov rdi, 0x00001000			;; GDT 0x1000..0x1FFF (max)
+	mov rcx, gdt64_end - gdt64
 	rep movsb					;; Move GDT to final location in memory.
 
 	mov r9, msg_pml4
 	call print
 
-;; Write Page Map Level 4 table (PML4). Starts at 0x0000000000002000. An entry m
-;; aps 512GiB (when 4KiB pages).
+;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
 pml4_2mb:
 	mov edi, 0x00002000		;; PML4 entry for physical mem, canonical low.
 	mov eax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
@@ -188,13 +203,55 @@ pml4_2mb:
 	mov r9, msg_ready
 	call print
 
+
+	;; Some cpuid information will be printed.
+	mov r9, msg_cpuid_info
+	call print
+
+pse:
+	mov eax, 0x01
+	cpuid
+	mov rax, rdx
+	bt rax, 3
+	lahf
+	mov al, ah
+	and rax, 0x0000000000000001
+	mov rsi, rax
+	mov r9, fmt_pse
+	call print
+
+pae:
+	mov eax, 0x01
+	cpuid
+	mov rax, rdx
+	bt rax, 6
+	lahf
+	mov al, ah
+	and rax, 0x0000000000000001
+	mov rsi, rax
+	mov r9, fmt_pae
+	call print
+
+pse36:
+	mov eax, 0x01
+	cpuid
+	mov rax, rdx
+	bt rax, 17
+	lahf
+	mov al, ah
+	and rax, 0x0000000000000001
+	mov rsi, rax
+	mov r9, fmt_pse36
+	call print
+
+
 pag_1gb_support:
 	mov r9, msg_support_1g_pages	;; Comienza aviso de soporte.
 	call print
 
 	mov eax, 0x80000001
 	cpuid
-	bt edx, 26			; Page1GB
+	bt edx, 26						;; Bit signals page 1GiB support.
 	jc support_1gb_pages
 
 	mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
@@ -207,19 +264,68 @@ pag_1gb_support:
 	mov r9, msg_pdpt
 	call print
 
-;; Canonical Low Page Directory Pointer Table (PDPT). At 0x0000000000003000. A s
-;; ingle PDPTE can map 1GiB (in 4KiB pages).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;ent_ini:	equ 0x0
+;;ent_cant	equ 256
+
+;; copiar parte de la pdpt desde 0x6de02000 hasta mi tabla.
+;;	mov rsi, 0x6de02000
+;;	mov rdi, 0x3000
+;;	mov rcx, cant_extremos
+;;	rep movsq
+
+;;	mov rsi, (0x6de02000 + 8 * (512 - cant_extremos))
+;;	mov rdi, (0x3000  + 8 * (512 - cant_extremos))
+;;	mov rcx, cant_extremos
+;;	rep movsq
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regulando cuantas entradas le piso hace funcionar?
+;;--> si
+;; 256? funciona
+;;
+;; 500> no
+;; En esta computadoras el fb se encuentra en 0x40 00 00 00 00 por lo que creo 
+;; que falta asignarle la pagina.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Canonical Low Page Directory Pointer Table (PDPT) = 0x3000. Entry maps 1GiB.
 pdpt_low:
-	mov ecx, 16				;; number of PDPE's to make. Each maps 1GiB of physi
+	mov rcx, 16				;; number of PDPE's to make. Each maps 1GiB of physi
 							;; cal memory
-	mov edi, 0x00003000		;; Location of low PDPE.
-	mov eax, 0x00010003		;; Bits 0 (P), 1 (R/W), location of first low PD (4K
-							;; iB aligned)
+	mov rdi, 0x00003000		;; Location of low PDPE.
+	mov rax, 0x00010003		;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
+							;;    1     |   1    |
 .pdpt_entry_low_2mb:
 	stosq
-	add rax, 0x00001000		;; 4KiB later (512 records x 8 bytes).
-	dec ecx
+	add rax, 0x00001000		;; Next PD, 4KiB later.
+	dec rcx
 	jnz .pdpt_entry_low_2mb
+
+
+;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
+mov rax, [0x6de02000 + 8 * 0x100]
+mov [0x3000  + 8 * 0x100], rax
+
+;;;;;;;;;;;;;;;; esto es temporal: crear entradas para mem video que esta muy alta
+;; es la entrada 0x100
+;;	mov rdi, 0x00003000 + 8 * 0x100		;; entrada para la zona mem video alta.
+;;	stosq
+;; en rax tengo el inicio de la pd, que apunta ahora a los marcos de 2MiB. este
+;; PD tiene que tener las direcciones fisicas de los marcos donde esta el fb.
+;;		mov rdi, rax
+;;		mov rax, 0x4000000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
+;;							;;    1    |    1     |   1    |
+;;	stosq
+;;	add rax, 0x00200000		;; Marcos de 2MiB.
+;;	stosq
+;;	add rax, 0x00200000		;; Marcos de 2MiB.
+;;
+;;;; listo, fin de este seteo de los marcos del fb provisorio
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	mov r9, msg_ready
 	call print
@@ -227,18 +333,19 @@ pdpt_low:
 	mov r9, msg_pd
 	call print
 
-	;; Create the Low Page-Directory Entries (PDE)
-	;; A single PDE can map 2MiB of RAM
-	;; A single PDE is 8 bytes in length
-	mov edi, 0x00010000		;; Location of first PDE
-	mov eax, 0x00000083		;; Bits 0 (P), 1 (R/W), and 7 (PS) set
-	mov ecx, 8192			;; Create 8192 2MiB page maps
+;; Low Page Directory
+pd_low_2mb:
+	mov rdi, 0x00010000		;; PD
+	mov rax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
+							;;    1    |    1     |   1    |
+	mov rcx, 16 * 512		;; The 16 PDs with 512 entries each, mapping to a fr
+							;; ame of 2MiB size.
 
-pde_low:					;; Create a 2MiB page
+.pd_low_2mb_entry:
 	stosq
-	add rax, 0x00200000		;; Increment by 2MiB
-	dec ecx
-	jnz pde_low
+	add rax, 0x00200000		;; Marcos de 2MiB.
+	dec rcx
+	jnz .pd_low_2mb_entry
 
 	mov r9, msg_ready
 	call print
@@ -295,7 +402,177 @@ skip_1gb:
 	call print
 
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;; imprime mapeo sin cambiar 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;	mov rax, 0x2000	;; cr3
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax + 0 * 8] ;; rax = page2mb_0
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; ra x= &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax+ 1 * 8];; rax = page2mb_1
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax+ 2 * 8];; rax = page2mb_2
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+	mov r9, msg_ready
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rax, [rax];; rax = &pdpt
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax + 0 * 8];; rax = page2mb_0
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rax, [rax];; rax = &pdpt
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax + 1 * 8];; rax = page2mb_1
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	mov r9, msg_ready
+	call print
+
+
+
+
+
+	mov r9, msg_ready
+	call print
+
+
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;; imprime mapeo con cambio
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;	mov rax, cr3	;; cr3
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, cr3	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, cr3	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, cr3	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax + 0 * 8] ;; rax = page2mb_0
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, cr3	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax+ 1 * 8];; rax = page2mb_1
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, cr3	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax+ 2 * 8];; rax = page2mb_2
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+
+;;	mov rax, cr3	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax+ 3 * 8];; rax = page2mb_3
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;	call keyboard_get_key
+
+
+;;cli
+;;hlt
+
+
 ;; Point cr3 at PML4
+cr3_load:
 	mov rax, 0x00002008		;;; Write-thru enabled (Bit 3).
 	mov cr3, rax
 ;; comentando esto bootea el SO exitosamente, ahora el problema
@@ -307,6 +584,7 @@ skip_1gb:
 ;; ahora, comento esto de cr3 y funciona en todo.
 
 
+
 	mov r9, msg_cr3_load
 	call print
 
@@ -314,6 +592,8 @@ skip_1gb:
 	mov r9, msg_cr3_at_this_point
 	call print
 
+;;cli
+;;hlt
 
 	xor rax, rax
 	xor rbx, rbx
@@ -449,6 +729,10 @@ patch_ap_code:
 
 	mov r9, msg_ready
 	call print
+
+
+cli 
+hlt
 
 	mov r9, msg_setting_memmap
 	call print
@@ -611,8 +895,8 @@ parse_uefi_memmap:
 
 	add rsp, 8 * EfiMaxMemoryType	;; Devuvelvo space for an information array.
 
-cli
-hlt
+;;cli
+;;hlt
 
 ;; Clear entries < 3MiB.
 clear_small:
@@ -921,7 +1205,7 @@ clear_regs:
 	mov r9, msg_system_setup_ready
 	call print
 
-	call keyboard_get_key
+	;;call keyboard_get_key
 
 	jmp 0x00100000	;; Jump to kernel.
 
@@ -1565,6 +1849,17 @@ fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
 fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
 fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
 fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
+
+msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
+mag_pae_already_set:		db "PAE enabled", 0x0A, 0
+
+
+msg_cpuid_info:		db "Processor features:", 0
+fmt_pse:		db " | PSE = %d", 0
+fmt_pae:		db " | PAE = %d", 0
+
+fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
+
 
 
 msg_test_hex:				db "Value = 0x%h", 0x0A, 0
