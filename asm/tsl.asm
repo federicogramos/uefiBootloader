@@ -164,40 +164,40 @@ set_pit_initial_freq:
 
 ;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
 ;; te va a quedar:
-;;            |      |           | if     |if   |mapped| 				| table(s) total
-;;            |4KiB	 |           | 1Mib	  |1GiB |per   |			| initilized
-;;            |blocks|			 | pages  |pages|entry |				| mem mapping
-;; -----------+------+-----------+--------+-------+--------------+---------------
-;; 0x00000000 |  1   | idt		 |		  |	    |	   |
-;; 0x00000FFF |      |           |        |     |	   |
-;; -----------------------------------------------------------------------------
-;; 0x00001000 |  1   | gdt		 |		  |	    |	   |
-;; 0x00001FFF |      |           |        |     |	   |
-;; -----------------------------------------------------------------------------
-;; 0x00002000 |  1   | pml4		 |		  |	    |	   |
-;; 0x00002FFF |      |           |        |     |      |           |       |
-;; -----------------------------------------------------------------------------
-;; 0x00003000 |  1   | pdpt cano | 16     |512  | 1GiB |
-;; 0x00003FFF |      | nical low | entr.  |entr.|	   |
-;; -----------------------------------------------------------------------------
-;; 0x00004000 |  1   | pdpt cano |	      |     |	   |
-;; 0x00004FFF |      | nical hig |        |     |	   |
-;; ----------------------------------------------------------------------------
-;; 0x00005000 |  3   | system    |        |     | 	   |		|
-;; 0x00007FFF |      |  data     |        |     |      |
-;; -----------------------------------------------------------------------------
-;; 0x00008000 |  8   | dispo     |        |     |	   |
-;; 0x0000FFFF |      |  nible    |        |     |      |
-;; -----------------------------------------------------------------------------
-;; 0x00010000 |  16  | pd low    |16 pag *| sin |2MiB  |
-;; 0x0001FFFF |      |           |512 entr| uso |      |
-;; -----------------------------------------------------------------------------
-;; 0x00020000 |  64  | pd high   |        | sin |	   |
-;; 0x0005FFFF |      |           |        | uso |	   |
-;; ----------------------------------------------------------------------------
-;; 0x00060000 |  64  | dispo     |	      |     |	   |	     |
-;; 0x0009FFFF |      | nible	 |	      |     |	   |	     |
-;; -----------------------------------------------------------------------------
+;;            |      |           | if        |if   |mapped| 				| table(s) total
+;;            |4KiB	 |           | 1Mib	     |1GiB |per   |			| initilized
+;;            |blocks|			 | pages     |pages|entry |				| mem mapping
+;; -----------+------+-----------+-----------+-----+------+--------+---------------
+;; 0x00000000 |  1   | idt		 |		     |	   |	   |
+;; 0x00000FFF |      |           |           |     |	   |
+;; -----------+------+-----------+-----------+-----+------+------------------------
+;; 0x00001000 |  1   | gdt		 |		     |	   |	   |
+;; 0x00001FFF |      |           |           |     |	   |
+;; -----------+------+-----------+-----------+-----+------+------------------------
+;; 0x00002000 |  1   | pml4		 |		     |	   |	   |
+;; 0x00002FFF |      |           |           |     |      |           |       |
+;; -----------+------+-----------+-----------+-----+------+------------------------
+;; 0x00003000 |  1   | pdpt cano | 16        |512  | 1GiB |
+;; 0x00003FFF |      | nical low | entr.     |entr.|	   |
+;; -----------+------+-----------+-----------+-----+------+------------------------
+;; 0x00004000 |  1   | pdpt cano |	         |     |	   |
+;; 0x00004FFF |      | nical hig |           |     |	   |
+;; -----------+------+-----------+-----------+-----+------+-----------------------
+;; 0x00005000 |  3   | system    |           |     | 	   |		|
+;; 0x00007FFF |      |  data     |           |     |      |
+;; -----------+------+-----------+-----------+-----+------+------------------------
+;; 0x00008000 |  8   | dispo     |           |     |	   |
+;; 0x0000FFFF |      |  nible    |           |     |      |
+;; -----------+------+-----------+-----------+-----+------+---------------------------
+;; 0x00010000 |  16  | pd low    |16 pag *   | sin |2MiB  |
+;; 0x0001FFFF |      |           |512 entr   | uso |      |
+;; -----------+------+-----------+-----------+-----+------+---------------------------
+;; 0x00020000 |  64  | pd high   |           | sin |	   |
+;; 0x0005FFFF |      |           |           | uso |	   |
+;; -----------+------+-----------+-----------+-----+------+--------------------------
+;; 0x00060000 |  64  |disponible |pd fb si   |     |	   |	     |
+;; 0x0009FFFF |      |condicion  |*fb<16*2^30|     |	   |	     |
+;; -----------+------+-----------+-----------+-----+------+---------------------------
 	mov r9, msg_gdt
 	call print
 
@@ -228,7 +228,7 @@ pml4:
 	call print
 
 pse:
-	mov eax, 0x01
+	mov rax, 0x01
 	cpuid
 	mov rax, rdx
 	bt rax, 3
@@ -240,7 +240,7 @@ pse:
 	call print
 
 pae:
-	mov eax, 0x01
+	mov rax, 0x01
 	cpuid
 	mov rax, rdx
 	bt rax, 6
@@ -252,7 +252,7 @@ pae:
 	call print
 
 pse36:
-	mov eax, 0x01
+	mov rax, 0x01
 	cpuid
 	mov rax, rdx
 	bt rax, 17
@@ -262,6 +262,26 @@ pse36:
 	mov rsi, rax
 	mov r9, fmt_pse36
 	call print
+
+physical_address_size:
+	mov rax, 0x80000008
+	cpuid
+	push rax ;; Para recuperarlo luego del print.
+	and rax, 0xFF
+	mov rsi, rax
+	mov r9, fmt_physical_addr
+	call print
+
+
+logical_address_size:
+	pop rax
+	mov al, ah
+	and rax, 0xFF
+	mov rsi, rax
+	mov r9, fmt_logical_addr
+	call print
+
+
 
 
 pag_1gb_support:
@@ -590,6 +610,9 @@ load_gdt:
 ;;cli
 ;;hlt
 
+
+;; TODO: continuar limpiando la carga de tablas. Agregar ver direccion fb y agre
+;; gar mapeo si no entra dentro del tamano actualmente mapeado.
 
 ;; Point cr3 at PML4
 cr3_load:
@@ -1225,7 +1248,7 @@ clear_regs:
 	mov r9, msg_system_setup_ready
 	call print
 
-	;;call keyboard_get_key
+	call keyboard_get_key
 
 	jmp 0x00100000	;; Jump to kernel.
 
@@ -1873,13 +1896,13 @@ fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
 msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
 mag_pae_already_set:		db "PAE enabled", 0x0A, 0
 
-
 msg_cpuid_info:		db "Processor features:", 0
 fmt_pse:		db " | PSE = %d", 0
 fmt_pae:		db " | PAE = %d", 0
-
 fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
 
+fmt_physical_addr			db "Physical address size [bits] = %d", 0
+fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
 
 
 msg_test_hex:				db "Value = 0x%h", 0x0A, 0
