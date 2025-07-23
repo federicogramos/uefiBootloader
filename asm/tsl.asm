@@ -162,66 +162,6 @@ set_pit_initial_freq:
 	;;mov r9, fmt_pae
 	;;call print
 
-;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
-;; te va a quedar:
-;;            |      |           | if        |if   |mapped| 				| table(s) total
-;;            |4KiB	 |           | 1Mib	     |1GiB |per   |			| initilized
-;;            |blocks|			 | pages     |pages|entry |				| mem mapping
-;; -----------+------+-----------+-----------+-----+------+--------+---------------
-;; 0x00000000 |  1   | idt		 |		     |	   |	   |
-;; 0x00000FFF |      |           |           |     |	   |
-;; -----------+------+-----------+-----------+-----+------+------------------------
-;; 0x00001000 |  1   | gdt		 |		     |	   |	   |
-;; 0x00001FFF |      |           |           |     |	   |
-;; -----------+------+-----------+-----------+-----+------+------------------------
-;; 0x00002000 |  1   | pml4		 |		     |	   |	   |
-;; 0x00002FFF |      |           |           |     |      |           |       |
-;; -----------+------+-----------+-----------+-----+------+------------------------
-;; 0x00003000 |  1   | pdpt cano | 16        |512  | 1GiB |
-;; 0x00003FFF |      | nical low | entr.     |entr.|	   |
-;; -----------+------+-----------+-----------+-----+------+------------------------
-;; 0x00004000 |  1   | pdpt cano |	         |     |	   |
-;; 0x00004FFF |      | nical hig |           |     |	   |
-;; -----------+------+-----------+-----------+-----+------+-----------------------
-;; 0x00005000 |  3   | system    |           |     | 	   |		|
-;; 0x00007FFF |      |  data     |           |     |      |
-;; -----------+------+-----------+-----------+-----+------+------------------------
-;; 0x00008000 |  8   | dispo     |           |     |	   |
-;; 0x0000FFFF |      |  nible    |           |     |      |
-;; -----------+------+-----------+-----------+-----+------+---------------------------
-;; 0x00010000 |  16  | pd low    |16 pag *   | sin |2MiB  |
-;; 0x0001FFFF |      |           |512 entr   | uso |      |
-;; -----------+------+-----------+-----------+-----+------+---------------------------
-;; 0x00020000 |  64  | pd high   |           | sin |	   |
-;; 0x0005FFFF |      |           |           | uso |	   |
-;; -----------+------+-----------+-----------+-----+------+--------------------------
-;; 0x00060000 |  64  |disponible |pd fb si   |     |	   |	     |
-;; 0x0009FFFF |      |condicion  |*fb<16*2^30|     |	   |	     |
-;; -----------+------+-----------+-----------+-----+------+---------------------------
-	mov r9, msg_gdt
-	call print
-
-	mov rsi, gdt64
-	mov rdi, 0x00001000			;; GDT 0x1000..0x1FFF (max)
-	mov rcx, gdt64_end - gdt64
-	rep movsb					;; Move GDT to final location in memory.
-
-	mov r9, msg_pml4
-	call print
-
-;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
-pml4:
-	mov edi, 0x00002000		;; PML4 entry for physical mem, canonical low.
-	mov eax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
-	stosq					;;    1     |   1    |
-	mov edi, 0x00002800		;; PML4 entry for canonical high start address of 0x
-							;; FFFF800000000000
-	mov eax, 0x00004003		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
-	stosq					;;    1     |   1    |
-
-	mov r9, msg_ready
-	call print
-
 
 	;; Some cpuid information will be printed.
 	mov r9, msg_cpuid_info
@@ -263,42 +203,123 @@ pse36:
 	mov r9, fmt_pse36
 	call print
 
-physical_address_size:
+addr_sizes:
 	mov rax, 0x80000008
 	cpuid
-	push rax ;; Para recuperarlo luego del print.
-	and rax, 0xFF
+	mov [addr_bits_physical], al
+	mov [addr_bits_logical], ah
+	
+physical_address_size:
+	xor rax, rax
+	mov al, [addr_bits_physical]
 	mov rsi, rax
 	mov r9, fmt_physical_addr
 	call print
 
-
 logical_address_size:
-	pop rax
-	mov al, ah
-	and rax, 0xFF
+	xor rax, rax
+	mov al, [addr_bits_logical]
 	mov rsi, rax
 	mov r9, fmt_logical_addr
 	call print
 
+pag_1gb:
+	mov rax, 0x80000001
+	cpuid
+	mov rax, rdx
+	bt rax, 26
+	lahf
+	mov al, ah
+	and rax, 0x0000000000000001
+	mov [p_1gb_pages], al
+	mov rsi, rax
+	mov r9, msg_support_1g_pages
+	call print
 
+	xor rax, rax
+	mov al, [p_1gb_pages]
+	mov rax, 1
+	mov r9, msg_pages_will_be
+	lea rsi, [msg_pages_size + 8 * rax]
+	call print
+
+
+;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
+;; te va a quedar:
+;;            |      |           | if        |if   |mapped| 	   |	
+;;            |4KiB	 |           | 1Mib	     |1GiB |per   |		   |
+;;            |blocks|			 | pages     |pages|entry |		   |	
+;; -----------+------+-----------+-----------+-----+------+--------+------------
+;; 0x00000000 |  1   | idt		 |		     |	   |	  |
+;; 0x00000FFF |      |           |           |     |	  |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00001000 |  1   | gdt		 |		     |	   |	  |
+;; 0x00001FFF |      |           |           |     |	  |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00002000 |  1   | pml4		 |		     |	   |	  |
+;; 0x00002FFF |      |           |           |     |      |           |       |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00003000 |  1   | pdpt cano | 16        |512  | 1GiB |
+;; 0x00003FFF |      | nical low | entr.     |entr.|	  |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00004000 |  1   | pdpt cano |	         |     |	  |
+;; 0x00004FFF |      | nical hig |           |     |	  |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00005000 |  3   | system    |           |     | 	  |		|
+;; 0x00007FFF |      |  data     |           |     |      |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00008000 |  8   | dispo     |           |     |	  |
+;; 0x0000FFFF |      |  nible    |           |     |      |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00010000 |  16  | pd low    |16 pag *   | sin |2MiB  |
+;; 0x0001FFFF |      |           |512 entr   | uso |      |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00020000 |  64  | pd high   |           | sin |	  |
+;; 0x0005FFFF |      |           |           | uso |	  |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00060000 |  64  |disponible |pd fb si   |     |	  |	     |
+;; 0x0009FFFF |      |condicion  |*fb<16*2^30|     |	  |	     |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+	mov r9, msg_gdt
+	call print
+
+	mov rsi, gdt64
+	mov rdi, 0x00001000			;; GDT 0x1000..0x1FFF (max)
+	mov rcx, gdt64_end - gdt64
+	rep movsb					;; Move GDT to final location in memory.
+
+	mov r9, msg_pml4
+	call print
+
+;; TODO: low y high definirlo leyendo el logical addr max.
+;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
+pml4:
+	mov edi, 0x00002000		;; PML4 entry for physical mem, canonical low.
+	mov eax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	stosq					;;    1     |   1    |
+	mov edi, 0x00002800		;; PML4 entry for canonical high start address of 0x
+							;; FFFF800000000000
+	mov eax, 0x00004003		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
+	stosq					;;    1     |   1    |
+
+	mov r9, msg_ready
+	call print
 
 
 pag_1gb_support:
-	mov r9, msg_support_1g_pages	;; Comienza aviso de soporte.
-	call print
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov r9, msg_support_1g_pages	;; Comienza aviso de soporte.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call print
 
-	mov eax, 0x80000001
-	cpuid
-	bt edx, 26						;; Bit signals page 1GiB support.
-	jc support_1gb_pages
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov eax, 0x80000001
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;cpuid
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;bt edx, 26						;; Bit signals page 1GiB support.
 
-	mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
-	call print
+	cmp byte [p_1gb_pages], 1
+	je support_1gb_pages
 
-	;; 2MiB pages.
-	mov r9, msg_pages_will_be_2mib
-	call print
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call print
+
 
 	mov r9, msg_pdpt
 	call print
@@ -398,11 +419,11 @@ pd_low_2mb:
 ;; GiB of RAM. The last entry is reserved for the virtual LFB address.
 support_1gb_pages:
 
-	mov r9, msg_support_1g_pages_yes	;; Completa: soporta pags 1GB.
-	call print
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov r9, msg_support_1g_pages_yes	;; Completa: soporta pags 1GB.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call print
 
 ;; TODO: revisar esta rama.
-	mov byte [p_1gb_pages], 1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	mov byte [p_1gb_pages], 1
 
 ;; Overwrite the original PML4 entry for physical memory.
 ;;pml4_1g:
@@ -1857,17 +1878,19 @@ msg_gdt:				db "Setting up GDT... ", 0
 msg_pml4:				db "PML4... ", 0
 msg_pdpt:				db "PDPT... ", 0
 msg_pd:					db "PD... ", 0
-msg_support_1g_pages:	db "Support for 1GB pages = ", 0
-msg_support_1g_pages_yes:	db "yes", 0x0A, 0
-msg_support_1g_pages_no:	db "no", 0x0A, 0
+
+msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
+msg_pages_will_be:		db " | Page size %s", 0
+msg_pages_size:			db "= 1GiB", 0x0A, 0
+						db "= 2MiB", 0x0A, 0
+
 msg_load_gdt:				db "Load gdt... ", 0
 msg_idt:					db "Setting up IDT... ", 0
 msg_idt_exceptions:			db "exceptions... ", 0
 msg_idt_irqs:				db "irqs ", 0
 msg_idt_load:				db "load... ", 0
 msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
-msg_pages_will_be_2mib: db "Page size = 2MiB", 0x0A, 0
-msg_setting_memmap:		db "Setting up memmap...", 0
+msg_setting_memmap:			db "Setting up memmap...", 0
 msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
 msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
 msg_patch:					db "Patching code for AP... ", 0x0A, 0
@@ -1905,12 +1928,14 @@ fmt_physical_addr			db "Physical address size [bits] = %d", 0
 fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
 
 
-msg_test_hex:				db "Value = 0x%h", 0x0A, 0
-msg_test_num:				db "Value = 0x%d", 0x0A, 0
+msg_test:				db "String de prueba", 0x0A, 0
+msg_test_hex:			db "Value = 0x%h", 0x0A, 0
+msg_test_num:			db "Value = 0x%d", 0x0A, 0
 
 
-
-
+;; Some additional system vars.
+addr_bits_physical	db 0
+addr_bits_logical	db 0
 
 
 TSL_SIZE equ 0x3000	;; 8KiB
