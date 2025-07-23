@@ -244,6 +244,15 @@ pag_1gb:
 	call print
 
 
+
+;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
+;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
+;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
+;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
+;; ado.
+
+
+
 ;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
 ;; te va a quedar:
 ;;            |      |           | if        |if   |mapped| 	   |	
@@ -291,15 +300,25 @@ pag_1gb:
 	mov r9, msg_pml4
 	call print
 
-;; TODO: low y high definirlo leyendo el logical addr max.
+;; Canonical start high address will be obtained in a generic way.
+pml4_find_canonical_high:
+	xor rcx, rcx
+	mov cl, [addr_bits_logical]
+	dec cl
+	mov rbx, 0x01
+	shl rbx, cl		;; rax direccion inicio canonical hi.
+	shr rbx, 39		;; addr / (2 ^ [9 + 9 + 9 + 12]) = nro entrada a completar e
+					;; n pml4.
+	shl rbx, 3		;; nroEntry * 8 = addr entrada a completar en pml4 (offset).
+ 
 ;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
 pml4:
-	mov edi, 0x00002000		;; PML4 entry for physical mem, canonical low.
-	mov eax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	mov rdi, 0x00002000		;; PML4 entry for physical mem, canonical low.
+	mov rax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
-	mov edi, 0x00002800		;; PML4 entry for canonical high start address of 0x
-							;; FFFF800000000000
-	mov eax, 0x00004003		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
+	add rdi, rbx			;; PML4 entry for canonical high start address of (e
+							;; jemplo para 48 bits) 0xFFFF800000000000 
+	mov rax, 0x00004003		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
 	stosq					;;    1     |   1    |
 
 	mov r9, msg_ready
