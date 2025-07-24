@@ -303,6 +303,8 @@ gdt_copy:
 	mov rcx, gdt64_end - gdt64
 	rep movsb					;; Move GDT to final location in memory.
 
+
+pml4:
 	mov r9, msg_pml4
 	call print
 
@@ -323,15 +325,15 @@ pml4_canonical_high_addr:
  
 ;; PML4. Each entry maps 512GiB. Ingresa aqui con lo siguiente:
 ;; -- rbx = addr entrada a completar canonical high.
-pml4:
-	mov rdi, BASE_PML4		;; PML4 canonical low entry for physical mem.
-	mov rax, BASE_PDPT_L + 0x03		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
-	stosq					;;    1     |   1    |
+pml4_write:
+	mov rdi, BASE_PML4			;; PML4 canonical low entry for physical mem.
+	mov rax, BASE_PDPT_L + 0x03	;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	stosq						;;    1     |   1    |
 
-	mov rdi, rbx			;; PML4 entry for canonical high start address of (e
-							;; jemplo para 48 bits) 0xFFFF800000000000 
-	mov rax, BASE_PDPT_H + 0x03		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
-	stosq					;;    1     |   1    |
+	mov rdi, rbx				;; PML4 entry for canonical high start address o
+								;; f (ejemplo para 48 bits) 0xFFFF800000000000 
+	mov rax, BASE_PDPT_H + 0x03	;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
+	stosq						;;    1     |   1    |
 
 	mov rsi, rbx
 	mov r9, msg_test_hex
@@ -341,22 +343,32 @@ pml4:
 	call print
 
 
+pdpt:
 	mov r9, msg_pdpt
 	call print
 
+pdpt_offset:
+	cmp byte [p_1gb_pages], 1
+	je .pag_1gb
+.pag_2mb:
+	mov rbx, 0x00001000		;; Next 4KiB PD.
+	jmp .continue
+.pag_1gb:
+	mov rbx, 0x40000000		;; Next 1GiB frame.
+.continue:
 
-;; Canonical Low Page Directory Pointer Table (PDPT) = 0x3000. Entry maps 1GiB.
+;; Canonical Low Page Directory Pointer Table (PDPT). Entry maps 1GiB.
 pdpt_low:
 	mov rcx, 16				;; number of PDPE's to make. Each maps 1GiB of physi
 							;; cal memory
 	mov rdi, BASE_PDPT_L		;; Location of low PDPE.
 	mov rax, BASE_PD_L + 0x03		;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
 							;;    1     |   1    |
-.pdpt_entry_low_2mb:
+.pdpt_low_entry:
 	stosq
-	add rax, 0x00001000		;; Next PD, 4KiB later.
+	add rax, rbx
 	dec rcx
-	jnz .pdpt_entry_low_2mb
+	jnz .pdpt_low_entry
 
 
 ;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
