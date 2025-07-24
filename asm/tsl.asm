@@ -299,7 +299,7 @@ gdt_copy:
 	call print
 
 	mov rsi, gdt64
-	mov rdi, BASE_GDT			;; GDT 0x1000..0x1FFF (max)
+	mov rdi, 0x00001000			;; GDT 0x1000..0x1FFF (max)
 	mov rcx, gdt64_end - gdt64
 	rep movsb					;; Move GDT to final location in memory.
 
@@ -319,8 +319,8 @@ pml4_canonical_high_find:
  
 ;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
 pml4:
-	mov rdi, BASE_PML4		;; PML4 canonical low entry for physical mem.
-	mov rax, BASE_PDPT_L + 0X03		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	mov rdi, 0x00002000		;; PML4 canonical low entry for physical mem.
+	mov rax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
 	add rdi, rbx			;; PML4 entry for canonical high start address of (e
 							;; jemplo para 48 bits) 0xFFFF800000000000 
@@ -1954,8 +1954,8 @@ addr_bits_logical	db 0
 
 TSL_SIZE equ 0x3000	;; 8KiB
 
-BASE_GDT	equ 0x00000000
-BASE_IDT	equ 0x00001000
+BASE_IDT	equ 0x00000000
+BASE_GDT	equ 0x00001000
 BASE_PML4	equ 0x00002000
 BASE_PDPT_L	equ 0x00003000
 BASE_PDPT_H	equ 0x00004000
