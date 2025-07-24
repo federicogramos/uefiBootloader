@@ -255,40 +255,43 @@ pag_1gb:
 
 ;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
 ;; te va a quedar:
+;; -----------+------+-----------+-----------+-----+------+--------+------------
 ;;            |      |           | if        |if   |mapped| 	   |	
 ;;            |4KiB	 |           | 1Mib	     |1GiB |per   |		   |
 ;;            |blocks|			 | pages     |pages|entry |		   |	
-;; -----------+------+-----------+-----------+-----+------+--------+------------
+;; ===========+======+===========+===========+=====+======+========+============
 ;; 0x00000000 |  1   | idt		 |		     |	   |	  |
 ;; 0x00000FFF |      |           |           |     |	  |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00001000 |  1   | gdt		 |		     |	   |	  |
 ;; 0x00001FFF |      |           |           |     |	  |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00002000 |  1   | pml4		 |		     |	   |	  |
-;; 0x00002FFF |      |           |           |     |      |           |       |
+;; 0x00002000 |  1   | pml4		 | 2         |2 ent|512GiB|
+;; 0x00002FFF |      |           | entries   |ries |      |                  
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00003000 |  1   | pdpt cano | 16        |512  | 1GiB |
-;; 0x00003FFF |      | nical low | entr.     |entr.|	  |
+;; 0x00003000 |  1   | pdpt cano | 32        |512  | 1GiB |
+;; 0x00003FFF |      | nical low | entr.     |entr.|      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00004000 |  1   | pdpt cano |	         |     |	  |
-;; 0x00004FFF |      | nical hig |           |     |	  |
+;; 0x00004000 |  1   | pdpt cano |sin        |     | 1GiB |
+;; 0x00004FFF |      | nical hig |inicializar|     |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00005000 |  3   | system    |           |     | 	  |		|
-;; 0x00007FFF |      |  data     |           |     |      |
+;; 0x00005000 |  3   | system    |           |     | 	  |		
+;; 0x00007FFF |      | data      |           |     |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00008000 |  8   | dispo     |           |     |	  |
-;; 0x0000FFFF |      |  nible    |           |     |      |
+;; 0x0000FFFF |      | nible     |           |     |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00010000 |  16  | pd low    |16 pag *   | sin |2MiB  |
-;; 0x0001FFFF |      |           |512 entr   | uso |      |
+;; 0x00010000 |  32  | pd low    | 32 pag *  | sin | 2MiB |
+;; 0x0002FFFF |      |           | 512 entr  | uso |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00020000 |  64  | pd high   |           | sin |	  |
-;; 0x0005FFFF |      |           |           | uso |	  |
+;; 0x00030000 |  32  | pd high   | 32 pag *  | sin | 2MiB |
+;; 0x0004FFFF |      |           | 512 entr  | uso |	  |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00060000 |  64  |disponible |pd fb si   |     |	  |	     |
-;; 0x0009FFFF |      |condicion  |*fb<16*2^30|     |	  |	     |
+;; 0x00060000 |  64  |disponible |pd fb si   |     |	  |	     
+;; 0x0009FFFF |      |condicion  |*fb<16*2^30|     |	  |	     
 ;; -----------+------+-----------+-----------+-----+------+---------------------
+
+gdt_copy:
 	mov r9, msg_gdt
 	call print
 
@@ -301,7 +304,7 @@ pag_1gb:
 	call print
 
 ;; Canonical start high address will be obtained in a generic way.
-pml4_find_canonical_high:
+pml4_canonical_high_find:
 	xor rcx, rcx
 	mov cl, [addr_bits_logical]
 	dec cl
@@ -313,7 +316,7 @@ pml4_find_canonical_high:
  
 ;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
 pml4:
-	mov rdi, 0x00002000		;; PML4 entry for physical mem, canonical low.
+	mov rdi, 0x00002000		;; PML4 canonical low entry for physical mem.
 	mov rax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
 	add rdi, rbx			;; PML4 entry for canonical high start address of (e
@@ -326,19 +329,8 @@ pml4:
 
 
 pag_1gb_support:
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov r9, msg_support_1g_pages	;; Comienza aviso de soporte.
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call print
-
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov eax, 0x80000001
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;cpuid
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;bt edx, 26						;; Bit signals page 1GiB support.
-
 	cmp byte [p_1gb_pages], 1
 	je support_1gb_pages
-
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov r9, msg_support_1g_pages_no	;; Completa: no soporta pags 1GB.
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call print
-
 
 	mov r9, msg_pdpt
 	call print
