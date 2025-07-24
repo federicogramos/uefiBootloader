@@ -272,8 +272,8 @@ pag_1gb:
 ;; 0x00003000 |  1   | pdpt cano | 32        |512  | 1GiB |
 ;; 0x00003FFF |      | nical low | entr.     |entr.|      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00004000 |  1   | pdpt cano |sin        |     | 1GiB |
-;; 0x00004FFF |      | nical hig |inicializar|     |      |
+;; 0x00004000 |  1   | pdpt cano |sin        |512  | 1GiB |
+;; 0x00004FFF |      | nical hig |inicializar|entr.|      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00005000 |  3   | system    |           |     | 	  |		
 ;; 0x00007FFF |      | data      |           |     |      |
@@ -299,7 +299,7 @@ gdt_copy:
 	call print
 
 	mov rsi, gdt64
-	mov rdi, 0x00001000			;; GDT 0x1000..0x1FFF (max)
+	mov rdi, BASE_GDT			;; GDT 0x1000..0x1FFF (max)
 	mov rcx, gdt64_end - gdt64
 	rep movsb					;; Move GDT to final location in memory.
 
@@ -319,7 +319,7 @@ pml4_canonical_high_find:
  
 ;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
 pml4:
-	mov rdi, 0x00002000		;; PML4 canonical low entry for physical mem.
+	mov rdi, BASE_PML4		;; PML4 canonical low entry for physical mem.
 	mov rax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
 	add rdi, rbx			;; PML4 entry for canonical high start address of (e
@@ -338,40 +338,13 @@ pag_1gb_support:
 	mov r9, msg_pdpt
 	call print
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;ent_ini:	equ 0x0
-;;ent_cant	equ 256
-
-;; copiar parte de la pdpt desde 0x6de02000 hasta mi tabla.
-;;	mov rsi, 0x6de02000
-;;	mov rdi, 0x3000
-;;	mov rcx, cant_extremos
-;;	rep movsq
-
-;;	mov rsi, (0x6de02000 + 8 * (512 - cant_extremos))
-;;	mov rdi, (0x3000  + 8 * (512 - cant_extremos))
-;;	mov rcx, cant_extremos
-;;	rep movsq
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; regulando cuantas entradas le piso hace funcionar?
-;;--> si
-;; 256? funciona
-;;
-;; 500> no
-;; En esta computadoras el fb se encuentra en 0x40 00 00 00 00 por lo que creo 
-;; que falta asignarle la pagina.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Canonical Low Page Directory Pointer Table (PDPT) = 0x3000. Entry maps 1GiB.
 pdpt_low:
 	mov rcx, 16				;; number of PDPE's to make. Each maps 1GiB of physi
 							;; cal memory
-	mov rdi, 0x00003000		;; Location of low PDPE.
-	mov rax, 0x00010003		;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
+	mov rdi, BASE_PDPT_L		;; Location of low PDPE.
+	mov rax, BASE_PD_L + 0x03		;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
 							;;    1     |   1    |
 .pdpt_entry_low_2mb:
 	stosq
@@ -1283,7 +1256,7 @@ clear_regs:
 	mov r9, msg_system_setup_ready
 	call print
 
-	call keyboard_get_key
+	;;call keyboard_get_key
 
 	jmp 0x00100000	;; Jump to kernel.
 
