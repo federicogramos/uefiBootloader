@@ -307,33 +307,39 @@ gdt_copy:
 	call print
 
 ;; Canonical start high address will be obtained in a generic way.
-pml4_canonical_high_find:
+pml4_canonical_high_addr:
 	xor rcx, rcx
 	mov cl, [addr_bits_logical]
 	dec cl
 	mov rbx, 0x01
-	shl rbx, cl		;; rax direccion inicio canonical hi.
-	shr rbx, 39		;; addr / (2 ^ [9 + 9 + 9 + 12]) = nro entrada a completar e
-					;; n pml4.
-	shl rbx, 3		;; nroEntry * 8 = addr entrada a completar en pml4 (offset).
+	shl rbx, cl			;; rax direccion inicio canonical hi.
+	shr rbx, 39			;; addr / (2 ^ [9 + 9 + 9 + 12]) = nro entrada a complet
+						;; ar en pml4.
+	shl rbx, 3			;; nroEntry * 8 = addr entrada a completar en pml4 (offs
+						;; et).
+	add rbx, BASE_PML4
+	or rbx, 0x03		;; #1 (R/W) | #0 (P) |
+						;;    1     |   1    |
  
-;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
+;; PML4. Each entry maps 512GiB. Ingresa aqui con lo siguiente:
+;; -- rbx = addr entrada a completar canonical high.
 pml4:
 	mov rdi, BASE_PML4		;; PML4 canonical low entry for physical mem.
-	mov rax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	mov rax, BASE_PDPT_L + 0x03		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
-	add rdi, rbx			;; PML4 entry for canonical high start address of (e
+
+	mov rdi, rbx			;; PML4 entry for canonical high start address of (e
 							;; jemplo para 48 bits) 0xFFFF800000000000 
-	mov rax, 0x00004003		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
+	mov rax, BASE_PDPT_H + 0x03		;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
 	stosq					;;    1     |   1    |
+
+	mov rsi, rbx
+	mov r9, msg_test_hex
+	call print
 
 	mov r9, msg_ready
 	call print
 
-
-pag_1gb_support:
-	cmp byte [p_1gb_pages], 1
-	je support_1gb_pages
 
 	mov r9, msg_pdpt
 	call print
@@ -354,8 +360,8 @@ pdpt_low:
 
 
 ;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
-mov rax, [0x6de02000 + 8 * 0x100]
-mov [0x3000  + 8 * 0x100], rax
+;;mov rax, [0x6de02000 + 8 * 0x100]
+;;mov [0x3000  + 8 * 0x100], rax
 
 ;;;;;;;;;;;;;;;; esto es temporal: crear entradas para mem video que esta muy alta
 ;; es la entrada 0x100
@@ -399,18 +405,6 @@ pd_low_2mb:
 
 	jmp load_gdt
 
-;; 1GiB Pages. Create the Low Page-Directory-Pointer Table Entries (PDPTE). PDPT
-;; E starts at 0x0000000000010000, create the first entry there. A single PDPTE 
-;; can map 1GiB. A single PDPTE is 8 bytes in length. A PDPTE points to 4KiB of 
-;; memory which contains 512 PDEs 8191 entries are created to map the first 8191
-;; GiB of RAM. The last entry is reserved for the virtual LFB address.
-support_1gb_pages:
-
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov r9, msg_support_1g_pages_yes	;; Completa: soporta pags 1GB.
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;call print
-
-;; TODO: revisar esta rama.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	mov byte [p_1gb_pages], 1
 
 ;; Overwrite the original PML4 entry for physical memory.
 ;;pml4_1g:
@@ -536,16 +530,6 @@ load_gdt:
 
 
 
-
-	mov r9, msg_ready
-	call print
-
-
-
-
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;; imprime mapeo con cambio
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -612,39 +596,22 @@ load_gdt:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-;;	call keyboard_get_key
-
-
-;;cli
-;;hlt
 
 
 ;; TODO: continuar limpiando la carga de tablas. Agregar ver direccion fb y agre
 ;; gar mapeo si no entra dentro del tamano actualmente mapeado.
 
-;; Point cr3 at PML4
 cr3_load:
-	mov rax, 0x00002008		;;; Write-thru enabled (Bit 3).
-	mov cr3, rax
-;; comentando esto bootea el SO exitosamente, ahora el problema
-;; se traslada a arreglar la memoria de video, que queda cambiada.
-;; actualizacion 20250516 esto esta bien lo dejo asi habilitado.
-;; 20250516 2337 confirmo lo siguiente basado en pruebas:
-;; mismo usb booteable en pc intel i7 pantalla 1920 * 1080 boot ok aun sin comentar lo de arriba.
-;; mismo usb en br1100 no bootea, sino resetea idem otra tb con pantalla 1377 * 768
-;; ahora, comento esto de cr3 y funciona en todo.
-
-
-
 	mov r9, msg_cr3_load
 	call print
+
+	mov rax, BASE_PML4 + 0x08		;;; Write-thru enabled (Bit 3).
+	mov cr3, rax
 
 	mov rsi, cr3
 	mov r9, msg_cr3_at_this_point
 	call print
 
-;;cli
-;;hlt
 
 	xor rax, rax
 	xor rbx, rbx
@@ -1256,7 +1223,7 @@ clear_regs:
 	mov r9, msg_system_setup_ready
 	call print
 
-	;;call keyboard_get_key
+	call keyboard_get_key
 
 	jmp 0x00100000	;; Jump to kernel.
 
