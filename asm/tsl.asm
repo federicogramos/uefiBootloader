@@ -278,8 +278,11 @@ pag_1gb:
 ;; 0x00005000 |  3   | system    |           |     | 	  |		
 ;; 0x00007FFF |      | data      |           |     |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00008000 |  8   | dispo     |           |     |	  |
-;; 0x0000FFFF |      | nible     |           |     |      |
+;; 0x00008000 |  7   | dispo     |           |     |	  |
+;; 0x0000EFFF |      | nible     |           |     |      |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x0000F000 |  1   |disponible |pd fb si   |     |	  |	     
+;; 0x0000FFFF |      |condicion  |*fb<16*2^30|     |	  |	     
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00010000 |  32  | pd low    | 32 pag *  | sin | 2MiB |
 ;; 0x0002FFFF |      |           | 512 entr  | uso |      |
@@ -287,8 +290,8 @@ pag_1gb:
 ;; 0x00030000 |  32  | pd high   | 32 pag *  | sin | 2MiB |
 ;; 0x0004FFFF |      |           | 512 entr  | uso |	  |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00060000 |  64  |disponible |pd fb si   |     |	  |	     
-;; 0x0009FFFF |      |condicion  |*fb<16*2^30|     |	  |	     
+;; 0x00060000 |  64  |dis-----ponible |pd fb si   |     |	  |	     
+;; 0x0009FFFF |      |con-----dicion  |*fb<16*2^30|     |	  |	     
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 
 gdt_copy:
@@ -296,7 +299,7 @@ gdt_copy:
 	call print
 
 	mov rsi, gdt64
-	mov rdi, 0x00001000			;; GDT 0x1000..0x1FFF (max)
+	mov rdi, BASE_GDT			;; GDT 0x1000..0x1FFF (max)
 	mov rcx, gdt64_end - gdt64
 	rep movsb					;; Move GDT to final location in memory.
 
@@ -316,8 +319,8 @@ pml4_canonical_high_find:
  
 ;; PML4. Starts at 0x0000000000002000. Each entry maps 512GiB.
 pml4:
-	mov rdi, 0x00002000		;; PML4 canonical low entry for physical mem.
-	mov rax, 0x00003003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
+	mov rdi, BASE_PML4		;; PML4 canonical low entry for physical mem.
+	mov rax, BASE_PDPT_L + 0X03		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
 	stosq					;;    1     |   1    |
 	add rdi, rbx			;; PML4 entry for canonical high start address of (e
 							;; jemplo para 48 bits) 0xFFFF800000000000 
@@ -1951,6 +1954,14 @@ addr_bits_logical	db 0
 
 TSL_SIZE equ 0x3000	;; 8KiB
 
+BASE_GDT	equ 0x00000000
+BASE_IDT	equ 0x00001000
+BASE_PML4	equ 0x00002000
+BASE_PDPT_L	equ 0x00003000
+BASE_PDPT_H	equ 0x00004000
+BASE_PD_FB	equ 0x0000F000
+BASE_PD_L	equ 0x00010000	;; Solo si pag 2MiB.
+BASE_PD_H	equ 0x00030000	;; Solo si pag 2MiB.
 
 
 EOF:
