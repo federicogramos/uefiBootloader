@@ -238,7 +238,7 @@ pag_1gb:
 
 	xor rax, rax
 	mov al, [p_1gb_pages]
-	mov rax, 1
+
 	mov r9, msg_pages_will_be
 	lea rsi, [msg_pages_size + 8 * rax]
 	call print
@@ -374,18 +374,13 @@ pdpt_entry_init:
 	mov rax, 0x00000083			;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
 .continue:
 
-
-
-
-
-
 ;; Canonical Low Page Directory Pointer Table (PDPT). Aqui entra con:
 ;; -- rcx = cant entradas a completar.
 ;; -- rbx = offset requerido segun pag 1GiB o 2MiB.
+;; -- rax = valor inicial de entradas segun pag 1GiB o 2MiB.
 pdpt_low:
-	mov rdi, BASE_PDPT_L		;; Location of low PDPE.
-	mov rax, BASE_PD_L + 0x03	;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
-								;;    1     |   1    |
+	mov rdi, BASE_PDPT_L
+
 .pdpt_low_write:
 	stosq
 	add rax, rbx
@@ -397,42 +392,28 @@ pdpt_low:
 ;;mov rax, [0x6de02000 + 8 * 0x100]
 ;;mov [0x3000  + 8 * 0x100], rax
 
-;;;;;;;;;;;;;;;; esto es temporal: crear entradas para mem video que esta muy alta
-;; es la entrada 0x100
-;;	mov rdi, 0x00003000 + 8 * 0x100		;; entrada para la zona mem video alta.
-;;	stosq
-;; en rax tengo el inicio de la pd, que apunta ahora a los marcos de 2MiB. este
-;; PD tiene que tener las direcciones fisicas de los marcos donde esta el fb.
-;;		mov rdi, rax
-;;		mov rax, 0x4000000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
-;;							;;    1    |    1     |   1    |
-;;	stosq
-;;	add rax, 0x00200000		;; Marcos de 2MiB.
-;;	stosq
-;;	add rax, 0x00200000		;; Marcos de 2MiB.
-;;
-;;;; listo, fin de este seteo de los marcos del fb provisorio
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 	mov r9, msg_ready
 	call print
+
+	cmp byte [p_1gb_pages], 1
+	je load_gdt
 
 	mov r9, msg_pd
 	call print
 
 ;; Low Page Directory
-pd_low_2mb:
-	mov rdi, 0x00010000		;; PD
+pd_low:
+	mov rdi, BASE_PD_L		;; PD
 	mov rax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
 							;;    1    |    1     |   1    |
-	mov rcx, 16 * 512		;; The 16 PDs with 512 entries each, mapping to a fr
+	mov rcx, 32 * 512		;; The 32 PDs with 512 entries each, mapping to a fr
 							;; ame of 2MiB size.
 
-.pd_low_2mb_entry:
+.pd_low_entry:
 	stosq
 	add rax, 0x00200000		;; Marcos de 2MiB.
 	dec rcx
-	jnz .pd_low_2mb_entry
+	jnz .pd_low_entry
 
 	mov r9, msg_ready
 	call print
@@ -534,32 +515,29 @@ load_gdt:
 ;;	mov r9, msg_test_hex
 ;;	call print
 
-	mov r9, msg_ready
-	call print
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax + 8 * 0x100];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax + 0 * 8];; rax = page2mb_0
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
 
-	mov rax, 0x2000	;; cr3
-	mov rax, [rax];; rax = &pdpt
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax + 0 * 8];; rax = page2mb_0
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rax, [rax];; rax = &pdpt
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax + 1 * 8];; rax = page2mb_1
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
+;;	mov rax, 0x2000	;; cr3
+;;	mov rax, [rax];; rax = &pdpt
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax + 8 * 0x100];; rax = &pd
+;;	and rax, 0xFFFFFFFFFFFFF000
+;;	mov rax, [rax + 1 * 8];; rax = page2mb_1
+;;	mov rsi, rax
+;;	mov r9, msg_test_hex
+;;	call print
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	mov r9, msg_ready
-	call print
+;;	mov r9, msg_ready
+;;	call print
 
 
 
@@ -645,7 +623,6 @@ cr3_load:
 	mov rsi, cr3
 	mov r9, msg_cr3_at_this_point
 	call print
-
 
 	xor rax, rax
 	xor rbx, rbx
@@ -766,6 +743,8 @@ load_interrupt_gates:
 
 	mov r9, msg_ready
 	call print
+
+
 
 ;; TODO: revisar que este pisando bien.
 ;; AP's will be told to start execution at TSL_BASE_ADDRESS.
@@ -923,6 +902,11 @@ parse_uefi_memmap:
 
 	mov r9, msg_ready
 	call print
+
+
+											call keyboard_get_key
+
+
 
 	mov r9, msg_mm_info
 	call print
@@ -1869,8 +1853,8 @@ msg_pd:					db "PD... ", 0
 
 msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
 msg_pages_will_be:		db " | Page size %s", 0
-msg_pages_size:			db "= 1GiB", 0x0A, 0
-						db "= 2MiB", 0x0A, 0
+msg_pages_size:			db "= 2MiB", 0x0A, 0
+						db "= 1GiB", 0x0A, 0
 
 msg_load_gdt:				db "Load gdt... ", 0
 msg_idt:					db "Setting up IDT... ", 0
@@ -1924,7 +1908,7 @@ msg_test_num:			db "Value = 0x%d", 0x0A, 0
 ;; Some additional system vars.
 addr_bits_physical	db 0
 addr_bits_logical	db 0
-
+force_2mb_pages	db 0
 
 TSL_SIZE equ 0x3000	;; 8KiB
 
