@@ -335,10 +335,6 @@ pml4_write:
 	mov rax, BASE_PDPT_H + 0x03	;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
 	stosq						;;    1     |   1    |
 
-	mov rsi, rbx
-	mov r9, msg_test_hex
-	call print
-
 	mov r9, msg_ready
 	call print
 
@@ -357,18 +353,44 @@ pdpt_offset:
 	mov rbx, 0x40000000		;; Next 1GiB frame.
 .continue:
 
-;; Canonical Low Page Directory Pointer Table (PDPT). Entry maps 1GiB.
+
+pdpt_cant_entries:
+	cmp byte [p_1gb_pages], 1
+	je .pag_1gb
+.pag_2mb:
+	mov rcx, 32		;; Mapeo de 32GiB.
+	jmp .continue
+.pag_1gb:
+	mov rcx, 512	;; Mapeo de 512GiB.
+.continue:
+
+pdpt_entry_init:
+	cmp byte [p_1gb_pages], 1
+	je .pag_1gb
+.pag_2mb:
+	mov rax, BASE_PD_L + 0x03	;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
+	jmp .continue
+.pag_1gb:
+	mov rax, 0x00000083			;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
+.continue:
+
+
+
+
+
+
+;; Canonical Low Page Directory Pointer Table (PDPT). Aqui entra con:
+;; -- rcx = cant entradas a completar.
+;; -- rbx = offset requerido segun pag 1GiB o 2MiB.
 pdpt_low:
-	mov rcx, 16				;; number of PDPE's to make. Each maps 1GiB of physi
-							;; cal memory
 	mov rdi, BASE_PDPT_L		;; Location of low PDPE.
-	mov rax, BASE_PD_L + 0x03		;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
-							;;    1     |   1    |
-.pdpt_low_entry:
+	mov rax, BASE_PD_L + 0x03	;; #1 (R/W) | #0 (P) | *PD low (4KiB aligned).
+								;;    1     |   1    |
+.pdpt_low_write:
 	stosq
 	add rax, rbx
 	dec rcx
-	jnz .pdpt_low_entry
+	jnz .pdpt_low_write
 
 
 ;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
