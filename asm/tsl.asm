@@ -395,7 +395,6 @@ paging_tables_ready_test:
 	je paging_tables_ready
 
 
-
 pd:
 	mov r9, msg_pd
 	call print
@@ -435,18 +434,18 @@ paging_tables_ready:
 ;;	jnz pml4_low_entry_1gb
 
 ;; Esto ya no va mas. Fue reemplazado mas arriba.
-pdpt_low_1gb:
-	mov ecx, 512			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
-	mov edi, 0x00003000		;; location of low PDPE
-	mov eax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
+;;pdpt_low_1gb:
+;;	mov ecx, 512			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
+;;	mov edi, 0x00003000		;; location of low PDPE
+;;	mov eax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
 							;;    1    |    1     |   1    |
 
-pdpt_entry_low_1gb:			;; Create a 1GiB page.
-	dec ecx
-	jz pdpt_entry_low_1gb
-	stosq
-	add rax, 0x40000000		;; Increment by 1GiB.
-	jmp pdpt_entry_low_1gb
+;;pdpt_entry_low_1gb:			;; Create a 1GiB page.
+;;	dec ecx
+;;	jz pdpt_entry_low_1gb
+;;	stosq
+;;	add rax, 0x40000000		;; Increment by 1GiB.
+;;	jmp pdpt_entry_low_1gb
 
 
 load_gdt:
@@ -536,7 +535,6 @@ load_gdt:
 
 ;;	mov r9, msg_ready
 ;;	call print
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;; imprime mapeo con cambio
@@ -647,22 +645,23 @@ cr3_load:
 	retfq
 
 clearcs64:
-
 	lgdt [GDTR64]	;; Reload the GDT
 
+idt:
 	mov r9, msg_idt
 	call print
+
 	xor rdi, rdi	;; IDT at linear address 0x0000000000000000.
 
-	;; TODO: modificar print para que no modifique registros.
+exception_gates:
 	push rdi
 	mov r9, msg_idt_exceptions
-	call print
+	call print		;; TODO: modificar print para que no modifique registros.
 	pop rdi
 
 	mov rcx, 32
 
-load_exception_gates:
+.load:
 	mov rax, exception_gate
 	push rax				;; Save exception gate for later use.
 	stosw					;; A15..A0
@@ -678,16 +677,18 @@ load_exception_gates:
 	xor rax, rax
 	stosd					;; Reserved.
 	dec rcx
-	jnz load_exception_gates
+	jnz .load
 
+
+irq_gates:
 	push rdi
-	mov r9, msg_idt_irqs
+	mov r9, msg_idt_irq_gates
 	call print
 	pop rdi
 
 	mov rcx, 256-32
 
-load_interrupt_gates:
+.load:
 	mov rax, interrupt_gate
 	push rax				;; Later use.
 	stosw					;; A15..A0
@@ -703,7 +704,7 @@ load_interrupt_gates:
 	xor eax, eax
 	stosd					;; Reserved
 	dec rcx
-	jnz load_interrupt_gates
+	jnz .load
 
 	;; Set up the exception gates for all of the CPU exceptions.
 	mov word [0x00 * 16], exception_gate_00	;; #DE
@@ -729,14 +730,14 @@ load_interrupt_gates:
 	mov word [0x14 * 16], exception_gate_20	;; #VE
 	mov word [0x15 * 16], exception_gate_21	;; #CP
 
-	mov r9, msg_idt_load
+idt_reg:
+	mov r9, msg_idt_finishing
 	call print
 
 	lidt [IDTR64]
 
 	mov r9, msg_ready
 	call print
-
 
 
 ;; TODO: revisar que este pisando bien.
@@ -1839,7 +1840,7 @@ msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
 msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
 msg_ready: 				db "ready", 0x0A, 0
 msg_entries:			db "entries... ", 0
-msg_gdt:				db "Setting up GDT... ", 0
+msg_gdt:				db "Setting up sys tables... GDT... ", 0
 msg_pml4:				db "PML4... ", 0
 msg_pdpt:				db "PDPT... ", 0
 msg_pd:					db "PD... ", 0
@@ -1852,8 +1853,8 @@ msg_pages_size:			db "= 2MiB", 0x0A, 0
 msg_load_gdt:				db "Load gdt... ", 0
 msg_idt:					db "Setting up IDT... ", 0
 msg_idt_exceptions:			db "exceptions... ", 0
-msg_idt_irqs:				db "irqs ", 0
-msg_idt_load:				db "load... ", 0
+msg_idt_irq_gates:				db "irq gates... ", 0
+msg_idt_finishing:				db "finishing... ", 0
 msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
 msg_setting_memmap:			db "Setting up memmap...", 0
 msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
