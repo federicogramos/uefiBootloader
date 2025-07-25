@@ -278,8 +278,8 @@ pag_1gb:
 ;; 0x00010000 |  32  | pd low    | 32 pag *  | sin | 2MiB |
 ;; 0x0002FFFF |      |           | 512 entr  | uso |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x00030000 |  32  | pd high   | 32 pag *  | sin | 2MiB |
-;; 0x0004FFFF |      |           | 512 entr  | uso |	  |
+;; 0x00030000 |  32  | pd high   |sin        | sin | 2MiB |
+;; 0x0004FFFF |      |           |inicializar| uso |	  |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00060000 |  64  |dis-----ponible |pd fb si   |     |	  |	     
 ;; 0x0009FFFF |      |con-----dicion  |*fb<16*2^30|     |	  |	     
@@ -334,34 +334,6 @@ pdpt:
 	mov r9, msg_pdpt
 	call print
 
-;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
-;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
-;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
-;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
-;; ado.
-
-fb_overflows_initialized_pdpt:
-	cmp byte [p_1gb_pages], 1
-	je .continue		;; Asume que canonical low cubre todo el mapa fisico pos
-						;; ible por lo que no requiere adicionar entradas.
-.pag_2mb:
-	mov rax, [FB]
-	add rax, [FB_SIZE]
-
-	cmp rax, PHYSICAL_ADDR_MAX_INITIALIZED
-	jbe .continue
-
-	mov r9, msg_pdpt_add_fb_entry
-	call print
-
-
-	jmp .continue
-.continue:
-
-
-
-
-
 pdpt_offset:
 	cmp byte [p_1gb_pages], 1
 	je .pag_1gb
@@ -371,7 +343,6 @@ pdpt_offset:
 .pag_1gb:
 	mov rbx, 0x40000000		;; Next 1GiB frame.
 .continue:
-
 
 pdpt_cant_entries:
 	cmp byte [p_1gb_pages], 1
@@ -407,6 +378,37 @@ pdpt_low:
 	jnz .pdpt_low_write
 
 
+;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
+;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
+;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
+;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
+;; ado.
+
+fb_overflows_initialized_pdpt:
+	cmp byte [p_1gb_pages], 1
+	je .continue		;; Asume q canonical low + high cubre mapa fisico posibl
+						;; e completo por lo que no requiere adicionar entradas.
+.pag_2mb:
+	mov rax, [FB]
+	add rax, [FB_SIZE]
+
+	cmp rax, PHYSICAL_ADDR_MAX_INITIALIZED
+	jbe .continue
+
+	mov r9, msg_pdpt_add_fb_entry
+	call print
+
+	mov byte [pd_fb_used], 1
+	mov rsi, [FB]
+	mov r9, msg_pdpt_fb_addr
+	call print
+
+	mov rax, [FB]
+	shr rax, 9 * 2 + 12
+	mov qword [BASE_PDPT_L  + 8 * rax], BASE_PD_FB
+.continue:
+
+
 ;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
 ;;mov rax, [0x6de02000 + 8 * 0x100]
 ;;mov [0x3000  + 8 * 0x100], rax
@@ -434,6 +436,23 @@ pd_low:
 	dec rcx
 	jnz .pd_low_entry
 
+
+pd_fb:
+	cmp byte [pd_fb_used], 1
+	jne .continue
+
+	mov rdi, BASE_PD_FB
+	mov rax, [FB]
+	or rax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
+							;;    1    |    1     |   1    |
+	mov rcx, 512
+
+.pd_fb_entry:
+	stosq
+	add rax, 0x00200000		;; Marcos de 2MiB.
+	dec rcx
+	jnz .pd_fb_entry
+.continue:
 
 paging_tables_ready:
 	mov r9, msg_ready
@@ -1914,7 +1933,8 @@ fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
 fmt_physical_addr			db "Physical address size [bits] = %d", 0
 fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
 
-msg_pdpt_add_fb_entry:		db "PDPT requires additional entry for fb.", 0x0A, 0
+msg_pdpt_fb_addr:			db "FB at %h ", 0
+msg_pdpt_add_fb_entry:		db "needs PDPT entry = %h.", 0x0A, 0
 
 msg_test:				db "String de prueba", 0x0A, 0
 msg_test_hex:			db "Value = 0x%h", 0x0A, 0
@@ -1922,9 +1942,15 @@ msg_test_num:			db "Value = 0x%d", 0x0A, 0
 
 
 ;; Some additional system vars.
-addr_bits_physical	db 0
-addr_bits_logical	db 0
-force_2mb_pages	db 0
+
+;; section .data
+pd_fb_used:			db 0
+force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
+
+;;section .bss
+addr_bits_physical:	db 0
+addr_bits_logical:	db 0
+
 
 TSL_SIZE equ 0x3000	;; 8KiB
 
