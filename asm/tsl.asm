@@ -391,12 +391,9 @@ fb_overflows_initialized_pdpt:
 .pag_2mb:
 	mov rax, [FB]
 	add rax, [FB_SIZE]
-
-	cmp rax, PHYSICAL_ADDR_MAX_INITIALIZED
+	mov rbx, PHYSICAL_ADDR_MAX_INITIALIZED
+	cmp rax, rbx
 	jbe .continue
-
-	mov r9, msg_pdpt_add_fb_entry
-	call print
 
 	mov byte [pd_fb_used], 1
 	mov rsi, [FB]
@@ -406,8 +403,14 @@ fb_overflows_initialized_pdpt:
 	mov rax, [FB]
 	shr rax, 9 * 2 + 12
 	mov qword [BASE_PDPT_L  + 8 * rax], BASE_PD_FB
+
+	mov rsi, rax
+	mov r9, msg_pdpt_add_fb_entry
+	call print
 .continue:
 
+								;;cli
+								;;hlt
 
 ;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
 ;;mov rax, [0x6de02000 + 8 * 0x100]
@@ -458,6 +461,92 @@ paging_tables_ready:
 	mov r9, msg_ready
 	call print
 
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;
+;;;; comparacion de 1er qword framebuffer
+;;mov rax, [0x6de02000 + 8 * 0x100]
+;;mov [0x3000  + 8 * 0x100], rax
+
+										mov rax, cr3	;; cr3
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax];; rax = &pdpt
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 8 * 0x100];; rax = &pd
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 0 * 8] ;; rax = page2mb_0
+										mov rsi, rax
+										mov r9, msg_test_hex
+										call print
+
+										mov rax, cr3	;; cr3
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax];; rax = &pdpt
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 8 * 0x100];; rax = &pd
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 1 * 8] ;; rax = page2mb_0
+										mov rsi, rax
+										mov r9, msg_test_hex
+										call print
+
+										mov rax, cr3	;; cr3
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax];; rax = &pdpt
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 8 * 0x100];; rax = &pd
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 2 * 8] ;; rax = page2mb_0
+										mov rsi, rax
+										mov r9, msg_test_hex
+										call print
+;;;;;;;;;;;;;;;;;;;;;
+										mov rax, BASE_PML4	;; cr3
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax];; rax = &pdpt
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 8 * 0x100];; rax = &pd
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 0 * 8] ;; rax = page2mb_0
+										mov rsi, rax
+										mov r9, msg_test_hex
+										call print
+
+										mov rax, BASE_PML4	;; cr3
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax];; rax = &pdpt
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 8 * 0x100];; rax = &pd
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 1 * 8] ;; rax = page2mb_0
+										mov rsi, rax
+										mov r9, msg_test_hex
+										call print
+
+										mov rax, BASE_PML4	;; cr3
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax];; rax = &pdpt
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 8 * 0x100];; rax = &pd
+										and rax, 0xFFFFFFFFFFFFF000
+										mov rax, [rax + 2 * 8] ;; rax = page2mb_0
+										mov rsi, rax
+										mov r9, msg_test_hex
+										call print
+
+
+									;;	cli
+									;;	hlt
+
+
+
+
+
+
+
 	jmp load_gdt
 
 
@@ -503,34 +592,34 @@ load_gdt:
 ;;;;;;;;;;;;;;;;;;; imprime mapeo sin cambiar 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;	mov rax, 0x2000	;; cr3
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, 0x2000	;; cr3
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, 0x2000	;; cr3
+	mov rax, [rax];; rax = &pdpt
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, 0x2000	;; cr3
+	mov rax, [rax];; rax = &pdpt
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax+8*0x100];; rax = &pd
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax + 0 * 8] ;; rax = page2mb_0
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, 0x2000	;; cr3
+	mov rax, [rax];; rax = &pdpt
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax+8*0x100];; rax = &pd
+	and rax, 0xFFFFFFFFFFFFF000
+	mov rax, [rax + 0 * 8] ;; rax = page2mb_0
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
 ;;	mov rax, 0x2000	;; cr3
 ;;	mov rax, [rax];; ra x= &pdpt
@@ -653,7 +742,13 @@ cr3_load:
 
 	mov rsi, cr3
 	mov r9, msg_cr3_at_this_point
-	call print
+	;;call print
+
+
+
+
+
+
 
 	xor rax, rax
 	xor rbx, rbx
@@ -681,11 +776,17 @@ cr3_load:
 
 	;; Set CS with a far return
 	push SYS64_CODE_SEL
-	push clearcs64
+	push clear_cs64
 	retfq
 
-clearcs64:
+clear_cs64:
 	lgdt [GDTR64]	;; Reload the GDT
+
+
+										cli
+										hlt
+
+
 
 idt:
 	mov r9, msg_idt
@@ -1934,11 +2035,13 @@ fmt_physical_addr			db "Physical address size [bits] = %d", 0
 fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
 
 msg_pdpt_fb_addr:			db "FB at %h ", 0
-msg_pdpt_add_fb_entry:		db "needs PDPT entry = %h.", 0x0A, 0
+msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
 
 msg_test:				db "String de prueba", 0x0A, 0
 msg_test_hex:			db "Value = 0x%h", 0x0A, 0
 msg_test_num:			db "Value = 0x%d", 0x0A, 0
+msg_test_below:				db "String de prueba: below", 0x0A, 0
+msg_test_above:				db "String de prueba: above", 0x0A, 0
 
 
 ;; Some additional system vars.
@@ -1963,7 +2066,7 @@ BASE_PD_FB	equ 0x0000F000
 BASE_PD_L	equ 0x00010000	;; Solo si pag 2MiB.
 BASE_PD_H	equ 0x00030000	;; Solo si pag 2MiB.
 
-PHYSICAL_ADDR_MAX_INITIALIZED equ 0x7FFFFFFFF	;; Por defecto se inicializan 32\
+PHYSICAL_ADDR_MAX_INITIALIZED equ 0x7FFFFFFFF	;; Por defecto se inicializan 32
 												;; GiB cuando page size = 2MiB.
 
 
