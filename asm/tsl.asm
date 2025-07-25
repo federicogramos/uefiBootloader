@@ -45,8 +45,8 @@ ap_startup:
 
 ;;==============================================================================
 ;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
-;; at 0x5FFF then we know it was a UEFI boot and can immediately proceed to star
-;; t64. Otherwise we need to set up a minimal 64-bit environment.
+;; at 0x5FFF then we know it was a UEFI boot and immediately proceed to start64.
+;; Otherwise we need to set up a minimal 64-bit environment.
 
 BITS 32
 
@@ -244,13 +244,11 @@ pag_1gb:
 	call print
 
 
-
 ;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
 ;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
 ;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
 ;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
 ;; ado.
-
 
 
 ;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
@@ -335,8 +333,8 @@ pml4_write:
 	mov rax, BASE_PDPT_H + 0x03	;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
 	stosq						;;    1     |   1    |
 
-	mov r9, msg_ready
-	call print
+	;;mov r9, msg_ready
+	;;call print
 
 
 pdpt:
@@ -392,12 +390,13 @@ pdpt_low:
 ;;mov rax, [0x6de02000 + 8 * 0x100]
 ;;mov [0x3000  + 8 * 0x100], rax
 
-	mov r9, msg_ready
-	call print
-
+paging_tables_ready_test:
 	cmp byte [p_1gb_pages], 1
-	je load_gdt
+	je paging_tables_ready
 
+
+
+pd:
 	mov r9, msg_pd
 	call print
 
@@ -415,6 +414,8 @@ pd_low:
 	dec rcx
 	jnz .pd_low_entry
 
+
+paging_tables_ready:
 	mov r9, msg_ready
 	call print
 
@@ -433,6 +434,7 @@ pd_low:
 ;;	dec ecx
 ;;	jnz pml4_low_entry_1gb
 
+;; Esto ya no va mas. Fue reemplazado mas arriba.
 pdpt_low_1gb:
 	mov ecx, 512			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
 	mov edi, 0x00003000		;; location of low PDPE
@@ -458,13 +460,9 @@ load_gdt:
 	mov r9, msg_cr3_at_this_point
 	call print
 
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;; imprime mapeo sin cambiar 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ;;	mov rax, 0x2000	;; cr3
 ;;	mov rsi, rax
@@ -540,12 +538,9 @@ load_gdt:
 ;;	call print
 
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;; imprime mapeo con cambio
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ;;	mov rax, cr3	;; cr3
 ;;	mov rsi, rax
@@ -606,8 +601,6 @@ load_gdt:
 ;;	mov r9, msg_test_hex
 ;;	call print
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 
 ;; TODO: continuar limpiando la carga de tablas. Agregar ver direccion fb y agre
@@ -1865,7 +1858,7 @@ msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
 msg_setting_memmap:			db "Setting up memmap...", 0
 msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
 msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
-msg_patch:					db "Patching code for AP... ", 0x0A, 0
+msg_patch:					db "Patching code for AP... ", 0
 
 msg_mm_info:				db "Memory map consists of the following regions (number of 4KiB pages):"
 							db 0x0A, 0
