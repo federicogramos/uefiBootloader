@@ -244,13 +244,6 @@ pag_1gb:
 	call print
 
 
-;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
-;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
-;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
-;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
-;; ado.
-
-
 ;; Aqui se comienzan a armar tablas de sistema. Breve resumen de lo que finalmen
 ;; te va a quedar:
 ;; -----------+------+-----------+-----------+-----+------+--------+------------
@@ -341,6 +334,29 @@ pdpt:
 	mov r9, msg_pdpt
 	call print
 
+;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
+;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
+;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
+;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
+;; ado.
+
+fb_overflows_initialized_pdpt:
+	cmp byte [p_1gb_pages], 1
+	je .continue		;; Asume que canonical low cubre todo el mapa fisico pos
+						;; ible por lo que no requiere adicionar entradas.
+.pag_2mb:
+	mov rax, [FB]
+	add rax, [FB_SIZE]
+
+	cmp rax, PHYSICAL_ADDR_MAX_INITIALIZED
+
+	jmp .continue
+.continue:
+
+
+
+
+
 pdpt_offset:
 	cmp byte [p_1gb_pages], 1
 	je .pag_1gb
@@ -356,10 +372,10 @@ pdpt_cant_entries:
 	cmp byte [p_1gb_pages], 1
 	je .pag_1gb
 .pag_2mb:
-	mov rcx, 32		;; Mapeo de 32GiB.
+	mov rcx, 32				;; Mapeo de 32GiB.
 	jmp .continue
 .pag_1gb:
-	mov rcx, 512	;; Mapeo de 512GiB.
+	mov rcx, 512			;; Mapeo de 512GiB.
 .continue:
 
 pdpt_entry_init:
@@ -1914,6 +1930,9 @@ BASE_PDPT_H	equ 0x00004000
 BASE_PD_FB	equ 0x0000F000
 BASE_PD_L	equ 0x00010000	;; Solo si pag 2MiB.
 BASE_PD_H	equ 0x00030000	;; Solo si pag 2MiB.
+
+PHYSICAL_ADDR_MAX_INITIALIZED equ 0x7FFFFFFFF	;; Por defecto se inicializan 32\
+												;; GiB cuando page size = 2MiB.
 
 
 EOF:
