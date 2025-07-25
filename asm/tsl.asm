@@ -349,6 +349,11 @@ fb_overflows_initialized_pdpt:
 	add rax, [FB_SIZE]
 
 	cmp rax, PHYSICAL_ADDR_MAX_INITIALIZED
+	jbe .continue
+
+	mov r9, msg_pdpt_add_fb_entry
+	call print
+
 
 	jmp .continue
 .continue:
@@ -1909,6 +1914,7 @@ fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
 fmt_physical_addr			db "Physical address size [bits] = %d", 0
 fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
 
+msg_pdpt_add_fb_entry:		db "PDPT requires additional entry for fb.", 0x0A, 0
 
 msg_test:				db "String de prueba", 0x0A, 0
 msg_test_hex:			db "Value = 0x%h", 0x0A, 0
