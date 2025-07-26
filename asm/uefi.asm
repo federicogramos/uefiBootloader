@@ -761,9 +761,9 @@ exit_uefi_services:
 	;; 0x800000     0x803000                           0x83C000         
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS
-	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS
-	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1024) - 1 =
-							;; 0x43FFF
+	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
+	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
+							;; 024) - 1 = 0x83BFFF
 
 	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
 	;; qword [0x00005F00] = Frame buffer base
