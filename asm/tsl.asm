@@ -272,8 +272,8 @@ pag_1gb:
 ;; 0x00008000 |  7   | dispo     |           |     |	  |
 ;; 0x0000EFFF |      | nible     |           |     |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
-;; 0x0000F000 |  1   |disponible |pd fb si   |     |	  |	     
-;; 0x0000FFFF |      |condicion  |*fb<16*2^30|     |	  |	     
+;; 0x0000F000 |  1   |condicional|*fb+sizeof |     |      |	     
+;; 0x0000FFFF |      |pd framebuf|<16*2^30   |     |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00010000 |  32  | pd low    | 32 pag *  | sin | 2MiB |
 ;; 0x0002FFFF |      |           | 512 entr  | uso |      |
@@ -325,9 +325,6 @@ pml4_write:
 								;; f (ejemplo para 48 bits) 0xFFFF800000000000 
 	mov rax, BASE_PDPT_H + 0x03	;; #1 (R/W) | #0 (P) | *PDP high (4KiB aligned).
 	stosq						;;    1     |   1    |
-
-	;;mov r9, msg_ready
-	;;call print
 
 
 pdpt:
@@ -383,11 +380,11 @@ pdpt_low:
 ;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
 ;; lo tanto, busco si el mapeo cubre al fb y caso contrario, adiciono mapeo apro
 ;; piado.
-
 fb_overflows_initialized_pdpt:
 	cmp byte [p_1gb_pages], 1
-	je .continue		;; Asume q canonical low + high cubre mapa fisico posibl
-						;; e completo por lo que no requiere adicionar entradas.
+	je .continue	;; Asume q 1 entrada canonical low + 1 high cubre mapa fisic
+					;; o posible completo por lo que no requiere adicionar entra
+					;; das (y si no lo cubre, q el fb ya se encuentra dentro).
 .pag_2mb:
 	mov rax, [FB]
 	add rax, [FB_SIZE]
@@ -408,13 +405,6 @@ fb_overflows_initialized_pdpt:
 	mov r9, msg_pdpt_add_fb_entry
 	call print
 .continue:
-
-								;;cli
-								;;hlt
-
-;; copio entrada 0x100 de pdpt original que contiene fb a mi nueva tabla.
-;;mov rax, [0x6de02000 + 8 * 0x100]
-;;mov [0x3000  + 8 * 0x100], rax
 
 paging_tables_ready_test:
 	cmp byte [p_1gb_pages], 1
@@ -463,47 +453,6 @@ paging_tables_ready:
 	call print
 
 
-
-;;TODO: ver si con 1 sola entrada copiada del original oka, y luego ir de a poco
-;; viendo que pasa. Siempre probando en la pc fisica.
-
-
-;;;;;;;;;;;;;;;;;;;;;
-;;;; comparacion de 1er qword framebuffer
-;;mov rax, [0x6de02000 + 8 * 0x100]
-;;mov [0x3000  + 8 * 0x100], rax
-
-
-	jmp load_gdt
-
-
-;; Overwrite the original PML4 entry for physical memory.
-;;pml4_1g:
-;;	mov ecx, 16
-;;	mov edi, 0x00002000		;; Create a PML4 entry for physical memory
-;;	mov eax, 0x00010003		;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
-							;;    1     |    1   |
-;;pml4_low_entry_1gb:
-;;	stosq
-;;	add rax, 0x00001000		;; Next pdpt 4KiB later.
-;;	dec ecx
-;;	jnz pml4_low_entry_1gb
-
-;; Esto ya no va mas. Fue reemplazado mas arriba.
-;;pdpt_low_1gb:
-;;	mov ecx, 512			;; Number of PDPE's to make.. each PDPE maps 1GiB of physical memory.
-;;	mov edi, 0x00003000		;; location of low PDPE
-;;	mov eax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
-							;;    1    |    1     |   1    |
-
-;;pdpt_entry_low_1gb:			;; Create a 1GiB page.
-;;	dec ecx
-;;	jz pdpt_entry_low_1gb
-;;	stosq
-;;	add rax, 0x40000000		;; Increment by 1GiB.
-;;	jmp pdpt_entry_low_1gb
-
-
 load_gdt:
 	mov r9, msg_load_gdt
 	call print
@@ -515,14 +464,9 @@ load_gdt:
 	mov r9, msg_cr3_at_this_point
 	call print
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 	mov r9, msg_ready
 	call print
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;; el del sistema inicio
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	mov rax, cr3	;; cr3
 	mov rsi, rax
