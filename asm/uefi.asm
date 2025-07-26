@@ -18,8 +18,8 @@
 ;;  | Encabez | Codigo | Datos | system     | Kernel.bin | el fin     |
 ;;  +---------+--------+-------+------------+------------+------------+
 ;;  |^        |^       |^      |^           |^           |^          ^|
-;; 0x0      0x200   0x1000   0x4000      0x5800      0x40000      0xFFFFF
-;; 0        512B    4KiB     16KiB        22KiB       256KiB       1MiB-1
+;; 0x0      0x200   0x1000   0x4000      0x7000      0x40000      0xFFFFF
+;; 0        512B    4KiB     16KiB       28KiB       256KiB       1MiB-1
 ;;==============================================================================
 
 TSL_BASE_ADDRESS equ 0x800000
@@ -606,7 +606,7 @@ verifica_payload:
 	mov rsi, PAYLOAD + 6
 	mov rax, [rsi]
 	mov rbx, "UEFIBOOT"	;; Chequeo simple de payload en lugar.
-	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64!
+	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64...
 	jne payloadSignatureFail
 
 get_memmap:
@@ -756,9 +756,9 @@ exit_uefi_services:
 	;;  +--------------------+----------------------------------+
 	;;  | uefiBootloader.sys | kernel.bin + modulosUserland.bin |
 	;;  +--------------------+----------------------------------+
-	;;  |<------ 6KiB ------>|<------------ 234KiB ------------>|
+	;;  |<------ 12KiB ----->|<------------ 228KiB ------------>|
 	;;  |^                   |^                                 |^
-	;; 0x8000              0x9800                             0x44000          
+	;; 0x800000          0x803000                           0x83C000         
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS
 	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS

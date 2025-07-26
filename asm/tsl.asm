@@ -762,14 +762,8 @@ parse_uefi_memmap:
 	mov r9, msg_ready
 	call print
 
-
-											call keyboard_get_key
-
-
-
 	mov r9, msg_mm_info
 	call print
-
 
 ;; Habiando terminado de parser todo el mapa de memoria, imprimir la info.
 .info_out:
@@ -857,8 +851,6 @@ uefi_round:
 
 	mov r9, msg_ready
 	call print
-
-	;;call keyboard_get_key
 
 
 ;; Create the High Page-Directory-Pointer-Table Entries (PDPTE). High PDPTE is s
@@ -1779,7 +1771,7 @@ addr_bits_physical:	db 0
 addr_bits_logical:	db 0
 
 
-TSL_SIZE equ 0x3000	;; 8KiB
+TSL_SIZE equ 0x3000	;; 12KiB
 
 BASE_IDT	equ 0x00000000
 BASE_GDT	equ 0x00001000
