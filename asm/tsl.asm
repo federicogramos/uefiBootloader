@@ -467,175 +467,9 @@ load_gdt:
 	mov r9, msg_ready
 	call print
 
-
-	mov rax, cr3	;; cr3
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, cr3	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, cr3	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, cr3	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax] ;; rax = page2mb_0
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, cr3	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax+ 1 * 8];; rax = page2mb_1
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, cr3	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax+ 2 * 8];; rax = page2mb_2
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, cr3	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax+ 3 * 8];; rax = page2mb_3
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	mov r9, msg_ready
-	call print
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mis tablas
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-	mov rax, 0x2000	;; cr3
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax] ;; rax = page2mb_0
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax+ 1 * 8];; rax = page2mb_1
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax+ 2 * 8];; rax = page2mb_2
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rbx, 0xFFFFFFFFFFFFF000
-	and rax, rbx
-	mov rax, [rax];; rax = &pdpt
-	and rax, rbx
-	mov rax, [rax + 8 * 0x100];; rax = &pd
-	and rax, rbx
-	mov rax, [rax+ 3 * 8];; rax = page2mb_3
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	mov r9, msg_ready
-	call print
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; TODO: continuar limpiando la carga de tablas. Agregar ver direccion fb y agre
-;; gar mapeo si no entra dentro del tamano actualmente mapeado.
-
 cr3_load:
 	mov r9, msg_cr3_load
 	call print
-
-
-									;;mov rax, [0x6de02000 + 8 * 0x100]
-									;;mov [0x3000  + 8 * 0x100], rax
-
-;;cli
-;;hlt
 
 	mov rax, BASE_PML4 + 0x08		;;; Write-thru enabled (Bit 3).
 	mov cr3, rax
@@ -643,12 +477,6 @@ cr3_load:
 	mov rsi, cr3
 	mov r9, msg_cr3_at_this_point
 	call print
-
-
-cli
-hlt
-
-
 
 
 	xor rax, rax
@@ -682,11 +510,6 @@ hlt
 
 clear_cs64:
 	lgdt [GDTR64]	;; Reload the GDT
-
-
-									;;	cli
-									;;	hlt
-
 
 
 idt:
