@@ -315,7 +315,7 @@ pml4_canonical_high_addr:
 						;;    1     |   1    |
  
 ;; PML4. Each entry maps 512GiB. Ingresa aqui con lo siguiente:
-;; -- rbx = addr entrada a completar canonical high.
+;; -- rbx = addr entrada pml4 a completar canonical high.
 pml4_write:
 	mov rdi, BASE_PML4			;; PML4 canonical low entry for physical mem.
 	mov rax, BASE_PDPT_L + 0x03	;; #1 (R/W) | #0 (P) | *PDP low (4KiB aligned).
@@ -381,8 +381,8 @@ pdpt_low:
 ;; En algunas computadoras fisicas el framebuffer se encuentra en direcciones al
 ;; tas, por arriba de 128GB, ejemplo 0x4000000000 por lo que si las paginas son 
 ;; de 2MiB no se llega a mapearlo con el mapeo por defecto que se hara aqui. Por
-;; lo tanto, busco si el mapeo cubre al fb y caso contrario, genero mapeo apropi
-;; ado.
+;; lo tanto, busco si el mapeo cubre al fb y caso contrario, adiciono mapeo apro
+;; piado.
 
 fb_overflows_initialized_pdpt:
 	cmp byte [p_1gb_pages], 1
@@ -402,7 +402,7 @@ fb_overflows_initialized_pdpt:
 
 	mov rax, [FB]
 	shr rax, 9 * 2 + 12
-	mov qword [BASE_PDPT_L  + 8 * rax], BASE_PD_FB
+	mov qword [BASE_PDPT_L  + 8 * rax], BASE_PD_FB + 0x03	;; #1 (R/W) | #0 (P)
 
 	mov rsi, rax
 	mov r9, msg_pdpt_add_fb_entry
@@ -445,7 +445,8 @@ pd_fb:
 	jne .continue
 
 	mov rdi, BASE_PD_FB
-	mov rax, [FB]
+	mov rax, [FB]			;; TODO: se podria asegurar que framebuffer entra en
+							;; este gb y no requiere prox pd.
 	or rax, 0x00000083		;; #7 (PS) | #1 (R/W) | #0 (P) |
 							;;    1    |    1     |   1    |
 	mov rcx, 512
@@ -463,88 +464,14 @@ paging_tables_ready:
 
 
 
-
+;;TODO: ver si con 1 sola entrada copiada del original oka, y luego ir de a poco
+;; viendo que pasa. Siempre probando en la pc fisica.
 
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;;;; comparacion de 1er qword framebuffer
 ;;mov rax, [0x6de02000 + 8 * 0x100]
 ;;mov [0x3000  + 8 * 0x100], rax
-
-										mov rax, cr3	;; cr3
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax];; rax = &pdpt
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 8 * 0x100];; rax = &pd
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 0 * 8] ;; rax = page2mb_0
-										mov rsi, rax
-										mov r9, msg_test_hex
-										call print
-
-										mov rax, cr3	;; cr3
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax];; rax = &pdpt
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 8 * 0x100];; rax = &pd
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 1 * 8] ;; rax = page2mb_0
-										mov rsi, rax
-										mov r9, msg_test_hex
-										call print
-
-										mov rax, cr3	;; cr3
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax];; rax = &pdpt
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 8 * 0x100];; rax = &pd
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 2 * 8] ;; rax = page2mb_0
-										mov rsi, rax
-										mov r9, msg_test_hex
-										call print
-;;;;;;;;;;;;;;;;;;;;;
-										mov rax, BASE_PML4	;; cr3
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax];; rax = &pdpt
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 8 * 0x100];; rax = &pd
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 0 * 8] ;; rax = page2mb_0
-										mov rsi, rax
-										mov r9, msg_test_hex
-										call print
-
-										mov rax, BASE_PML4	;; cr3
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax];; rax = &pdpt
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 8 * 0x100];; rax = &pd
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 1 * 8] ;; rax = page2mb_0
-										mov rsi, rax
-										mov r9, msg_test_hex
-										call print
-
-										mov rax, BASE_PML4	;; cr3
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax];; rax = &pdpt
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 8 * 0x100];; rax = &pd
-										and rax, 0xFFFFFFFFFFFFF000
-										mov rax, [rax + 2 * 8] ;; rax = page2mb_0
-										mov rsi, rax
-										mov r9, msg_test_hex
-										call print
-
-
-									;;	cli
-									;;	hlt
-
-
-
-
-
 
 
 	jmp load_gdt
@@ -588,147 +515,169 @@ load_gdt:
 	mov r9, msg_cr3_at_this_point
 	call print
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;; imprime mapeo sin cambiar 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-	mov rax, 0x2000	;; cr3
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rax, [rax];; rax = &pdpt
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rax, [rax];; rax = &pdpt
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax+8*0x100];; rax = &pd
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-	mov rax, 0x2000	;; cr3
-	mov rax, [rax];; rax = &pdpt
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax+8*0x100];; rax = &pd
-	and rax, 0xFFFFFFFFFFFFF000
-	mov rax, [rax + 0 * 8] ;; rax = page2mb_0
-	mov rsi, rax
-	mov r9, msg_test_hex
-	call print
-
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; ra x= &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax+ 1 * 8];; rax = page2mb_1
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
-
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax+ 2 * 8];; rax = page2mb_2
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
-
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax + 8 * 0x100];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax + 0 * 8];; rax = page2mb_0
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
-
-;;	mov rax, 0x2000	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax + 8 * 0x100];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax + 1 * 8];; rax = page2mb_1
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;	mov r9, msg_ready
-;;	call print
+	mov r9, msg_ready
+	call print
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;; imprime mapeo con cambio
+;;;;;;;;;;;;;;;;;;; el del sistema inicio
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;	mov rax, cr3	;; cr3
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, cr3	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, cr3	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, cr3	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax + 0 * 8] ;; rax = page2mb_0
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax] ;; rax = page2mb_0
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, cr3	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax+ 1 * 8];; rax = page2mb_1
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax+ 1 * 8];; rax = page2mb_1
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, cr3	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax+ 2 * 8];; rax = page2mb_2
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax+ 2 * 8];; rax = page2mb_2
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
 
-;;	mov rax, cr3	;; cr3
-;;	mov rax, [rax];; rax = &pdpt
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax];; rax = &pd
-;;	and rax, 0xFFFFFFFFFFFFF000
-;;	mov rax, [rax+ 3 * 8];; rax = page2mb_3
-;;	mov rsi, rax
-;;	mov r9, msg_test_hex
-;;	call print
+	mov rax, cr3	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax+ 3 * 8];; rax = page2mb_3
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	mov r9, msg_ready
+	call print
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mis tablas
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+	mov rax, 0x2000	;; cr3
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax] ;; rax = page2mb_0
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax+ 1 * 8];; rax = page2mb_1
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax+ 2 * 8];; rax = page2mb_2
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+	mov rax, 0x2000	;; cr3
+	mov rbx, 0xFFFFFFFFFFFFF000
+	and rax, rbx
+	mov rax, [rax];; rax = &pdpt
+	and rax, rbx
+	mov rax, [rax + 8 * 0x100];; rax = &pd
+	and rax, rbx
+	mov rax, [rax+ 3 * 8];; rax = page2mb_3
+	mov rsi, rax
+	mov r9, msg_test_hex
+	call print
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	mov r9, msg_ready
+	call print
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; TODO: continuar limpiando la carga de tablas. Agregar ver direccion fb y agre
 ;; gar mapeo si no entra dentro del tamano actualmente mapeado.
@@ -737,15 +686,23 @@ cr3_load:
 	mov r9, msg_cr3_load
 	call print
 
+
+									;;mov rax, [0x6de02000 + 8 * 0x100]
+									;;mov [0x3000  + 8 * 0x100], rax
+
+;;cli
+;;hlt
+
 	mov rax, BASE_PML4 + 0x08		;;; Write-thru enabled (Bit 3).
 	mov cr3, rax
 
 	mov rsi, cr3
 	mov r9, msg_cr3_at_this_point
-	;;call print
+	call print
 
 
-
+cli
+hlt
 
 
 
@@ -783,8 +740,8 @@ clear_cs64:
 	lgdt [GDTR64]	;; Reload the GDT
 
 
-										cli
-										hlt
+									;;	cli
+									;;	hlt
 
 
 
