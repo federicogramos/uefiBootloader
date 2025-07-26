@@ -753,12 +753,12 @@ exit_uefi_services:
 
 	;; Payload al destino. Maximo tamano 240KiB y por eso cuando armamos imagen 
 	;; se deberia revisar que no sea mayor. Un posible payload es:
-	;;  +--------------------+----------------------------------+
-	;;  | uefiBootloader.sys | kernel.bin + modulosUserland.bin |
-	;;  +--------------------+----------------------------------+
-	;;  |<------ 12KiB ----->|<------------ 228KiB ------------>|
-	;;  |^                   |^                                 |^
-	;; 0x800000          0x803000                           0x83C000         
+	;;  +--------------------+-----------------------------+
+	;;  |    tsl.sys    | kernel.bin + modulosUserland.bin |
+	;;  +--------------------+-----------------------------+
+	;;  |<--- 12KiB --->|<------------ 228KiB ------------>|
+	;;  |^              |^                                 |^
+	;; 0x800000     0x803000                           0x83C000         
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS
 	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS
