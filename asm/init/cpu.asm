@@ -2,6 +2,7 @@
 ; INIT CPU - This code is called by all activated CPU cores in the system
 ; =============================================================================
 
+global init_cpu
 
 
 init_cpu:

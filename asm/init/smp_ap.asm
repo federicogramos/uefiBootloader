@@ -2,6 +2,18 @@
 ; INIT SMP AP
 ; =============================================================================
 
+%include "./asm/include/sysvar.inc"
+
+;; sysvar.asm
+extern GDTR32
+extern GDTR64
+extern SYS64_CODE_SEL
+extern IDTR64
+
+;; cpu.asm
+extern init_cpu
+;; tsl.asm
+extern start64
 
 BITS 16
 
