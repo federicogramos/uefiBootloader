@@ -5,60 +5,268 @@
 ;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
 ;; el en 0x100000.
 ;;=============================================================================
- 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+%include "./asm/include/sysvar.inc"
+%include "./asm/sysvar.asm"
+
+
+section .data
+
+
+hexConvert8:				db "0123456789ABCDEF"
+print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
+
+;; Hay otro con el mismo nombre en uefi.asm pero ese pertenece a efi_print.
+volatile_placeholder:
+times	64 dw 0x0000
+
+font_height	equ 16
+font_data:
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x00 uni0000
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x01 uni0001
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x02 uni0002
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x03 uni0003
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x04 uni0004
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x05 uni0005
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x06 uni0006
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x07 uni0007
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x08 uni0008
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x09 uni0009
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0a uni000A
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0b uni000B
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0c uni000C
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0d uni000D
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0e uni000E
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0f uni000F
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x10 uni0010
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x11 uni0011
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x12 uni0012
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x13 uni0013
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x14 uni0014
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x15 uni0015
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x16 uni0016
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x17 uni0017
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x18 uni0018
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x19 uni0019
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1a uni001A
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1b uni001B
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1c uni001C
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1d uni001D
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1e uni001E
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1f uni001F
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x20 space
+	dd 0x08080000, 0x08080808, 0x00000808, 0x00000808 ;; 0x21 exclam
+	dd 0x14140000, 0x00001414, 0x00000000, 0x00000000 ;; 0x22 quotedbl
+	dd 0x48000000, 0x24FE4848, 0x127F2424, 0x00001212 ;; 0x23 numbersign
+	dd 0x08080000, 0x0909493E, 0x4848380E, 0x08083E49 ;; 0x24 dollar
+	dd 0x09060000, 0x30C60909, 0x9090630C, 0x00006090 ;; 0x25 percent
+	dd 0x221C0000, 0x04040202, 0x41A1918A, 0x0000BC42 ;; 0x26 ampersand
+	dd 0x08080000, 0x00000808, 0x00000000, 0x00000000 ;; 0x27 quotesingle
+	dd 0x10200000, 0x04040808, 0x04040404, 0x20100808 ;; 0x28 parenleft
+	dd 0x08040000, 0x20201010, 0x20202020, 0x04081010 ;; 0x29 parenright
+	dd 0x08080000, 0x2A1C2A49, 0x00080849, 0x00000000 ;; 0x2a asterisk
+	dd 0x00000000, 0x08080000, 0x08087F08, 0x00000008 ;; 0x2b plus
+	dd 0x00000000, 0x00000000, 0x00000000, 0x0C181818 ;; 0x2c comma
+	dd 0x00000000, 0x00000000, 0x00007E00, 0x00000000 ;; 0x2d hyphen
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00001818 ;; 0x2e period
+	dd 0x40400000, 0x10102020, 0x04040808, 0x01010202 ;; 0x2f slash
+	dd 0x221C0000, 0x49515161, 0x43454549, 0x00001C22 ;; 0x30 zero
+	dd 0x0C080000, 0x0808090A, 0x08080808, 0x00003F08 ;; 0x31 one
+	dd 0x221C0000, 0x20404041, 0x02040810, 0x00007F01 ;; 0x32 two
+	dd 0x211E0000, 0x1E204040, 0x40404020, 0x00001E21 ;; 0x33 three
+	dd 0x28300000, 0x22242428, 0x207F2122, 0x00002020 ;; 0x34 four
+	dd 0x013F0000, 0x201F0101, 0x40404040, 0x00001E21 ;; 0x35 five
+	dd 0x221C0000, 0x231D0102, 0x41414141, 0x00001C22 ;; 0x36 six
+	dd 0x407F0000, 0x10102020, 0x04040808, 0x00000202 ;; 0x37 seven
+	dd 0x221C0000, 0x1C224141, 0x41414122, 0x00001C22 ;; 0x38 eight
+	dd 0x221C0000, 0x41414141, 0x40405C62, 0x00001C22 ;; 0x39 nine
+	dd 0x00000000, 0x18180000, 0x00000000, 0x00001818 ;; 0x3a colon
+	dd 0x00000000, 0x18180000, 0x00000000, 0x0C181818 ;; 0x3b semicolon
+	dd 0x00000000, 0x0C30C000, 0x300C0303, 0x000000C0 ;; 0x3c less
+	dd 0x00000000, 0x7F000000, 0x007F0000, 0x00000000 ;; 0x3d equal
+	dd 0x00000000, 0x300C0300, 0x0C30C0C0, 0x00000003 ;; 0x3e greater
+	dd 0x423C0000, 0x20404040, 0x00080810, 0x00000808 ;; 0x3f question
+	dd 0x38000000, 0xC9B28244, 0x89898989, 0x0402B2C9 ;; 0x40 at
+	dd 0x18180000, 0x24242424, 0x427E4242, 0x00008181 ;; 0x41 A
+	dd 0x211F0000, 0x1F214141, 0x41414121, 0x00001F21 ;; 0x42 B
+	dd 0x423C0000, 0x01010102, 0x02010101, 0x00003C42 ;; 0x43 C
+	dd 0x211F0000, 0x41414141, 0x41414141, 0x00001F21 ;; 0x44 D
+	dd 0x017F0000, 0x7F010101, 0x01010101, 0x00007F01 ;; 0x45 E
+	dd 0x017F0000, 0x7F010101, 0x01010101, 0x00000101 ;; 0x46 F
+	dd 0x423C0000, 0x01010102, 0x42414171, 0x00003C42 ;; 0x47 G
+	dd 0x41410000, 0x7F414141, 0x41414141, 0x00004141 ;; 0x48 H
+	dd 0x083E0000, 0x08080808, 0x08080808, 0x00003E08 ;; 0x49 I
+	dd 0x40780000, 0x40404040, 0x40404040, 0x00003E41 ;; 0x4a J
+	dd 0x41010000, 0x05091121, 0x21110907, 0x00008141 ;; 0x4b K
+	dd 0x01010000, 0x01010101, 0x01010101, 0x00007F01 ;; 0x4c L
+	dd 0x63630000, 0x49555555, 0x41414949, 0x00004141 ;; 0x4d M
+	dd 0x43430000, 0x49494545, 0x61615151, 0x00004141 ;; 0x4e N
+	dd 0x221C0000, 0x41414141, 0x41414141, 0x00001C22 ;; 0x4f O
+	dd 0x211F0000, 0x21414141, 0x0101011F, 0x00000101 ;; 0x50 P
+	dd 0x221C0000, 0x41414141, 0x49414141, 0x20101C2A ;; 0x51 Q
+	dd 0x211F0000, 0x21414141, 0x4141211F, 0x00008141 ;; 0x52 R
+	dd 0x413E0000, 0x3E010101, 0x40404040, 0x00003E41 ;; 0x53 S
+	dd 0x087F0000, 0x08080808, 0x08080808, 0x00000808 ;; 0x54 T
+	dd 0x41410000, 0x41414141, 0x41414141, 0x00001C22 ;; 0x55 U
+	dd 0x81810000, 0x42424281, 0x24242442, 0x00001818 ;; 0x56 V
+	dd 0x41410000, 0x49494941, 0x55555555, 0x00002222 ;; 0x57 W
+	dd 0x41410000, 0x08142222, 0x22221408, 0x00004141 ;; 0x58 X
+	dd 0x41410000, 0x14142222, 0x08080808, 0x00000808 ;; 0x59 Y
+	dd 0x407F0000, 0x08101020, 0x02040408, 0x00007F01 ;; 0x5a Z
+	dd 0x041C0000, 0x04040404, 0x04040404, 0x1C040404 ;; 0x5b bracketleft
+	dd 0x01010000, 0x04040202, 0x10100808, 0x40402020 ;; 0x5c backslash
+	dd 0x101C0000, 0x10101010, 0x10101010, 0x1C101010 ;; 0x5d bracketright
+	dd 0x24180000, 0x00008142, 0x00000000, 0x00000000 ;; 0x5e asciicircum
+	dd 0x00000000, 0x00000000, 0x00000000, 0xFF000000 ;; 0x5f underscore
+	dd 0x10080400, 0x00000000, 0x00000000, 0x00000000 ;; 0x60 grave
+	dd 0x00000000, 0x40423C00, 0x4141417E, 0x00005E61 ;; 0x61 a
+	dd 0x01010000, 0x41231D01, 0x41414141, 0x00001D23 ;; 0x62 b
+	dd 0x00000000, 0x01423C00, 0x01010101, 0x00003C42 ;; 0x63 c
+	dd 0x40400000, 0x41625C40, 0x41414141, 0x00005C62 ;; 0x64 d
+	dd 0x00000000, 0x41221C00, 0x01017F41, 0x00003C42 ;; 0x65 e
+	dd 0x08700000, 0x08087E08, 0x08080808, 0x00000808 ;; 0x66 f
+	dd 0x00000000, 0x41625C00, 0x41414141, 0x22405C62 ;; 0x67 g
+	dd 0x01010000, 0x41231D01, 0x41414141, 0x00004141 ;; 0x68 h
+	dd 0x08080000, 0x08080E00, 0x08080808, 0x00007F08 ;; 0x69 i
+	dd 0x10100000, 0x10101C00, 0x10101010, 0x10101010 ;; 0x6a j
+	dd 0x01010000, 0x09112101, 0x21110B05, 0x00008141 ;; 0x6b k
+	dd 0x080F0000, 0x08080808, 0x08080808, 0x00007008 ;; 0x6c l
+	dd 0x00000000, 0x49493F00, 0x49494949, 0x00004949 ;; 0x6d m
+	dd 0x00000000, 0x41231D00, 0x41414141, 0x00004141 ;; 0x6e n
+	dd 0x00000000, 0x41221C00, 0x41414141, 0x00001C22 ;; 0x6f o
+	dd 0x00000000, 0x41231D00, 0x41414141, 0x01011D23 ;; 0x70 p
+	dd 0x00000000, 0x41625C00, 0x41414141, 0x40405C62 ;; 0x71 q
+	dd 0x00000000, 0x02463A00, 0x02020202, 0x00000202 ;; 0x72 r
+	dd 0x00000000, 0x01413E00, 0x40403E01, 0x00003E41 ;; 0x73 s
+	dd 0x08000000, 0x08087E08, 0x08080808, 0x00007008 ;; 0x74 t
+	dd 0x00000000, 0x41414100, 0x41414141, 0x00005E61 ;; 0x75 u
+	dd 0x00000000, 0x41414100, 0x14222222, 0x00000814 ;; 0x76 v
+	dd 0x00000000, 0x49414100, 0x55555555, 0x00002222 ;; 0x77 w
+	dd 0x00000000, 0x22414100, 0x22140814, 0x00004141 ;; 0x78 x
+	dd 0x00000000, 0x42414100, 0x18242422, 0x08101018 ;; 0x79 y
+	dd 0x00000000, 0x20407F00, 0x02040810, 0x00007F01 ;; 0x7a z
+	dd 0x08300000, 0x08080808, 0x08080608, 0x08080808 ;; 0x7b braceleft
+	dd 0x08080000, 0x08080808, 0x08080808, 0x08080808 ;; 0x7c bar
+	dd 0x08060000, 0x08080808, 0x08083008, 0x08080808 ;; 0x7d braceright
+	dd 0x00000000, 0x00000000, 0x0000324C, 0x00000000 ;; 0x7e asciitilde
+	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x7f uni007F
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; estos son agregados por poder imprimir aqui adentro
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
+msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
+						db "[press 'n' to continue...]", 0x0A, 0
+msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
+msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
+msg_ready: 				db "ready", 0x0A, 0
+msg_entries:			db "entries... ", 0
+msg_gdt:				db "Setting up sys tables... GDT... ", 0
+msg_pml4:				db "PML4... ", 0
+msg_pdpt:				db "PDPT... ", 0
+msg_pd:					db "PD... ", 0
+
+msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
+msg_pages_will_be:		db " | Page size %s", 0
+msg_pages_size:			db "= 2MiB", 0x0A, 0
+						db "= 1GiB", 0x0A, 0
+
+msg_load_gdt:				db "Load gdt... ", 0
+msg_idt:					db "Setting up IDT... ", 0
+msg_idt_exceptions:			db "exceptions... ", 0
+msg_idt_irq_gates:				db "irq gates... ", 0
+msg_idt_finishing:				db "finishing... ", 0
+msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
+msg_setting_memmap:			db "Setting up memmap...", 0
+msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
+msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
+msg_patch:					db "Patching code for AP... ", 0
+
+msg_mm_info:				db "Memory map consists of the following regions (number of 4KiB pages):"
+							db 0x0A, 0
+
+;; El orden importa. Es un arreglo.
+fmt_mm_info_array:
+fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
+fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
+fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
+fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
+fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
+fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
+fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
+fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
+fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
+fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
+fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
+
+msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
+mag_pae_already_set:		db "PAE enabled", 0x0A, 0
+
+msg_cpuid_info:		db "Processor features:", 0
+fmt_pse:		db " | PSE = %d", 0
+fmt_pae:		db " | PAE = %d", 0
+fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
+
+fmt_physical_addr			db "Physical address size [bits] = %d", 0
+fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
+
+msg_pdpt_fb_addr:			db "FB at %h ", 0
+msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
+
+msg_test:				db "String de prueba", 0x0A, 0
+msg_test_hex:			db "Value = 0x%h", 0x0A, 0
+msg_test_num:			db "Value = 0x%d", 0x0A, 0
+msg_test_below:				db "String de prueba: below", 0x0A, 0
+msg_test_above:				db "String de prueba: above", 0x0A, 0
+
+
+;; Some additional system vars.
+
+;; section .data
+pd_fb_used:			db 0
+force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
+
+;;section .bss
+addr_bits_physical:	db 0
+addr_bits_logical:	db 0
+
+
+
+
+
+
+
+global start64
+
+;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
+;; codigo, se salta a 0x800000.
+
+
+section .text
+
 %include "./asm/include/tsl.inc"
 
-BITS 64
 
-TSL_BASE_ADDRESS equ 0x800000
-ORG TSL_BASE_ADDRESS
-
-start:
-	jmp bootmode	;; Will be overwritten with 'NOP's before AP's are started.
-	nop
-	db "UEFIBOOT"	;; Marca para un simple chequeo de que hay payload.
-	nop
-	nop
-
-
-BITS 16
-
-ap_startup:
-	cli
-	xor eax, eax
-	xor ebx, ebx
-	xor ecx, ecx
-	xor edx, edx
-	xor esi, esi
-	xor edi, edi
-	xor ebp, ebp
-	mov ds, ax
-	mov es, ax
-	mov ss, ax
-	mov fs, ax
-	mov gs, ax
-	mov esp, 0x7000
-	jmp 0x0000:init_smp_ap
-
-%include "./asm/init/smp_ap.asm"	;; AP's will start execution at TSL_BASE_ADD
-									;; RESS and fall through to this code.
-
-;;==============================================================================
-;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
-;; at 0x5FFF then we know it was a UEFI boot and immediately proceed to start64.
-;; Otherwise we need to set up a minimal 64-bit environment.
-
-BITS 32
-
-bootmode:
-	cmp bl, 'U'	;; If uefi boot then already in 64 bit mode.
-	je start64
-
-%ifdef BIOS
-%include "./asm/bios/bios_32_64.asm"
-%endif
-
-BITS 64
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BITS 64
+TSL_BASE_ADDRESS equ 0x8000
 
 start64:
 
@@ -524,10 +732,13 @@ exception_gates:
 	call print		;; TODO: modificar print para que no modifique registros.
 	pop rdi
 
-	mov rcx, 32
+	mov rcx, 0
+	mov rax, exception_gate_00
 
 .load:
-	mov rax, exception_gate
+	;;mov rax, exception_gate
+	;;lea rax, [rax + 16 * rcx]
+	add rax, exception_gate_offset
 	push rax				;; Save exception gate for later use.
 	stosw					;; A15..A0
 	mov ax, SYS64_CODE_SEL
@@ -541,8 +752,9 @@ exception_gates:
 	stosd					;; A63..A32
 	xor rax, rax
 	stosd					;; Reserved.
-	dec rcx
-	jnz .load
+	inc rcx
+	cmp rcx, 32
+	jne .load
 
 
 irq_gates:
@@ -572,28 +784,29 @@ irq_gates:
 	jnz .load
 
 	;; Set up the exception gates for all of the CPU exceptions.
-	mov word [0x00 * 16], exception_gate_00	;; #DE
-	mov word [0x01 * 16], exception_gate_01	;; #DB
-	mov word [0x02 * 16], exception_gate_02
-	mov word [0x03 * 16], exception_gate_03	;; #BP
-	mov word [0x04 * 16], exception_gate_04	;; #OF
-	mov word [0x05 * 16], exception_gate_05	;; #BR
-	mov word [0x06 * 16], exception_gate_06	;; #UD
-	mov word [0x07 * 16], exception_gate_07	;; #NM
-	mov word [0x08 * 16], exception_gate_08	;; #DF
-	mov word [0x09 * 16], exception_gate_09	;; #MF
-	mov word [0x0A * 16], exception_gate_10	;; #TS
-	mov word [0x0B * 16], exception_gate_11	;; #NP
-	mov word [0x0C * 16], exception_gate_12	;; #SS
-	mov word [0x0D * 16], exception_gate_13	;; #GP
-	mov word [0x0E * 16], exception_gate_14	;; #PF
-	mov word [0x0F * 16], exception_gate_15
-	mov word [0x10 * 16], exception_gate_16	;; #MF
-	mov word [0x11 * 16], exception_gate_17	;; #AC
-	mov word [0x12 * 16], exception_gate_18	;; #MC
-	mov word [0x13 * 16], exception_gate_19	;; #XM
-	mov word [0x14 * 16], exception_gate_20	;; #VE
-	mov word [0x15 * 16], exception_gate_21	;; #CP
+
+	;;mov word [0x00 * 16], exception_gate_00	;; #DE
+	;;mov word [0x01 * 16], exception_gate_01	;; #DB
+	;;mov word [0x02 * 16], exception_gate_02
+	;;mov word [0x03 * 16], exception_gate_03	;; #BP
+	;;mov word [0x04 * 16], exception_gate_04	;; #OF
+	;;mov word [0x05 * 16], exception_gate_05	;; #BR
+	;;mov word [0x06 * 16], exception_gate_06	;; #UD
+	;;mov word [0x07 * 16], exception_gate_07	;; #NM
+	;;mov word [0x08 * 16], exception_gate_08	;; #DF
+	;;mov word [0x09 * 16], exception_gate_09	;; #MF
+	;;mov word [0x0A * 16], exception_gate_10	;; #TS
+	;;mov word [0x0B * 16], exception_gate_11	;; #NP
+	;;mov word [0x0C * 16], exception_gate_12	;; #SS
+	;;mov word [0x0D * 16], exception_gate_13	;; #GP
+	;;mov word [0x0E * 16], exception_gate_14	;; #PF
+	;;mov word [0x0F * 16], exception_gate_15
+	;;mov word [0x10 * 16], exception_gate_16	;; #MF
+	;;mov word [0x11 * 16], exception_gate_17	;; #AC
+	;;mov word [0x12 * 16], exception_gate_18	;; #MC
+	;;mov word [0x13 * 16], exception_gate_19	;; #XM
+	;;mov word [0x14 * 16], exception_gate_20	;; #VE
+	;;mov word [0x15 * 16], exception_gate_21	;; #CP
 
 idt_reg:
 	mov r9, msg_idt_finishing
@@ -612,7 +825,8 @@ patch_ap_code:
 	mov r9, msg_patch
 	call print
 
-	mov rdi, start
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov rdi, start
+	mov rdi, TSL_BASE_ADDRESS
 	mov rax, 0x9090909090909090
 	stosq						;; Remove code between start and ap_startup, so
 								;; they can reach their starting code.
@@ -1108,7 +1322,7 @@ clear_regs:
 %endif
 
 %include "./asm/interrupts.asm"
-%include "./asm/sysvar.asm"
+
 
 ; -----------------------------------------------------------------------------
 %ifdef BIOS
@@ -1537,238 +1751,6 @@ emptyKbBuffer:
 
 
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;section .data
-
-hexConvert8:				db "0123456789ABCDEF"
-print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
-
-;; Hay otro con el mismo nombre en uefi.asm pero ese pertenece a efi_print.
-volatile_placeholder:
-times	64 dw 0x0000
-
-font_height	equ 16
-font_data:
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x00 uni0000
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x01 uni0001
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x02 uni0002
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x03 uni0003
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x04 uni0004
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x05 uni0005
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x06 uni0006
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x07 uni0007
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x08 uni0008
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x09 uni0009
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0a uni000A
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0b uni000B
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0c uni000C
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0d uni000D
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0e uni000E
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x0f uni000F
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x10 uni0010
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x11 uni0011
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x12 uni0012
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x13 uni0013
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x14 uni0014
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x15 uni0015
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x16 uni0016
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x17 uni0017
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x18 uni0018
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x19 uni0019
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1a uni001A
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1b uni001B
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1c uni001C
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1d uni001D
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1e uni001E
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x1f uni001F
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x20 space
-	dd 0x08080000, 0x08080808, 0x00000808, 0x00000808 ;; 0x21 exclam
-	dd 0x14140000, 0x00001414, 0x00000000, 0x00000000 ;; 0x22 quotedbl
-	dd 0x48000000, 0x24FE4848, 0x127F2424, 0x00001212 ;; 0x23 numbersign
-	dd 0x08080000, 0x0909493E, 0x4848380E, 0x08083E49 ;; 0x24 dollar
-	dd 0x09060000, 0x30C60909, 0x9090630C, 0x00006090 ;; 0x25 percent
-	dd 0x221C0000, 0x04040202, 0x41A1918A, 0x0000BC42 ;; 0x26 ampersand
-	dd 0x08080000, 0x00000808, 0x00000000, 0x00000000 ;; 0x27 quotesingle
-	dd 0x10200000, 0x04040808, 0x04040404, 0x20100808 ;; 0x28 parenleft
-	dd 0x08040000, 0x20201010, 0x20202020, 0x04081010 ;; 0x29 parenright
-	dd 0x08080000, 0x2A1C2A49, 0x00080849, 0x00000000 ;; 0x2a asterisk
-	dd 0x00000000, 0x08080000, 0x08087F08, 0x00000008 ;; 0x2b plus
-	dd 0x00000000, 0x00000000, 0x00000000, 0x0C181818 ;; 0x2c comma
-	dd 0x00000000, 0x00000000, 0x00007E00, 0x00000000 ;; 0x2d hyphen
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00001818 ;; 0x2e period
-	dd 0x40400000, 0x10102020, 0x04040808, 0x01010202 ;; 0x2f slash
-	dd 0x221C0000, 0x49515161, 0x43454549, 0x00001C22 ;; 0x30 zero
-	dd 0x0C080000, 0x0808090A, 0x08080808, 0x00003F08 ;; 0x31 one
-	dd 0x221C0000, 0x20404041, 0x02040810, 0x00007F01 ;; 0x32 two
-	dd 0x211E0000, 0x1E204040, 0x40404020, 0x00001E21 ;; 0x33 three
-	dd 0x28300000, 0x22242428, 0x207F2122, 0x00002020 ;; 0x34 four
-	dd 0x013F0000, 0x201F0101, 0x40404040, 0x00001E21 ;; 0x35 five
-	dd 0x221C0000, 0x231D0102, 0x41414141, 0x00001C22 ;; 0x36 six
-	dd 0x407F0000, 0x10102020, 0x04040808, 0x00000202 ;; 0x37 seven
-	dd 0x221C0000, 0x1C224141, 0x41414122, 0x00001C22 ;; 0x38 eight
-	dd 0x221C0000, 0x41414141, 0x40405C62, 0x00001C22 ;; 0x39 nine
-	dd 0x00000000, 0x18180000, 0x00000000, 0x00001818 ;; 0x3a colon
-	dd 0x00000000, 0x18180000, 0x00000000, 0x0C181818 ;; 0x3b semicolon
-	dd 0x00000000, 0x0C30C000, 0x300C0303, 0x000000C0 ;; 0x3c less
-	dd 0x00000000, 0x7F000000, 0x007F0000, 0x00000000 ;; 0x3d equal
-	dd 0x00000000, 0x300C0300, 0x0C30C0C0, 0x00000003 ;; 0x3e greater
-	dd 0x423C0000, 0x20404040, 0x00080810, 0x00000808 ;; 0x3f question
-	dd 0x38000000, 0xC9B28244, 0x89898989, 0x0402B2C9 ;; 0x40 at
-	dd 0x18180000, 0x24242424, 0x427E4242, 0x00008181 ;; 0x41 A
-	dd 0x211F0000, 0x1F214141, 0x41414121, 0x00001F21 ;; 0x42 B
-	dd 0x423C0000, 0x01010102, 0x02010101, 0x00003C42 ;; 0x43 C
-	dd 0x211F0000, 0x41414141, 0x41414141, 0x00001F21 ;; 0x44 D
-	dd 0x017F0000, 0x7F010101, 0x01010101, 0x00007F01 ;; 0x45 E
-	dd 0x017F0000, 0x7F010101, 0x01010101, 0x00000101 ;; 0x46 F
-	dd 0x423C0000, 0x01010102, 0x42414171, 0x00003C42 ;; 0x47 G
-	dd 0x41410000, 0x7F414141, 0x41414141, 0x00004141 ;; 0x48 H
-	dd 0x083E0000, 0x08080808, 0x08080808, 0x00003E08 ;; 0x49 I
-	dd 0x40780000, 0x40404040, 0x40404040, 0x00003E41 ;; 0x4a J
-	dd 0x41010000, 0x05091121, 0x21110907, 0x00008141 ;; 0x4b K
-	dd 0x01010000, 0x01010101, 0x01010101, 0x00007F01 ;; 0x4c L
-	dd 0x63630000, 0x49555555, 0x41414949, 0x00004141 ;; 0x4d M
-	dd 0x43430000, 0x49494545, 0x61615151, 0x00004141 ;; 0x4e N
-	dd 0x221C0000, 0x41414141, 0x41414141, 0x00001C22 ;; 0x4f O
-	dd 0x211F0000, 0x21414141, 0x0101011F, 0x00000101 ;; 0x50 P
-	dd 0x221C0000, 0x41414141, 0x49414141, 0x20101C2A ;; 0x51 Q
-	dd 0x211F0000, 0x21414141, 0x4141211F, 0x00008141 ;; 0x52 R
-	dd 0x413E0000, 0x3E010101, 0x40404040, 0x00003E41 ;; 0x53 S
-	dd 0x087F0000, 0x08080808, 0x08080808, 0x00000808 ;; 0x54 T
-	dd 0x41410000, 0x41414141, 0x41414141, 0x00001C22 ;; 0x55 U
-	dd 0x81810000, 0x42424281, 0x24242442, 0x00001818 ;; 0x56 V
-	dd 0x41410000, 0x49494941, 0x55555555, 0x00002222 ;; 0x57 W
-	dd 0x41410000, 0x08142222, 0x22221408, 0x00004141 ;; 0x58 X
-	dd 0x41410000, 0x14142222, 0x08080808, 0x00000808 ;; 0x59 Y
-	dd 0x407F0000, 0x08101020, 0x02040408, 0x00007F01 ;; 0x5a Z
-	dd 0x041C0000, 0x04040404, 0x04040404, 0x1C040404 ;; 0x5b bracketleft
-	dd 0x01010000, 0x04040202, 0x10100808, 0x40402020 ;; 0x5c backslash
-	dd 0x101C0000, 0x10101010, 0x10101010, 0x1C101010 ;; 0x5d bracketright
-	dd 0x24180000, 0x00008142, 0x00000000, 0x00000000 ;; 0x5e asciicircum
-	dd 0x00000000, 0x00000000, 0x00000000, 0xFF000000 ;; 0x5f underscore
-	dd 0x10080400, 0x00000000, 0x00000000, 0x00000000 ;; 0x60 grave
-	dd 0x00000000, 0x40423C00, 0x4141417E, 0x00005E61 ;; 0x61 a
-	dd 0x01010000, 0x41231D01, 0x41414141, 0x00001D23 ;; 0x62 b
-	dd 0x00000000, 0x01423C00, 0x01010101, 0x00003C42 ;; 0x63 c
-	dd 0x40400000, 0x41625C40, 0x41414141, 0x00005C62 ;; 0x64 d
-	dd 0x00000000, 0x41221C00, 0x01017F41, 0x00003C42 ;; 0x65 e
-	dd 0x08700000, 0x08087E08, 0x08080808, 0x00000808 ;; 0x66 f
-	dd 0x00000000, 0x41625C00, 0x41414141, 0x22405C62 ;; 0x67 g
-	dd 0x01010000, 0x41231D01, 0x41414141, 0x00004141 ;; 0x68 h
-	dd 0x08080000, 0x08080E00, 0x08080808, 0x00007F08 ;; 0x69 i
-	dd 0x10100000, 0x10101C00, 0x10101010, 0x10101010 ;; 0x6a j
-	dd 0x01010000, 0x09112101, 0x21110B05, 0x00008141 ;; 0x6b k
-	dd 0x080F0000, 0x08080808, 0x08080808, 0x00007008 ;; 0x6c l
-	dd 0x00000000, 0x49493F00, 0x49494949, 0x00004949 ;; 0x6d m
-	dd 0x00000000, 0x41231D00, 0x41414141, 0x00004141 ;; 0x6e n
-	dd 0x00000000, 0x41221C00, 0x41414141, 0x00001C22 ;; 0x6f o
-	dd 0x00000000, 0x41231D00, 0x41414141, 0x01011D23 ;; 0x70 p
-	dd 0x00000000, 0x41625C00, 0x41414141, 0x40405C62 ;; 0x71 q
-	dd 0x00000000, 0x02463A00, 0x02020202, 0x00000202 ;; 0x72 r
-	dd 0x00000000, 0x01413E00, 0x40403E01, 0x00003E41 ;; 0x73 s
-	dd 0x08000000, 0x08087E08, 0x08080808, 0x00007008 ;; 0x74 t
-	dd 0x00000000, 0x41414100, 0x41414141, 0x00005E61 ;; 0x75 u
-	dd 0x00000000, 0x41414100, 0x14222222, 0x00000814 ;; 0x76 v
-	dd 0x00000000, 0x49414100, 0x55555555, 0x00002222 ;; 0x77 w
-	dd 0x00000000, 0x22414100, 0x22140814, 0x00004141 ;; 0x78 x
-	dd 0x00000000, 0x42414100, 0x18242422, 0x08101018 ;; 0x79 y
-	dd 0x00000000, 0x20407F00, 0x02040810, 0x00007F01 ;; 0x7a z
-	dd 0x08300000, 0x08080808, 0x08080608, 0x08080808 ;; 0x7b braceleft
-	dd 0x08080000, 0x08080808, 0x08080808, 0x08080808 ;; 0x7c bar
-	dd 0x08060000, 0x08080808, 0x08083008, 0x08080808 ;; 0x7d braceright
-	dd 0x00000000, 0x00000000, 0x0000324C, 0x00000000 ;; 0x7e asciitilde
-	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x7f uni007F
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; estos son agregados por poder imprimir aqui adentro
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
-msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
-						db "[press 'n' to continue...]", 0x0A, 0
-msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
-msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
-msg_ready: 				db "ready", 0x0A, 0
-msg_entries:			db "entries... ", 0
-msg_gdt:				db "Setting up sys tables... GDT... ", 0
-msg_pml4:				db "PML4... ", 0
-msg_pdpt:				db "PDPT... ", 0
-msg_pd:					db "PD... ", 0
-
-msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
-msg_pages_will_be:		db " | Page size %s", 0
-msg_pages_size:			db "= 2MiB", 0x0A, 0
-						db "= 1GiB", 0x0A, 0
-
-msg_load_gdt:				db "Load gdt... ", 0
-msg_idt:					db "Setting up IDT... ", 0
-msg_idt_exceptions:			db "exceptions... ", 0
-msg_idt_irq_gates:				db "irq gates... ", 0
-msg_idt_finishing:				db "finishing... ", 0
-msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
-msg_setting_memmap:			db "Setting up memmap...", 0
-msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
-msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
-msg_patch:					db "Patching code for AP... ", 0
-
-msg_mm_info:				db "Memory map consists of the following regions (number of 4KiB pages):"
-							db 0x0A, 0
-
-;; El orden importa. Es un arreglo.
-fmt_mm_info_array:
-fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
-fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
-fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
-fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
-fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
-fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
-fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
-fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
-fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
-fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
-fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
-fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
-fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
-fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
-fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
-
-msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
-mag_pae_already_set:		db "PAE enabled", 0x0A, 0
-
-msg_cpuid_info:		db "Processor features:", 0
-fmt_pse:		db " | PSE = %d", 0
-fmt_pae:		db " | PAE = %d", 0
-fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
-
-fmt_physical_addr			db "Physical address size [bits] = %d", 0
-fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
-
-msg_pdpt_fb_addr:			db "FB at %h ", 0
-msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
-
-msg_test:				db "String de prueba", 0x0A, 0
-msg_test_hex:			db "Value = 0x%h", 0x0A, 0
-msg_test_num:			db "Value = 0x%d", 0x0A, 0
-msg_test_below:				db "String de prueba: below", 0x0A, 0
-msg_test_above:				db "String de prueba: above", 0x0A, 0
-
-
-;; Some additional system vars.
-
-;; section .data
-pd_fb_used:			db 0
-force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
-
-;;section .bss
-addr_bits_physical:	db 0
-addr_bits_logical:	db 0
 
 
 TSL_SIZE equ 0x3000	;; 12KiB

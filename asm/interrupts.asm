@@ -3,6 +3,8 @@
 ;;==============================================================================
 
 
+
+
 ; -----------------------------------------------------------------------------
 ; Default exception handler
 exception_gate:
@@ -143,6 +145,8 @@ exception_gate_20:
 exception_gate_21:
 	mov al, 0x15
 	jmp exception_gate_main
+
+exception_gate_offset	equ exception_gate_01 - exception_gate_00
 
 exception_gate_main:
 	; Set screen to Red
