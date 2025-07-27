@@ -25,7 +25,12 @@ $(UEFI_SYS): build
 	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o ./obj/uefi.elf ./obj/uefi.o ./obj/lib.o ./obj/lib_efi.o
 
 $(TSL_SYS): $(UEFI_SYS)
-	$(ASM) ./asm/tsl.asm -o ./build/$(TSL_SYS)
+#	$(ASM) ./asm/tsl.asm -o ./build/$(TSL_SYS)
+	$(ASM) -g -F DWARF -f elf64 ./asm/tsl.asm -o ./obj/tsl.o
+	$(ASM) -g -F DWARF -f elf64 ./asm/tsl_ap.asm -o ./obj/tsl_ap.o
+	$(ASM) -g -F DWARF -f elf64 ./asm/tsl_start.asm -o ./obj/tsl_start.o
+	$(LD) -T tsl.ld -o ./build/$(TSL_SYS) ./obj/tsl.o ./obj/tsl_ap.o ./obj/tsl_start.o
+	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o ./obj/tsl.elf ./obj/tsl.o ./obj/tsl_ap.o ./obj/tsl_start.o
 
 
 build:
