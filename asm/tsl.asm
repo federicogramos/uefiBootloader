@@ -5,7 +5,7 @@
 ;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
 ;; el en 0x100000.
 ;;=============================================================================
-
+ 
 %include "./asm/include/tsl.inc"
 
 BITS 64
