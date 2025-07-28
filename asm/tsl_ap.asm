@@ -39,10 +39,6 @@ ap_startup:
 	mov esp, 0x7000
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;jmp 0x0000:init_smp_ap
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/init/smp_ap.asm"	
 ;; AP's will start execution at TSL_BASE_ADD
 ;; RESS and fall through to this code.
@@ -204,19 +200,6 @@ ap_sleep:
 	jmp ap_sleep			; just-in-case of an NMI
 
 
-; =============================================================================
-; EOF
-
-
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/include/sysvar.inc"
-
-
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -240,4 +223,32 @@ bootmode_branch:
 %include "./asm/bios/bios_32_64.asm"
 %endif
 
-%include "./asm/sysvar_16.asm"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/sysvar_16.asm"
+
+
+
+;;==============================================================================
+;; System Variables | @file /asm/sysvar.asm
+;;==============================================================================
+
+
+section .data
+
+
+align 16
+GDTR32:										;; Global Descriptors Table Register
+				dw gdt32_end - gdt32 - 1	;; Limit.
+				dq gdt32					;; Linear address of GDT
+
+align 16
+gdt32:
+SYS32_NULL_SEL:	equ $ - gdt32			;; Null Segment
+				dq 0x0000000000000000
+SYS32_CODE_SEL:	equ $ - gdt32			;; 32-bit code descriptor
+				dq 0x00CF9A000000FFFF	;; 55 Granularity 4KiB, 54 Size 32bit, 4
+										;; 7 Present, 44 Code/Data, 43 Executabl
+										;; e, 41 Readable.
+SYS32_DATA_SEL:	equ $ - gdt32			;; 32-bit data descriptor		
+				dq 0x00CF92000000FFFF	;; 55 Granularity 4KiB, 54 Size 32bit, 4
+										;; 7 Present, 44 Code/Data, 41 Writeable
+gdt32_end:

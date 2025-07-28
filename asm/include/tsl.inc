@@ -2,6 +2,10 @@
 ;; Definitions for Transient System Load | @file /include/tsl.inc
 ;;=============================================================================
 
+;; TODO: esto sacarlo o definirlo en tsl.ld
+TSL_SIZE equ 0x3000	;; 12KiB
+
+
 ;; EFI_MEMORY_TYPE
 EfiReservedMemoryType		equ 0
 EfiLoaderCode				equ 1
@@ -18,9 +22,6 @@ EfiMemoryMappedIO			equ 11
 EfiMemoryMappedIOPortSpace	equ 12
 EfiPalCode					equ 13
 EfiMaxMemoryType			equ 14
-
-
-TSL_SIZE equ 0x3000	;; 12KiB
 
 
 BASE_IDT	equ 0x00000000
