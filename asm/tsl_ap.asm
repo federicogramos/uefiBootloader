@@ -152,14 +152,14 @@ align 16
 BITS 64
 
 startap64:
-	xor eax, eax			; aka r0
-	xor ebx, ebx			; aka r3
-	xor ecx, ecx			; aka r1
-	xor edx, edx			; aka r2
-	xor esi, esi			; aka r6
-	xor edi, edi			; aka r7
-	xor ebp, ebp			; aka r5
-	xor esp, esp			; aka r4
+	xor eax, eax
+	xor ebx, ebx
+	xor ecx, ecx
+	xor edx, edx
+	xor esi, esi
+	xor edi, edi
+	xor ebp, ebp
+	xor esp, esp
 	xor r8, r8
 	xor r9, r9
 	xor r10, r10
@@ -169,28 +169,31 @@ startap64:
 	xor r14, r14
 	xor r15, r15
 
-	mov ax, 0x10			; TODO Is this needed?
+	mov ax, 0x10		; TODO Is this needed?
 	mov ds, ax			; Clear the legacy segment registers
 	mov es, ax
 	mov ss, ax
 	mov fs, ax
 	mov gs, ax
 
-	; Reset the stack. Each CPU gets a 1024-byte unique stack location
-	mov rsi, [p_LocalAPICAddress]	; We would call p_smp_get_id here but the stack is not ...
-	add rsi, 0x20			; ... yet defined. It is safer to find the value directly.
-	lodsd				; Load a 32-bit value. We only want the high 8 bits
-	shr rax, 24			; Shift to the right and AL now holds the CPU's APIC ID
-	shl rax, 10			; shift left 10 bits for a 1024byte stack
-	add rax, 0x0000000000090000	; stacks decrement when you "push", start at 1024 bytes in
-	mov rsp, rax			; Leave 0x50000-0x9FFFF free so we use that
+	;; Reset the stack. Each CPU gets a 1024-byte unique stack location.
+	mov rsi, [p_LocalAPICAddress]	;; We would call p_smp_get_id here but stack
+									;; is not yet defined. It is safer to find t
+									;; he value directly.
+	add rsi, 0x20
+	lodsd				;; Load a 32-bit value. We only want the high 8 bits.
+	shr rax, 24			;; al = CPU APIC ID.
+	shl rax, 10			;; Shift left 10 bits for a 1024 byte stack.
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;add rax, 0x00090000
+	add rax, 0x00050000
+	mov rsp, rax		;; 0x50000 - 0x9FFFF free so we use that
 
-	lgdt [GDTR64]			; Load the GDT
-	lidt [IDTR64]			; Load the IDT
+	lgdt [GDTR64]		;; Load the GDT
+	lidt [IDTR64]		;; Load the IDT
 
-	call init_cpu			; Setup CPU
+	call init_cpu		;; Setup CPU
 
-	sti				; Activate interrupts for SMP
+	sti					;; Activate interrupts for SMP
 	jmp ap_sleep
 
 align 16
@@ -198,14 +201,6 @@ align 16
 ap_sleep:
 	hlt				; Suspend CPU until an interrupt is received. opcode for hlt is 0xF4
 	jmp ap_sleep			; just-in-case of an NMI
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 
 ;;==============================================================================
