@@ -13,6 +13,9 @@
 %include "./asm/include/sysvar.inc"
 %include "./asm/include/tsl.inc"
 
+global GDTR64
+global SYS64_CODE_SEL
+global IDTR64
 
 global start64
 
@@ -1503,35 +1506,131 @@ emptyKbBuffer:
 	ret
 
 
+section .data
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Some additional system vars.
+
+pd_fb_used:			db 0
+force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
+
+;;section .bss
+addr_bits_physical:	db 0
+addr_bits_logical:	db 0
+
+STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+
+;;==============================================================================
+;; System Variables
+;;==============================================================================
+
+cfg_smpinit:	db 1	; By default SMP is enabled. Set to 0 to disable.
 
 
+align 16
 
-TSL_SIZE equ 0x3000	;; 12KiB
+tGDTR64:									;; Global Descriptors Table Register
+				dw gdt64_end - gdt64 - 1	;; Limit.
+				dq gdt64					;; linear address of GDT
 
-BASE_IDT	equ 0x00000000
-BASE_GDT	equ 0x00001000
-BASE_PML4	equ 0x00002000
-BASE_PDPT_L	equ 0x00003000
-BASE_PDPT_H	equ 0x00004000
-BASE_PD_FB	equ 0x0000F000
-BASE_PD_L	equ 0x00010000	;; Solo si pag 2MiB.
-BASE_PD_H	equ 0x00030000	;; Solo si pag 2MiB.
+align 16
+GDTR64:										;; Global Descriptors Table Register
+				dw gdt64_end - gdt64 - 1	;; Limit.
+				dq 0x0000000000001000		;; linear address of GDT
 
-PHYSICAL_ADDR_MAX_INITIALIZED equ 0x7FFFFFFFF	;; Por defecto se inicializan 32
-												;; GiB cuando page size = 2MiB.
+gdt64:									;; Struct copied to 0x0000000000001000
+SYS64_NULL_SEL:	equ $ - gdt64			;; Null Segment
+				dq 0x0000000000000000
+SYS64_CODE_SEL:	equ $ - gdt64			;; Code segment, read/execute, nonconfor
+										;; ming
+				dq 0x00209A0000000000	;; 53 Long mode code, 47 Present, 44 Cod
+										;; e/Data, 43 Executable, 41 Readable
+SYS64_DATA_SEL:	equ $ - gdt64			;; Data segment, read/write, expand down
+				dq 0x0000920000000000	;; 47 Present, 44 Code/Data, 41 Writable
+gdt64_end:
+
+IDTR64:									;; Interrupt Descriptor Table Register
+				dw 256 * 16 - 1			;; Limit = 4096 - 1
+				dq 0x0000000000000000	;; linear address of IDT
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Messages
+
+msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
+msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
+						db "[press 'n' to continue...]", 0x0A, 0
+msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
+msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
+msg_ready: 				db "ready", 0x0A, 0
+msg_entries:			db "entries... ", 0
+msg_gdt:				db "Setting up sys tables... GDT... ", 0
+msg_pml4:				db "PML4... ", 0
+msg_pdpt:				db "PDPT... ", 0
+msg_pd:					db "PD... ", 0
+
+msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
+msg_pages_will_be:		db " | Page size %s", 0
+msg_pages_size:			db "= 2MiB", 0x0A, 0
+						db "= 1GiB", 0x0A, 0
+
+msg_load_gdt:			db "Load gdt... ", 0
+msg_idt:				db "Setting up IDT... ", 0
+msg_idt_exceptions:		db "exceptions... ", 0
+msg_idt_irq_gates:		db "irq gates... ", 0
+msg_idt_finishing:		db "finishing... ", 0
+msg_exception_occurred:	db "An exception has occurred in the system.", 0x0A, 0
+msg_setting_memmap:		db "Setting up memmap...", 0
+msg_cr3_at_this_point:	db "CR3 at this point = 0x%h", 0x0A, 0
+msg_cr3_load:			db "Load CR3 a new value", 0x0A, 0
+msg_patch:				db "Patching code for AP... ", 0
+
+msg_mm_info:			db "Memory map consists of the following regions "
+						db "(number of 4KiB pages):", 0x0A, 0
+
+;; El orden importa. Es un arreglo.
+fmt_mm_info_array:
+fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
+fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
+fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
+fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
+fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
+fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
+fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
+fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
+fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
+fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
+fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
+
+msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
+mag_pae_already_set:		db "PAE enabled", 0x0A, 0
+
+msg_cpuid_info:				db "Processor features:", 0
+fmt_pse:					db " | PSE = %d", 0
+fmt_pae:					db " | PAE = %d", 0
+fmt_pse36:					db " | PSE-36 = %d", 0x0A, 0
+
+fmt_physical_addr			db "Physical address size [bits] = %d", 0
+fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
+
+msg_pdpt_fb_addr:			db "FB at %h ", 0
+msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
+
+msg_test:					db "String de prueba", 0x0A, 0
+msg_test_hex:				db "Value = 0x%h", 0x0A, 0
+msg_test_num:				db "Value = 0x%d", 0x0A, 0
+msg_test_below:				db "String de prueba: below", 0x0A, 0
+msg_test_above:				db "String de prueba: above", 0x0A, 0
 
 
-EOF:
-	db 0xDE, 0xAD, 0xC0, 0xDE
-
-
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TODO: section data perteneciente a lib.asm, los cuales puedo no dupliacar, si
 ;; no pasar de una zona a otra antes de abandonar efi (podria incluso no copiars
 ;; sino solo referenciarse luego de abandonar efi.).
-
-section .data
-
 
 hexConvert8:				db "0123456789ABCDEF"
 print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
@@ -1671,169 +1770,12 @@ font_data:
 	dd 0x00000000, 0x00000000, 0x0000324C, 0x00000000 ;; 0x7e asciitilde
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x7f uni007F
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; estos son agregados por poder imprimir aqui adentro
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
-msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
-						db "[press 'n' to continue...]", 0x0A, 0
-msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
-msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
-msg_ready: 				db "ready", 0x0A, 0
-msg_entries:			db "entries... ", 0
-msg_gdt:				db "Setting up sys tables... GDT... ", 0
-msg_pml4:				db "PML4... ", 0
-msg_pdpt:				db "PDPT... ", 0
-msg_pd:					db "PD... ", 0
-
-msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
-msg_pages_will_be:		db " | Page size %s", 0
-msg_pages_size:			db "= 2MiB", 0x0A, 0
-						db "= 1GiB", 0x0A, 0
-
-msg_load_gdt:				db "Load gdt... ", 0
-msg_idt:					db "Setting up IDT... ", 0
-msg_idt_exceptions:			db "exceptions... ", 0
-msg_idt_irq_gates:				db "irq gates... ", 0
-msg_idt_finishing:				db "finishing... ", 0
-msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
-msg_setting_memmap:			db "Setting up memmap...", 0
-msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
-msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
-msg_patch:					db "Patching code for AP... ", 0
-
-msg_mm_info:				db "Memory map consists of the following regions (number of 4KiB pages):"
-							db 0x0A, 0
-
-;; El orden importa. Es un arreglo.
-fmt_mm_info_array:
-fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
-fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
-fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
-fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
-fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
-fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
-fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
-fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
-fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
-fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
-fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
-fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
-fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
-fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
-fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
-
-msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
-mag_pae_already_set:		db "PAE enabled", 0x0A, 0
-
-msg_cpuid_info:		db "Processor features:", 0
-fmt_pse:		db " | PSE = %d", 0
-fmt_pae:		db " | PAE = %d", 0
-fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
-
-fmt_physical_addr			db "Physical address size [bits] = %d", 0
-fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
-
-msg_pdpt_fb_addr:			db "FB at %h ", 0
-msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
-
-msg_test:				db "String de prueba", 0x0A, 0
-msg_test_hex:			db "Value = 0x%h", 0x0A, 0
-msg_test_num:			db "Value = 0x%d", 0x0A, 0
-msg_test_below:				db "String de prueba: below", 0x0A, 0
-msg_test_above:				db "String de prueba: above", 0x0A, 0
-
-
-
-
-
-
-;; Some additional system vars.
-
-;; section .data
-pd_fb_used:			db 0
-force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
-
-;;section .bss
-addr_bits_physical:	db 0
-addr_bits_logical:	db 0
-
-
-
-
-
-
-
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;==============================================================================
-;; System Variables | @file /asm/sysvar.asm
-;;==============================================================================
-
-
-section .data
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;global GDTR32	;; Requiere ubicacion hasta FFFFFFFF.
-global GDTR64
-global SYS64_CODE_SEL
-global IDTR64
-
-cfg_smpinit:	db 1	; By default SMP is enabled. Set to 0 to disable.
-
-
-align 16
-
-tGDTR64:									;; Global Descriptors Table Register
-				dw gdt64_end - gdt64 - 1	;; Limit.
-				dq gdt64					;; linear address of GDT
-
-align 16
-GDTR64:										;; Global Descriptors Table Register
-				dw gdt64_end - gdt64 - 1	;; Limit.
-				dq 0x0000000000001000		;; linear address of GDT
-
-gdt64:									;; Struct copied to 0x0000000000001000
-SYS64_NULL_SEL:	equ $ - gdt64			;; Null Segment
-				dq 0x0000000000000000
-SYS64_CODE_SEL:	equ $ - gdt64			;; Code segment, read/execute, nonconfor
-										;; ming
-				dq 0x00209A0000000000	;; 53 Long mode code, 47 Present, 44 Cod
-										;; e/Data, 43 Executable, 41 Readable
-SYS64_DATA_SEL:	equ $ - gdt64			;; Data segment, read/write, expand down
-				dq 0x0000920000000000	;; 47 Present, 44 Code/Data, 41 Writable
-gdt64_end:
-
-IDTR64:									;; Interrupt Descriptor Table Register
-				dw 256 * 16 - 1			;; Limit = 4096 - 1
-				dq 0x0000000000000000	;; linear address of IDT
-
-
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
 ;; Pad to an even KB file
-times TSL_SIZE - ($ - $$) db 0x90
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;times TSL_SIZE - ($ - $$) db 0x90
 
 
-; =============================================================================
-; EOF
