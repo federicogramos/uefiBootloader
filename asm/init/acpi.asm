@@ -27,8 +27,10 @@ searchingforACPI:
 
 ; Find the ACPI RSDP Structure on a UEFI system
 foundACPIfromUEFI:
-	mov rsi, [0x400000 + 4 * 1024 + 8 * 6]	;; TODO: simbolizar. El 4 es KiB que
-											;; ocupa seccion de codig o de uefi.
+	mov rsi, [0x400000 + 4 * 1024 + 8 * 6]	;; TODO: simbolizar. 0x400000 = base
+											;; addr conde imagen efi se carga. E
+											;; l 4 es KiB que ocupa seccion de c
+											;; odigo de uefi.
 	mov rbx, "RSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
 	lodsq				;; Carga signature. Luego de carga, apunta a checksum.
 	cmp rax, rbx

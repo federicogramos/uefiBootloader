@@ -936,6 +936,11 @@ vid_max:			dq 0
 vid_size:			dq 0
 vid_info:			dq 0
 
+;; Me interesa referenciarlo desde tsl.asm
+STEP_MODE_FLAG	db STEP_MODE_INIT_VAL	;; Lo activa presionar 's' al booteo. El
+										;; valor inicial es asignado durante la 
+										;; compilacion.
+
 ;; Para localizar el device path del text input.
 EFI_DEVICE_PATH_PROTOCOL_GUID:
 	dd	0x09576e91
@@ -959,10 +964,6 @@ EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
 ;; CHAR16	UnicodeChar;
 ;; } EFI_INPUT_KEY;
 EFI_INPUT_KEY	dw 0, 0
-
-STEP_MODE_FLAG	db STEP_MODE_INIT_VAL	;; Lo activa presionar 's' al booteo. El
-										;; valor inicial es asignado durante la 
-										;; compilacion.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.

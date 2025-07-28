@@ -3,9 +3,6 @@
 ;;==============================================================================
 
 
-;;global GDTR32	;; Requiere ubicacion hasta FFFFFFFF.
-
-
 section .data
 
 
