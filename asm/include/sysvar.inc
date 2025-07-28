@@ -3,8 +3,6 @@
 ;;==============================================================================
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;cfg_smpinit:	db 1	; By default SMP is enabled. Set to 0 to disable.
-
 ;; Memory locations
 ;; Info de video en 2 lugares para consultar: InfoMap y VBEModeInfoBlock.
 ;; Info de video desde 0x5080
@@ -68,9 +66,4 @@ p_x2APIC:			equ SystemVariables + 0x183
 p_HPET_Timers:		equ SystemVariables + 0x184
 p_BootDisk:			equ SystemVariables + 0x185	;; 'F' for Floppy drive
 p_1gb_pages:		equ SystemVariables + 0x186	;; 1 if 1GB pages are supported
-
-
-
-
-
 

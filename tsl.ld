@@ -2,40 +2,37 @@ OUTPUT_FORMAT("binary")
 SECTIONS
 {
 	. = 0x8000;
-	codeLowerStart = .;
-	.text_lower :	{
-		text = .;
+	code_low_start = .;
+	.text_low :	{
+		/*text = .;*/
 		./obj/tsl_start.o (.text)
 		./obj/tsl_ap.o (.text)
-		BYTE (0xFE);
-		BYTE (0xFE);
-		BYTE (0xFE);
-		BYTE (0xFE);
-		BYTE (0xFE);
 	}
-	codeLowerSize = . - codeLowerStart;
-
+	code_low_size = . - code_low_start;
 
 	. = ALIGN(0x200);
+	data_low_start = .;
+	.data_low : {
+		/*data = .;*/
+		./obj/tsl_ap.o (.data)
+	}
+	data_low_size = . - data_low_start;
+
+	. = ALIGN(0x800000);
+	codeUpperStart = .;
+	.text : { 
+		text = .;
+		*(.text)
+	}
+	codeUpperSize = . - codeUpperStart;
+
+	. = ALIGN(0x1000);
 	dataStart = .;
 	.data : {
 		data = .;
 		*(.data)
 	}
 	dataSize = . - dataStart;
-
-
-
-
-/*	. = ALIGN(0x4000);*/
-	. = 0x800000;
-	codeUpperStart = .;
-/*	.text 0x4000 :	AT (0x800000) { */
-	.text : { 
-		text = .;
-		*(.text)
-	}
-	codeUpperSize = . - codeUpperStart;
 
 
 
@@ -46,5 +43,5 @@ SECTIONS
 		*(EXCLUDE_FILE (*.o) COMMON)
 	}
 
-	fileSize = . - codeLowerStart;
+	fileSize = . - code_low_start;
 }

@@ -6,11 +6,21 @@
 ;; el en 0x100000.
 ;;=============================================================================
 
+;; Como se estructura en memoria los distintos fuentes que componen esta parte d
+;; e inicializacion del sistema.
+;; tsl_start.asm  tsl_ap.asm                             tsl.asm
+;; 0x8000                                                0x800000
+
+
+
+%include "./asm/include/tsl.inc"
+
+
 section .text
 
 
 ;; tsl_ap.asm
-extern bootmode
+extern bootmode_branch
 
 
 ;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
@@ -19,17 +29,15 @@ extern bootmode
 
 section .text
 
-%include "./asm/include/tsl.inc"
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BITS 64
 
-TSL_BASE_ADDRESS equ 0x800000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;TSL_BASE_ADDRESS equ 0x800000
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;ORG TSL_BASE_ADDRESS
 
 start:
-	jmp bootmode	;; Will be overwritten with 'NOP's before AP's are started.
+	jmp bootmode_branch	;; Overwritten with 'NOP's before AP's are started.
 	nop
-	db "UEFIBOOT"	;; Marca para un simple chequeo de que hay payload.
+	db "UEFIBOOT"		;; Marca para un simple chequeo de que hay payload.
 	nop
 	nop
 
