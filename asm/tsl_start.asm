@@ -38,6 +38,8 @@ section .text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;ORG TSL_BASE_ADDRESS
 
 start:
+db 0xAA
+dq start
 	jmp bootmode_branch	;; Overwritten with 'NOP's before AP's are started.
 	nop
 	db "UEFIBOOT"		;; Marca para un simple chequeo de que hay payload.

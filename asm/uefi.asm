@@ -24,7 +24,7 @@
 ;;==============================================================================
 
 TSL_BASE_ADDRESS		equ 0x800000
-TSL_BASE_ADDRESS_LOW	equ 0x800000
+TSL_BASE_ADDRESS_LOW	equ 0x8000
 
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
@@ -870,7 +870,7 @@ exit_uefi_services:
 	mov bl, 'U'
 
 to_transient_system:
-	mov rax, TSL_BASE_ADDRESS
+	mov rax, TSL_BASE_ADDRESS_LOW
 	jmp rax
 
 

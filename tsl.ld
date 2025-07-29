@@ -16,9 +16,14 @@ SECTIONS
 	}
 	data_low_size = . - data_low_start;
 
-	. = ALIGN(0x800000);
+	/*. = ALIGN(0x80000);*/
+	. = 0x9000;
 	code_hi_start = .;
-	.text : { 
+	.text : {
+		BYTE(0xFE)
+		BYTE(0xFE)
+		BYTE(0xFE)
+		BYTE(0xFE)
 		*(.text)
 	}
 	code_hi_size = . - code_hi_start;
