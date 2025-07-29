@@ -1,17 +1,20 @@
 ;;==============================================================================
-;; Transient System Load | @file /asm/tsl.asm
+;; Transient System Load | @file /asm/tsl_start.asm
 ;;=============================================================================
 ;; Recibe la informacion del sistema. Hace configuraciones basicas del mismo. Co
 ;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
 ;; el en 0x100000.
 ;;=============================================================================
 
-;; Como se estructura en memoria los distintos fuentes que componen esta parte d
-;; e inicializacion del sistema.
-;; tsl_start.asm | tsl_ap.asm | .data | 00..00 | tsl.asm
-;; 0x8000        |            |       | 00..00 | 0x800000
-
-
+;; Ubicacion en memoria los distintos fuentes que componen esta parte de inicial
+;; izacion del sistema.
+;;  +---------------+------------+-------+---..---+----------+------+
+;;  | tsl_start.asm | tsl_ap.asm | .data | 00..00 | tsl.asm  |.data |
+;;  | .text_low     | .text_low  | _low  | 00..00 | .text    |      |
+;;  +---------------+------------+-------+---..---+----------+------+
+;;  |^              |            |       |        |          |      |
+;;  |<-------------- 4KiB -------------->|        |<----   KiB ---->|
+;; 0x8000                      0x8200  0x2000   0x800000
 
 %include "./asm/include/tsl.inc"
 

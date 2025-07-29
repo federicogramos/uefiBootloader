@@ -16,13 +16,16 @@
 ;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
 ;;  |         |        |       | transient  | packed     | 0x00 hasta |
 ;;  | Encabez | Codigo | Datos | system     | Kernel.bin | el fin     |
-;;  +---------+--------+-------+------------+------------+------------+
-;;  |^        |^       |^      |^           |^           |^          ^|
-;; 0x0      0x200   0x1000   0x4000      0x7000      0x40000      0xFFFFF
-;; 0        512B    4KiB     16KiB       28KiB       256KiB       1MiB-1
+;;  |         |        |       | low |  hi  |            |            |
+;;  +---------+--------+-------+-----+------+------------+------------+
+;;  |^        |^       |^      |^    |^     |^           |^          ^|
+;; 0x0    0x200   0x1000   0x4000  0x5000  0x7000     0x40000      0xFFFFF
+;; 0      512B    4KiB     16KiB   20KiB   28KiB      256KiB       1MiB-1
 ;;==============================================================================
 
-TSL_BASE_ADDRESS equ 0x800000
+TSL_BASE_ADDRESS		equ 0x800000
+TSL_BASE_ADDRESS_LOW	equ 0x800000
+
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
 
@@ -758,12 +761,28 @@ exit_uefi_services:
 	;;  +--------------------+-----------------------------+
 	;;  |<--- 12KiB --->|<------------ 228KiB ------------>|
 	;;  |^              |^                                 |^
-	;; 0x800000     0x803000                           0x83C000         
+	;; 0x800000     0x803000                           0x83C000
+
+
+;; Low tsl. 4K de los 240 del payload.
 	mov rsi, PAYLOAD
+	mov rdi, TSL_BASE_ADDRESS_LOW
+	mov rcx, 4 * 1024	;; 4KiB a partir de TSL_BASE_ADDRESS_LOW.
+	rep movsb				;; ---------------------Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
+							;;---------------------- 024) - 1 = 0x83BFFF
+
+;; Hi tsl. Los restantes 236K.
+	mov rsi, PAYLOAD + 4 * 1024
 	mov rdi, TSL_BASE_ADDRESS
-	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
+	mov rcx, (236 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
 	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
 							;; 024) - 1 = 0x83BFFF
+
+;;	mov rsi, PAYLOAD
+;;	mov rdi, TSL_BASE_ADDRESS
+;;	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
+;;	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
+;;							;; 024) - 1 = 0x83BFFF
 
 	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
 	;; qword [0x00005F00] = Frame buffer base
