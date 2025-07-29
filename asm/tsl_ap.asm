@@ -1,9 +1,7 @@
 ;;==============================================================================
-;; Transient System Load | @file /asm/tsl_ap.asm
+;; AP startup | @file /asm/tsl_ap.asm
 ;;=============================================================================
-;; Recibe la informacion del sistema. Hace configuraciones basicas del mismo. Co
-;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
-;; el en 0x100000.
+;; AP's will start execution at TSL_BASE_ADDRESS and fall through to this code.
 ;;=============================================================================
 
 
@@ -37,20 +35,11 @@ ap_startup:
 	mov fs, ax
 	mov gs, ax
 	mov esp, 0x7000
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;jmp 0x0000:init_smp_ap
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/init/smp_ap.asm"	
-;; AP's will start execution at TSL_BASE_ADD
-;; RESS and fall through to this code.
-
-
-
 
 
 ; =============================================================================
 ; INIT SMP AP
 ; =============================================================================
-;; Esto compilar en archivo separado y es codigo 16 bits que va en text_low
 
 ;; sysvar.asm
 ;;extern GDTR32
@@ -217,9 +206,6 @@ bootmode_branch:
 %ifdef BIOS
 %include "./asm/bios/bios_32_64.asm"
 %endif
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/sysvar_16.asm"
-
 
 
 ;;==============================================================================

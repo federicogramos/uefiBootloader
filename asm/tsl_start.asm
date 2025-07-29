@@ -8,8 +8,8 @@
 
 ;; Como se estructura en memoria los distintos fuentes que componen esta parte d
 ;; e inicializacion del sistema.
-;; tsl_start.asm  tsl_ap.asm                             tsl.asm
-;; 0x8000                                                0x800000
+;; tsl_start.asm | tsl_ap.asm | .data | 00..00 | tsl.asm
+;; 0x8000        |            |       | 00..00 | 0x800000
 
 
 

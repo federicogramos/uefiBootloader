@@ -13,6 +13,7 @@
 %include "./asm/include/sysvar.inc"
 %include "./asm/include/tsl.inc"
 
+
 global GDTR64
 global SYS64_CODE_SEL
 global IDTR64
@@ -110,7 +111,7 @@ set_pit_initial_freq:
 	rep stosd
 
 	mov rcx, 81920	;; 320KiB for Page Descriptor Entries (0x10000 - 0x5FFFF)
-	mov rdi, 0x00010000
+	mov rdi, BASE_PD_L
 	rep stosd		
 
 	mov r9, msg_ready
@@ -121,7 +122,7 @@ set_pit_initial_freq:
 	;;bt rax, 5
 	;;lahf
 	;;mov al, ah
-	;;and rax, 0x0000000000000001
+	;;and rax, 0x00000001
 	;;mov rsi, rax
 	;;mov r9, fmt_pae
 	;;call print
@@ -138,7 +139,7 @@ pse:
 	bt rax, 3
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov rsi, rax
 	mov r9, fmt_pse
 	call print
@@ -150,7 +151,7 @@ pae:
 	bt rax, 6
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov rsi, rax
 	mov r9, fmt_pae
 	call print
@@ -162,7 +163,7 @@ pse36:
 	bt rax, 17
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov rsi, rax
 	mov r9, fmt_pse36
 	call print
@@ -194,7 +195,7 @@ pag_1gb:
 	bt rax, 26
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov [p_1gb_pages], al
 	mov rsi, rax
 	mov r9, msg_support_1g_pages
