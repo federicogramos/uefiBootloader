@@ -26,9 +26,6 @@ section .text
 TSL_BASE_ADDRESS equ 0x8000
 
 start64:
-dw 0xDEFE
-dd start64
-jmp start64
 	mov rsp, TSL_BASE_ADDRESS
 
 	;; El cursor quedo en el anterior loader.

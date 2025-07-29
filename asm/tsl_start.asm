@@ -15,6 +15,9 @@
 ;;  |^              |            |       |        |          |      |
 ;;  |<-------------- 4KiB -------------->|        |<----   KiB ---->|
 ;; 0x8000                      0x8200  0x2000   0x800000
+;; 
+;; code 0 a 0x200 , data 0x200 a 300\
+;; y en 0x300 aparece tsl que se carga en 800000
 
 %include "./asm/include/tsl.inc"
 
@@ -38,8 +41,8 @@ section .text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;ORG TSL_BASE_ADDRESS
 
 start:
-db 0xAA
-dq start
+;;db 0xAA
+;;dq start
 	jmp bootmode_branch	;; Overwritten with 'NOP's before AP's are started.
 	nop
 	db "UEFIBOOT"		;; Marca para un simple chequeo de que hay payload.

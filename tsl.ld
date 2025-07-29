@@ -12,7 +12,7 @@ SECTIONS
 		./obj/tsl_ap.o (.data)
 	}
 
-	align = 0x100;
+	align = 0x400;
 	addr_tsl_hi_align = (. - tsl_low_reloc_addr + align - 1) & ~(align - 1);
 	.text 0x800000 : AT (addr_tsl_hi_align) {
 		*(.text)

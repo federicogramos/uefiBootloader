@@ -19,8 +19,8 @@
 ;;  |         |        |       | low |  hi  |            |            |
 ;;  +---------+--------+-------+-----+------+------------+------------+
 ;;  |^        |^       |^      |^    |^     |^           |^          ^|
-;; 0x0    0x200   0x1000   0x4000  0x5000  0x7000     0x40000      0xFFFFF
-;; 0      512B    4KiB     16KiB   20KiB   28KiB      256KiB       1MiB-1
+;; 0x0    0x200   0x1000   0x4000  0x4400  0x7000     0x40000      0xFFFFF
+;; 0      512B    4KiB     16KiB   17KiB   28KiB      256KiB       1MiB-1
 ;;==============================================================================
 
 TSL_BASE_ADDRESS		equ 0x800000
@@ -762,20 +762,22 @@ exit_uefi_services:
 	;;  |<--- 12KiB --->|<------------ 228KiB ------------>|
 	;;  |^              |^                                 |^
 	;; 0x800000     0x803000                           0x83C000
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   ^^^^^-----  TODO: nnooooo ... actualizar!!!!!
 
-
-;; Low tsl. 4K de los 240 del payload.
+;; Low primeros 0x300 bytes de los 240 del payload.
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS_LOW
-	mov rcx, 4 * 1024	;; 4KiB a partir de TSL_BASE_ADDRESS_LOW.
+	mov rcx, 0x300	;; ----KiB a partir de TSL_BASE_ADDRESS_LOW.
 	rep movsb				;; ---------------------Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
 							;;---------------------- 024) - 1 = 0x83BFFF
 
-;; Hi tsl. Los restantes 236K.
-	mov rsi, PAYLOAD + 4 * 1024
+;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
+	mov rsi, PAYLOAD + 1024
 	mov rdi, TSL_BASE_ADDRESS
-	mov rcx, (236 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
-	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
+	mov rcx, (239 * 1024)	;; ------------- 240KiB a partir de TSL_BASE_ADDRESS.
+	rep movsb				;; ---------------Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
 							;; 024) - 1 = 0x83BFFF
 
 ;;	mov rsi, PAYLOAD
