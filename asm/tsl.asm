@@ -25,6 +25,9 @@ section .text
 
 TSL_BASE_ADDRESS equ 0x8000
 
+
+;; AGREGAR ARCHIVOS DEBUG 
+
 start64:
 	mov rsp, TSL_BASE_ADDRESS
 
