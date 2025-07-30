@@ -66,4 +66,8 @@ Menos detalle que el anterior, pero buenas referencias al fondo de la pagina. Al
 
 [Paginacion: linda tabla que indica flags y modos](https://shell-storm.org/blog/Paging-modes-for-the-x86-32-bits-architectures/)
 
+[Other nice paging web](https://connormcgarr.github.io/paging/)
+
 [Info en general de caracteristicas Intel](http://x86asm.net/articles/x86-64-tour-of-intel-manuals/index.html)
+
+[some reference for ld scripts](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html)
