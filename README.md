@@ -73,3 +73,10 @@ Info en general de caracteristicas Intel.
 
 [ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html)
 Some reference for ld scripts.
+
+### Info no demasiado relevante
+
+[pdf de UEFI plugfest](https://uefi.org/sites/default/files/resources/Driver%20Development%20with%20EDKII_Final.pdf)
+
+[aeb.win.tue.nl](https://aeb.win.tue.nl/linux/kbd/scancodes-10.html)
+Scancode different sets reference.
