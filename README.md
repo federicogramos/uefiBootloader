@@ -60,3 +60,10 @@ Menos detalle que el anterior, pero buenas referencias al fondo de la pagina. Al
 
 [GOP](https://wiki.osdev.org/GOP)
 
+[cpuid web 1](https://www.felixcloutier.com/x86/cpuid)
+
+[cpuid web 2](https://eun.github.io/Intel-Pentium-Instruction-Set-Reference/data/cpuid.html)
+
+[Paginacion: linda tabla que indica flags y modos](https://shell-storm.org/blog/Paging-modes-for-the-x86-32-bits-architectures/)
+
+[Info en general de caracteristicas Intel](http://x86asm.net/articles/x86-64-tour-of-intel-manuals/index.html)
