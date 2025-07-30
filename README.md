@@ -68,6 +68,8 @@ Menos detalle que el anterior, pero buenas referencias al fondo de la pagina. Al
 
 [Other nice paging web](https://connormcgarr.github.io/paging/)
 
-[Info en general de caracteristicas Intel](http://x86asm.net/articles/x86-64-tour-of-intel-manuals/index.html)
+[x86asm.net](http://x86asm.net/articles/x86-64-tour-of-intel-manuals/index.html)
+Info en general de caracteristicas Intel.
 
-[some reference for ld scripts](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html)
+[ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html)
+Some reference for ld scripts.
