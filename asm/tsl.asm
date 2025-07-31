@@ -14,6 +14,9 @@
 %include "./asm/include/tsl.inc"
 
 
+extern data_hi_end_addr
+extern code_data_hi_size
+
 global GDTR64
 global SYS64_CODE_SEL
 global IDTR64
@@ -1039,11 +1042,18 @@ lfb_wc_end:
 
 
 	;; Kernel to its final location.
-	mov esi, TSL_BASE_ADDRESS + TSL_SIZE	;; Offset to end of tsl.sys
+	;;mov rsi, TSL_BASE_ADDRESS_HI + TSL_SIZE_HI	;; Offset to end of tsl.sys (res
+
+kernel_copy:
+	mov rsi, data_hi_end_addr	;; Offset to end of tsl.sys (res
+												;; t of hi part) and start of ke
+												;; rnel.
 	mov rdi, 0x100000							;; Kernel final destination.
-	;;mov rcx, ((32768 - TSL_SIZE) / 8)
-	mov rcx, (((232 * 1024) - TSL_SIZE) / 8)	;; 232KiB Kernel + Userland
-	rep movsq
+	mov rcx, 239 * 1024	;; 239KiB menos lo que ocupa cod + data = Kernel + Userland
+	sub rcx, code_data_hi_size	;; 239KiB menos lo que ocupa cod hi + data hi = Kernel + Userland
+												;; No puede dividir por 8 ahora porque debe esperar
+												;; a la linkedicion, por lo q copio byte a byte.
+	rep movsb
 
 %ifdef BIOS
 	cmp byte [p_BootDisk], 'F'	;; Check if sys is booted from floppy?
@@ -1073,7 +1083,8 @@ clear_regs:
 
 	call keyboard_get_key
 
-	jmp 0x00100000	;; Jump to kernel.
+	mov rax, 0x100000
+	jmp rax	;; Long jump to kernel.
 
 
 %include "./asm/init/acpi.asm"

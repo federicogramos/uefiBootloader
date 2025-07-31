@@ -12,18 +12,24 @@ SECTIONS
 		./obj/tsl_ap.o (.data)
 	}
 
-	align = 0x400;
+	align = 0x400; /* Manually align here. */
 	addr_tsl_hi_align = (. - tsl_low_reloc_addr + align - 1) & ~(align - 1);
+
+	text_hi_start_addr = 0x800000;
 	.text 0x800000 : AT (addr_tsl_hi_align) {
 		*(.text)
 	}
+	text_size = SIZEOF (.text);
 
 	. = ALIGN(0x1000);
-	data_hi_start = .;
+	data_hi_start_addr = .;
 	.data : {
 		*(.data)
 	}
-	data_hi_size = . - data_hi_start;
+	/* data_size = SIZEOF (.data); */
+	/* data_hi_end_addr = data_hi_start_addr + data_size;*/
+	data_hi_end_addr = . ;
+	code_data_hi_size = data_hi_end_addr - text_hi_start_addr;
 
 	. = ALIGN(0x1000);
 	.bss : {

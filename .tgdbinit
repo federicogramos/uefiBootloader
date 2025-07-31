@@ -167,7 +167,10 @@ gdb.execute(f"dashboard registers -style list 'rax rbx rcx rdx rsi rdi rbp rsp r
 
 #gdb.execute(f'set dir /home/fgr/arq/uefiBootloader:/home/fgr/arq/uefiBootloader/asm/obj')
 gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/obj/uefi.elf 0x400200')
-#gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/obj/tsl_lo.elf 0x0000')
+
+# TODO: arreglar este corto tramo de debugueo:
+#gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/obj/tsl_lo.elf 0x8000')
+
 gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/obj/tsl_hi.elf 0x800000')
 gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/sys/kernel.elf 0x100000')
 

@@ -775,7 +775,7 @@ exit_uefi_services:
 	rep movsb
 
 ;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
-	mov rsi, PAYLOAD + 1024
+	mov rsi, PAYLOAD + 0x400
 	mov rdi, TSL_BASE_ADDRESS
 	mov rcx, (239 * 1024)	;; 239KiB.
 	rep movsb
