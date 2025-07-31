@@ -64,7 +64,8 @@ Menos detalle que el anterior, pero buenas referencias al fondo de la pagina. Al
 
 [cpuid web 2](https://eun.github.io/Intel-Pentium-Instruction-Set-Reference/data/cpuid.html)
 
-[Paginacion: linda tabla que indica flags y modos](https://shell-storm.org/blog/Paging-modes-for-the-x86-32-bits-architectures/)
+[shell-storm.org](https://shell-storm.org/blog/Paging-modes-for-the-x86-32-bits-architectures/)
+Paginacion: linda tabla que indica flags y modos.
 
 [Other nice paging web](https://connormcgarr.github.io/paging/)
 
