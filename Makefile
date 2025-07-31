@@ -30,7 +30,8 @@ $(TSL_SYS): $(UEFI_SYS)
 	$(ASM) -g -F DWARF -f elf64 ./asm/tsl_ap.asm -o ./obj/tsl_ap.o
 	$(ASM) -g -F DWARF -f elf64 ./asm/tsl_start.asm -o ./obj/tsl_start.o
 	$(LD) -T tsl.ld -o ./build/$(TSL_SYS) ./obj/tsl.o ./obj/tsl_ap.o ./obj/tsl_start.o
-	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o ./obj/tsl.elf ./obj/tsl.o ./obj/tsl_ap.o ./obj/tsl_start.o
+	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o ./obj/tsl_lo.elf ./obj/tsl.o ./obj/tsl_ap.o ./obj/tsl_start.o
+	$(LD) --oformat=elf64-x86-64 -T tsl_hi.ld -o ./obj/tsl_hi.elf ./obj/tsl.o
 
 
 build:
