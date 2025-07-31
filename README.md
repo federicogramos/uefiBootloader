@@ -80,3 +80,11 @@ Some reference for ld scripts.
 
 [aeb.win.tue.nl](https://aeb.win.tue.nl/linux/kbd/scancodes-10.html)
 Scancode different sets reference.
+
+[basicinputoutput.com](https://www.basicinputoutput.com/2024/11/the-keyboard-controller-interface.html)
+Me fui un poco por las ramas, pero linda tabla con comandos varios para mouse, led, teclado. Tiene otros posteos interesantes, dejo la referencia porque luego quiero darle una mirada a otros posteos.
+
+### Info en espera
+
+[i386-stub.c ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/gdb/html_node/gdb_125.html)
+Para driver debug en pc fisica.
