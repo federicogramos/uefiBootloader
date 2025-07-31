@@ -755,31 +755,31 @@ exit_uefi_services:
 	cli							;; Ya afuera.
 
 	;; Payload al destino. Maximo tamano 240KiB y por eso cuando armamos imagen 
-	;; se deberia revisar que no sea mayor. Un posible payload es:
-	;;  +--------------------+-----------------------------+
-	;;  |    tsl.sys    | kernel.bin + modulosUserland.bin |
-	;;  +--------------------+-----------------------------+
-	;;  |<--- 12KiB --->|<------------ 228KiB ------------>|
-	;;  |^              |^                                 |^
-	;; 0x800000     0x803000                           0x83C000
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   ^^^^^-----  TODO: nnooooo ... actualizar!!!!!
+	;; se deberia revisar que no sea mayor. Posible payload (previo copia):
+	;;  +-----------------------------------+--------------------+
+	;;  |              tsl.sys              |  packedKernel.bin  |
+	;;  | code | data | 00..0 | code | data | kernel | mods user |
+	;;  | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
+	;;  +-------------|---------------------+---------------------+
+	;;  |<---240KiB -------------------------------------------->|
+	;;  |<-- 0x300 -->|       |<----------- 239KiB ------------->|
+	;;  |<-- 0x400 ---------->|                                  |
+	;;  |^                    |^                                 |^
+	;; 0x404000            0x404400                           0x440000
+	;; PAYLOAD
 
 ;; Low primeros 0x300 bytes de los 240 del payload.
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS_LOW
-	mov rcx, 0x300	;; ----KiB a partir de TSL_BASE_ADDRESS_LOW.
-	rep movsb				;; ---------------------Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
-							;;---------------------- 024) - 1 = 0x83BFFF
+	mov rcx, 0x300	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
+	rep movsb
 
 ;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
 	mov rsi, PAYLOAD + 1024
 	mov rdi, TSL_BASE_ADDRESS
-	mov rcx, (239 * 1024)	;; ------------- 240KiB a partir de TSL_BASE_ADDRESS.
-	rep movsb				;; ---------------Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
-							;; 024) - 1 = 0x83BFFF
-
+	mov rcx, (239 * 1024)	;; 239KiB.
+	rep movsb
+	
 ;;	mov rsi, PAYLOAD
 ;;	mov rdi, TSL_BASE_ADDRESS
 ;;	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
