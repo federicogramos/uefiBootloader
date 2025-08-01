@@ -40,7 +40,7 @@ $(OBJ_DIR)/%.o: $(LIB_DIR)/%.asm
 $(UEFI_SYS): build ./obj/lib.o ./obj/efi.o
 	$(ASM) -D STEP_MODE_INIT_VAL=$(FORCE_STEP_MODE) -g -F DWARF -f elf64 $(ASM_DIR)/uefi.asm -o $(UEFI_OBJ)
 	$(LD) -T uefi.ld -o $@ $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
-	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o $(OBJ_DIR)/uefi.elf $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
+	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o $(UEFI_ELF) $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
 
 $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
 	$(LD) -T tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(TSL_OBJS_LIB_HI)
