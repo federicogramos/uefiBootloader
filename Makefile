@@ -23,6 +23,7 @@ TSL_SRCS_LO = tsl_ap.asm tsl_start.asm
 TSL_SRCS_HI = tsl.asm
 TSL_OBJS_LO = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_LO))
 TSL_OBJS_HI = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_HI))
+TSL_OBJS_LIB_HI = $(OBJ_DIR)/lib.o	# Requerimiento ya generado por $(UEFI_SYS).
 TSL_ELF_LO = $(ELF_DIR)/tsl_lo.elf
 TSL_ELF_HI = $(ELF_DIR)/tsl_hi.elf
 TSL_SYS = $(BUILD_DIR)/tsl.sys
@@ -42,9 +43,9 @@ $(UEFI_SYS): build ./obj/lib.o ./obj/efi.o
 	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o $(OBJ_DIR)/uefi.elf $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
 
 $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
-	$(LD) -T tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI)
-	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI)
-	$(LD) --oformat=elf64-x86-64 -T tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI)
+	$(LD) -T tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(TSL_OBJS_LIB_HI)
+	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(TSL_OBJS_LIB_HI)
+	$(LD) --oformat=elf64-x86-64 -T tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(TSL_OBJS_LIB_HI)
 
 build:
 	mkdir -p $(BUILD_DIR) $(IMG_DIR) $(OUT_DIR) $(OBJ_DIR) $(ELF_DIR) 
