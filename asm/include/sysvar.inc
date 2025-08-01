@@ -1,9 +1,7 @@
 ;;==============================================================================
-;; System Variables | @file /asm/sysvar.asm
+;; System Variables | @file /include/sysvar.inc
 ;;==============================================================================
 
-
-cfg_smpinit:	db 1	; By default SMP is enabled. Set to 0 to disable.
 
 ;; Memory locations
 ;; Info de video en 2 lugares para consultar: InfoMap y VBEModeInfoBlock.
@@ -68,49 +66,4 @@ p_x2APIC:			equ SystemVariables + 0x183
 p_HPET_Timers:		equ SystemVariables + 0x184
 p_BootDisk:			equ SystemVariables + 0x185	;; 'F' for Floppy drive
 p_1gb_pages:		equ SystemVariables + 0x186	;; 1 if 1GB pages are supported
-
-align 16
-GDTR32:										;; Global Descriptors Table Register
-				dw gdt32_end - gdt32 - 1	;; Limit.
-				dq gdt32					;; Linear address of GDT
-
-align 16
-gdt32:
-SYS32_NULL_SEL:	equ $ - gdt32			;; Null Segment
-				dq 0x0000000000000000
-SYS32_CODE_SEL:	equ $ - gdt32			;; 32-bit code descriptor
-				dq 0x00CF9A000000FFFF	;; 55 Granularity 4KiB, 54 Size 32bit, 4
-										;; 7 Present, 44 Code/Data, 43 Executabl
-										;; e, 41 Readable.
-SYS32_DATA_SEL:	equ $ - gdt32			;; 32-bit data descriptor		
-				dq 0x00CF92000000FFFF	;; 55 Granularity 4KiB, 54 Size 32bit, 4
-										;; 7 Present, 44 Code/Data, 41 Writeable
-gdt32_end:
-
-align 16
-
-tGDTR64:									;; Global Descriptors Table Register
-				dw gdt64_end - gdt64 - 1	;; Limit.
-				dq gdt64					;; linear address of GDT
-
-align 16
-GDTR64:										;; Global Descriptors Table Register
-				dw gdt64_end - gdt64 - 1	;; Limit.
-				dq 0x0000000000001000		;; linear address of GDT
-
-gdt64:									;; Struct copied to 0x0000000000001000
-SYS64_NULL_SEL:	equ $ - gdt64			;; Null Segment
-				dq 0x0000000000000000
-SYS64_CODE_SEL:	equ $ - gdt64			;; Code segment, read/execute, nonconfor
-										;; ming
-				dq 0x00209A0000000000	;; 53 Long mode code, 47 Present, 44 Cod
-										;; e/Data, 43 Executable, 41 Readable
-SYS64_DATA_SEL:	equ $ - gdt64			;; Data segment, read/write, expand down
-				dq 0x0000920000000000	;; 47 Present, 44 Code/Data, 41 Writable
-gdt64_end:
-
-IDTR64:									;; Interrupt Descriptor Table Register
-				dw 256 * 16 - 1			;; Limit = 4096 - 1
-				dq 0x0000000000000000	;; linear address of IDT
-
 

@@ -1,2 +1,4 @@
-*DS_Store
+# Imagenes de disco grandes. No necesario, se generan con ./build.sh 
 img/*
+
+*DS_Store

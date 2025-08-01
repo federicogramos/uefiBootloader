@@ -60,3 +60,32 @@ Menos detalle que el anterior, pero buenas referencias al fondo de la pagina. Al
 
 [GOP](https://wiki.osdev.org/GOP)
 
+[cpuid web 1](https://www.felixcloutier.com/x86/cpuid)
+
+[cpuid web 2](https://eun.github.io/Intel-Pentium-Instruction-Set-Reference/data/cpuid.html)
+
+[shell-storm.org](https://shell-storm.org/blog/Paging-modes-for-the-x86-32-bits-architectures/)
+Paginacion: linda tabla que indica flags y modos.
+
+[Other nice paging web](https://connormcgarr.github.io/paging/)
+
+[x86asm.net](http://x86asm.net/articles/x86-64-tour-of-intel-manuals/index.html)
+Info en general de caracteristicas Intel.
+
+[ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_chapter/ld_3.html)
+Some reference for ld scripts.
+
+### Info no demasiado relevante
+
+[pdf de UEFI plugfest](https://uefi.org/sites/default/files/resources/Driver%20Development%20with%20EDKII_Final.pdf)
+
+[aeb.win.tue.nl](https://aeb.win.tue.nl/linux/kbd/scancodes-10.html)
+Scancode different sets reference.
+
+[basicinputoutput.com](https://www.basicinputoutput.com/2024/11/the-keyboard-controller-interface.html)
+Me fui un poco por las ramas, pero linda tabla con comandos varios para mouse, led, teclado. Tiene otros posteos interesantes, dejo la referencia porque luego quiero darle una mirada a otros posteos.
+
+### Info en espera
+
+[i386-stub.c ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/gdb/html_node/gdb_125.html)
+Para driver debug en pc fisica.

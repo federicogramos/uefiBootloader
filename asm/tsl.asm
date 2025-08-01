@@ -6,62 +6,35 @@
 ;; el en 0x100000.
 ;;=============================================================================
 
+;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
+;; codigo, se salta a 0x800000.
+
+
+%include "./asm/include/sysvar.inc"
 %include "./asm/include/tsl.inc"
 
-BITS 64
 
-TSL_BASE_ADDRESS equ 0x800000
-ORG TSL_BASE_ADDRESS
+extern data_hi_end_addr
+extern code_data_hi_size
 
-start:
-	jmp bootmode	;; Will be overwritten with 'NOP's before AP's are started.
-	nop
-	db "UEFIBOOT"	;; Marca para un simple chequeo de que hay payload.
-	nop
-	nop
+global GDTR64
+global SYS64_CODE_SEL
+global IDTR64
+
+global start64
 
 
-BITS 16
+section .text
 
-ap_startup:
-	cli
-	xor eax, eax
-	xor ebx, ebx
-	xor ecx, ecx
-	xor edx, edx
-	xor esi, esi
-	xor edi, edi
-	xor ebp, ebp
-	mov ds, ax
-	mov es, ax
-	mov ss, ax
-	mov fs, ax
-	mov gs, ax
-	mov esp, 0x7000
-	jmp 0x0000:init_smp_ap
+TSL_BASE_ADDRESS equ 0x8000
 
-%include "./asm/init/smp_ap.asm"	;; AP's will start execution at TSL_BASE_ADD
-									;; RESS and fall through to this code.
 
-;;==============================================================================
-;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
-;; at 0x5FFF then we know it was a UEFI boot and immediately proceed to start64.
-;; Otherwise we need to set up a minimal 64-bit environment.
-
-BITS 32
-
-bootmode:
-	cmp bl, 'U'	;; If uefi boot then already in 64 bit mode.
-	je start64
-
-%ifdef BIOS
-%include "./asm/bios/bios_32_64.asm"
-%endif
-
-BITS 64
+;; AGREGAR ARCHIVOS DEBUG 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 start64:
-
 	mov rsp, TSL_BASE_ADDRESS
 
 	;; El cursor quedo en el anterior loader.
@@ -146,7 +119,7 @@ set_pit_initial_freq:
 	rep stosd
 
 	mov rcx, 81920	;; 320KiB for Page Descriptor Entries (0x10000 - 0x5FFFF)
-	mov rdi, 0x00010000
+	mov rdi, BASE_PD_L
 	rep stosd		
 
 	mov r9, msg_ready
@@ -157,7 +130,7 @@ set_pit_initial_freq:
 	;;bt rax, 5
 	;;lahf
 	;;mov al, ah
-	;;and rax, 0x0000000000000001
+	;;and rax, 0x00000001
 	;;mov rsi, rax
 	;;mov r9, fmt_pae
 	;;call print
@@ -174,7 +147,7 @@ pse:
 	bt rax, 3
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov rsi, rax
 	mov r9, fmt_pse
 	call print
@@ -186,7 +159,7 @@ pae:
 	bt rax, 6
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov rsi, rax
 	mov r9, fmt_pae
 	call print
@@ -198,7 +171,7 @@ pse36:
 	bt rax, 17
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov rsi, rax
 	mov r9, fmt_pse36
 	call print
@@ -230,7 +203,7 @@ pag_1gb:
 	bt rax, 26
 	lahf
 	mov al, ah
-	and rax, 0x0000000000000001
+	and rax, 0x00000001
 	mov [p_1gb_pages], al
 	mov rsi, rax
 	mov r9, msg_support_1g_pages
@@ -280,6 +253,9 @@ pag_1gb:
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00030000 |  32  | pd high   |sin        | sin | 2MiB |
 ;; 0x0004FFFF |      |           |inicializar| uso |	  |
+;; -----------+------+-----------+-----------+-----+------+---------------------
+;; 0x00050000 |  32  |
+;; 0x0005FFFF |      |
 ;; -----------+------+-----------+-----------+-----+------+---------------------
 ;; 0x00060000 |  64  |dis-----ponible |pd fb si   |     |	  |	     
 ;; 0x0009FFFF |      |con-----dicion  |*fb<16*2^30|     |	  |	     
@@ -524,10 +500,13 @@ exception_gates:
 	call print		;; TODO: modificar print para que no modifique registros.
 	pop rdi
 
-	mov rcx, 32
+	mov rcx, 0
+	mov rax, exception_gate_00
 
 .load:
-	mov rax, exception_gate
+	;;mov rax, exception_gate
+	;;lea rax, [rax + 16 * rcx]
+	add rax, exception_gate_offset
 	push rax				;; Save exception gate for later use.
 	stosw					;; A15..A0
 	mov ax, SYS64_CODE_SEL
@@ -541,8 +520,9 @@ exception_gates:
 	stosd					;; A63..A32
 	xor rax, rax
 	stosd					;; Reserved.
-	dec rcx
-	jnz .load
+	inc rcx
+	cmp rcx, 32
+	jne .load
 
 
 irq_gates:
@@ -572,28 +552,29 @@ irq_gates:
 	jnz .load
 
 	;; Set up the exception gates for all of the CPU exceptions.
-	mov word [0x00 * 16], exception_gate_00	;; #DE
-	mov word [0x01 * 16], exception_gate_01	;; #DB
-	mov word [0x02 * 16], exception_gate_02
-	mov word [0x03 * 16], exception_gate_03	;; #BP
-	mov word [0x04 * 16], exception_gate_04	;; #OF
-	mov word [0x05 * 16], exception_gate_05	;; #BR
-	mov word [0x06 * 16], exception_gate_06	;; #UD
-	mov word [0x07 * 16], exception_gate_07	;; #NM
-	mov word [0x08 * 16], exception_gate_08	;; #DF
-	mov word [0x09 * 16], exception_gate_09	;; #MF
-	mov word [0x0A * 16], exception_gate_10	;; #TS
-	mov word [0x0B * 16], exception_gate_11	;; #NP
-	mov word [0x0C * 16], exception_gate_12	;; #SS
-	mov word [0x0D * 16], exception_gate_13	;; #GP
-	mov word [0x0E * 16], exception_gate_14	;; #PF
-	mov word [0x0F * 16], exception_gate_15
-	mov word [0x10 * 16], exception_gate_16	;; #MF
-	mov word [0x11 * 16], exception_gate_17	;; #AC
-	mov word [0x12 * 16], exception_gate_18	;; #MC
-	mov word [0x13 * 16], exception_gate_19	;; #XM
-	mov word [0x14 * 16], exception_gate_20	;; #VE
-	mov word [0x15 * 16], exception_gate_21	;; #CP
+
+	;;mov word [0x00 * 16], exception_gate_00	;; #DE
+	;;mov word [0x01 * 16], exception_gate_01	;; #DB
+	;;mov word [0x02 * 16], exception_gate_02
+	;;mov word [0x03 * 16], exception_gate_03	;; #BP
+	;;mov word [0x04 * 16], exception_gate_04	;; #OF
+	;;mov word [0x05 * 16], exception_gate_05	;; #BR
+	;;mov word [0x06 * 16], exception_gate_06	;; #UD
+	;;mov word [0x07 * 16], exception_gate_07	;; #NM
+	;;mov word [0x08 * 16], exception_gate_08	;; #DF
+	;;mov word [0x09 * 16], exception_gate_09	;; #MF
+	;;mov word [0x0A * 16], exception_gate_10	;; #TS
+	;;mov word [0x0B * 16], exception_gate_11	;; #NP
+	;;mov word [0x0C * 16], exception_gate_12	;; #SS
+	;;mov word [0x0D * 16], exception_gate_13	;; #GP
+	;;mov word [0x0E * 16], exception_gate_14	;; #PF
+	;;mov word [0x0F * 16], exception_gate_15
+	;;mov word [0x10 * 16], exception_gate_16	;; #MF
+	;;mov word [0x11 * 16], exception_gate_17	;; #AC
+	;;mov word [0x12 * 16], exception_gate_18	;; #MC
+	;;mov word [0x13 * 16], exception_gate_19	;; #XM
+	;;mov word [0x14 * 16], exception_gate_20	;; #VE
+	;;mov word [0x15 * 16], exception_gate_21	;; #CP
 
 idt_reg:
 	mov r9, msg_idt_finishing
@@ -612,7 +593,8 @@ patch_ap_code:
 	mov r9, msg_patch
 	call print
 
-	mov rdi, start
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov rdi, start
+	mov rdi, TSL_BASE_ADDRESS
 	mov rax, 0x9090909090909090
 	stosq						;; Remove code between start and ap_startup, so
 								;; they can reach their starting code.
@@ -1060,11 +1042,18 @@ lfb_wc_end:
 
 
 	;; Kernel to its final location.
-	mov esi, TSL_BASE_ADDRESS + TSL_SIZE	;; Offset to end of tsl.sys
+	;;mov rsi, TSL_BASE_ADDRESS_HI + TSL_SIZE_HI	;; Offset to end of tsl.sys (res
+
+kernel_copy:
+	mov rsi, data_hi_end_addr	;; Offset to end of tsl.sys (res
+												;; t of hi part) and start of ke
+												;; rnel.
 	mov rdi, 0x100000							;; Kernel final destination.
-	;;mov rcx, ((32768 - TSL_SIZE) / 8)
-	mov rcx, (((232 * 1024) - TSL_SIZE) / 8)	;; 232KiB Kernel + Userland
-	rep movsq
+	mov rcx, 239 * 1024	;; 239KiB menos lo que ocupa cod + data = Kernel + Userland
+	sub rcx, code_data_hi_size	;; 239KiB menos lo que ocupa cod hi + data hi = Kernel + Userland
+												;; No puede dividir por 8 ahora porque debe esperar
+												;; a la linkedicion, por lo q copio byte a byte.
+	rep movsb
 
 %ifdef BIOS
 	cmp byte [p_BootDisk], 'F'	;; Check if sys is booted from floppy?
@@ -1094,7 +1083,8 @@ clear_regs:
 
 	call keyboard_get_key
 
-	jmp 0x00100000	;; Jump to kernel.
+	mov rax, 0x100000
+	jmp rax	;; Long jump to kernel.
 
 
 %include "./asm/init/acpi.asm"
@@ -1108,34 +1098,6 @@ clear_regs:
 %endif
 
 %include "./asm/interrupts.asm"
-%include "./asm/sysvar.asm"
-
-; -----------------------------------------------------------------------------
-%ifdef BIOS
-; -----------------------------------------------------------------------------
-; debug_progressbar
-; IN:	EBX = Index #
-; Note:	During a floppy load this function gets called 40 times
-debug_progressbar:
-	mov rdi, [0x00005F00]		; Frame buffer base
-	add rdi, rbx
-	; Offset to start of progress bar location
-	; 1024 - screen width
-	; 367 - Line # to display bar
-	; 32 - Offset to start of the progress blocks
-	; 512 - Middle of screen
-	; 4 - 32-bit pixels
-	add rdi, ((1024 * 387 - 32) + 512) * 4
-
-	; Draw the pixel
-	mov eax, 0x00FFFFFF		; White
-	stosd
-	add rdi, (1024 * 4) - 4
-	stosd
-
-	ret
-; -----------------------------------------------------------------------------
-%endif
 
 
 ;;==============================================================================
@@ -1536,9 +1498,131 @@ emptyKbBuffer:
 	ret
 
 
+section .data
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Some additional system vars.
+
+pd_fb_used:			db 0
+force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
+
+;;section .bss
+addr_bits_physical:	db 0
+addr_bits_logical:	db 0
+
+STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+
+;;==============================================================================
+;; System Variables
+;;==============================================================================
+
+cfg_smpinit:	db 1	; By default SMP is enabled. Set to 0 to disable.
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;section .data
+align 16
+
+tGDTR64:									;; Global Descriptors Table Register
+				dw gdt64_end - gdt64 - 1	;; Limit.
+				dq gdt64					;; linear address of GDT
+
+align 16
+GDTR64:										;; Global Descriptors Table Register
+				dw gdt64_end - gdt64 - 1	;; Limit.
+				dq 0x0000000000001000		;; linear address of GDT
+
+gdt64:									;; Struct copied to 0x0000000000001000
+SYS64_NULL_SEL:	equ $ - gdt64			;; Null Segment
+				dq 0x0000000000000000
+SYS64_CODE_SEL:	equ $ - gdt64			;; Code segment, read/execute, nonconfor
+										;; ming
+				dq 0x00209A0000000000	;; 53 Long mode code, 47 Present, 44 Cod
+										;; e/Data, 43 Executable, 41 Readable
+SYS64_DATA_SEL:	equ $ - gdt64			;; Data segment, read/write, expand down
+				dq 0x0000920000000000	;; 47 Present, 44 Code/Data, 41 Writable
+gdt64_end:
+
+IDTR64:									;; Interrupt Descriptor Table Register
+				dw 256 * 16 - 1			;; Limit = 4096 - 1
+				dq 0x0000000000000000	;; linear address of IDT
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Messages
+
+msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
+msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
+						db "[press 'n' to continue...]", 0x0A, 0
+msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
+msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
+msg_ready: 				db "ready", 0x0A, 0
+msg_entries:			db "entries... ", 0
+msg_gdt:				db "Setting up sys tables... GDT... ", 0
+msg_pml4:				db "PML4... ", 0
+msg_pdpt:				db "PDPT... ", 0
+msg_pd:					db "PD... ", 0
+
+msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
+msg_pages_will_be:		db " | Page size %s", 0
+msg_pages_size:			db "= 2MiB", 0x0A, 0
+						db "= 1GiB", 0x0A, 0
+
+msg_load_gdt:			db "Load gdt... ", 0
+msg_idt:				db "Setting up IDT... ", 0
+msg_idt_exceptions:		db "exceptions... ", 0
+msg_idt_irq_gates:		db "irq gates... ", 0
+msg_idt_finishing:		db "finishing... ", 0
+msg_exception_occurred:	db "An exception has occurred in the system.", 0x0A, 0
+msg_setting_memmap:		db "Setting up memmap...", 0
+msg_cr3_at_this_point:	db "CR3 at this point = 0x%h", 0x0A, 0
+msg_cr3_load:			db "Load CR3 a new value", 0x0A, 0
+msg_patch:				db "Patching code for AP... ", 0
+
+msg_mm_info:			db "Memory map consists of the following regions "
+						db "(number of 4KiB pages):", 0x0A, 0
+
+;; El orden importa. Es un arreglo.
+fmt_mm_info_array:
+fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
+fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
+fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
+fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
+fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
+fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
+fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
+fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
+fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
+fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
+fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
+fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
+
+msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
+mag_pae_already_set:		db "PAE enabled", 0x0A, 0
+
+msg_cpuid_info:				db "Processor features:", 0
+fmt_pse:					db " | PSE = %d", 0
+fmt_pae:					db " | PAE = %d", 0
+fmt_pse36:					db " | PSE-36 = %d", 0x0A, 0
+
+fmt_physical_addr			db "Physical address size [bits] = %d", 0
+fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
+
+msg_pdpt_fb_addr:			db "FB at %h ", 0
+msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
+
+msg_test:					db "String de prueba", 0x0A, 0
+msg_test_hex:				db "Value = 0x%h", 0x0A, 0
+msg_test_num:				db "Value = 0x%d", 0x0A, 0
+msg_test_below:				db "String de prueba: below", 0x0A, 0
+msg_test_above:				db "String de prueba: above", 0x0A, 0
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TODO: section data perteneciente a lib.asm, los cuales puedo no dupliacar, si
+;; no pasar de una zona a otra antes de abandonar efi (podria incluso no copiars
+;; sino solo referenciarse luego de abandonar efi.).
 
 hexConvert8:				db "0123456789ABCDEF"
 print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
@@ -1678,120 +1762,12 @@ font_data:
 	dd 0x00000000, 0x00000000, 0x0000324C, 0x00000000 ;; 0x7e asciitilde
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x7f uni007F
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; estos son agregados por poder imprimir aqui adentro
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
-msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
-						db "[press 'n' to continue...]", 0x0A, 0
-msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
-msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
-msg_ready: 				db "ready", 0x0A, 0
-msg_entries:			db "entries... ", 0
-msg_gdt:				db "Setting up sys tables... GDT... ", 0
-msg_pml4:				db "PML4... ", 0
-msg_pdpt:				db "PDPT... ", 0
-msg_pd:					db "PD... ", 0
-
-msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
-msg_pages_will_be:		db " | Page size %s", 0
-msg_pages_size:			db "= 2MiB", 0x0A, 0
-						db "= 1GiB", 0x0A, 0
-
-msg_load_gdt:				db "Load gdt... ", 0
-msg_idt:					db "Setting up IDT... ", 0
-msg_idt_exceptions:			db "exceptions... ", 0
-msg_idt_irq_gates:				db "irq gates... ", 0
-msg_idt_finishing:				db "finishing... ", 0
-msg_exception_occurred: db "An exception has occurred in the system.", 0x0A, 0
-msg_setting_memmap:			db "Setting up memmap...", 0
-msg_cr3_at_this_point:		db "CR3 at this point = 0x%h", 0x0A, 0
-msg_cr3_load:				db "Load CR3 a new value", 0x0A, 0
-msg_patch:					db "Patching code for AP... ", 0
-
-msg_mm_info:				db "Memory map consists of the following regions (number of 4KiB pages):"
-							db 0x0A, 0
-
-;; El orden importa. Es un arreglo.
-fmt_mm_info_array:
-fmt_mm_info_efi_res:		db "EFI Reserved Memory       = %d", 0x0A, 0
-fmt_mm_info_efi_lc:			db "EFI Loader Code           = %d", 0x0A, 0
-fmt_mm_info_efi_ld:			db "EFI Loader Data           = %d", 0x0A, 0
-fmt_mm_info_efi_bsc:		db "EFI Boot Services Code    = %d", 0x0A, 0
-fmt_mm_info_efi_bsd:		db "EFI Boot Services Data    = %d", 0x0A, 0
-fmt_mm_info_efi_rtsc:		db "EFI Runtime Services Code = %d", 0x0A, 0
-fmt_mm_info_efi_rtsd:		db "EFI Runtime Services Data = %d", 0x0A, 0
-fmt_mm_info_efi_conv:		db "EFI Conventional Memory   = %d", 0x0A, 0
-fmt_mm_info_efi_unuse:		db "EFI Unusable Memory       = %d", 0x0A, 0
-fmt_mm_info_efi_acpi_rec:	db "EFI ACPI Reclaim Memory   = %d", 0x0A, 0
-fmt_mm_info_efi_acpi_nvs:	db "EFI ACPI Memory NVS       = %d", 0x0A, 0
-fmt_mm_info_efi_mmio:		db "EFI Memory Mapped IO      = %d", 0x0A, 0
-fmt_mm_info_efi_mmio_ports:	db "EFI MM IO Port Space      = %d", 0x0A, 0
-fmt_mm_info_efi_pal_code:	db "EFI Pal Code              = %d", 0x0A, 0
-fmt_mm_info_siz				equ $ - fmt_mm_info_efi_pal_code
-
-msg_pae_off_will_set:		db "PAE off. Enabling... ", 0
-mag_pae_already_set:		db "PAE enabled", 0x0A, 0
-
-msg_cpuid_info:		db "Processor features:", 0
-fmt_pse:		db " | PSE = %d", 0
-fmt_pae:		db " | PAE = %d", 0
-fmt_pse36:		db " | PSE-36 = %d", 0x0A, 0
-
-fmt_physical_addr			db "Physical address size [bits] = %d", 0
-fmt_logical_addr			db " | Logical address size [bits] = %d", 0x0A, 0
-
-msg_pdpt_fb_addr:			db "FB at %h ", 0
-msg_pdpt_add_fb_entry:		db "needs PDPT entry = 0x%h", 0x0A, 0
-
-msg_test:				db "String de prueba", 0x0A, 0
-msg_test_hex:			db "Value = 0x%h", 0x0A, 0
-msg_test_num:			db "Value = 0x%d", 0x0A, 0
-msg_test_below:				db "String de prueba: below", 0x0A, 0
-msg_test_above:				db "String de prueba: above", 0x0A, 0
-
-
-;; Some additional system vars.
-
-;; section .data
-pd_fb_used:			db 0
-force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
-
-;;section .bss
-addr_bits_physical:	db 0
-addr_bits_logical:	db 0
-
-
-TSL_SIZE equ 0x3000	;; 12KiB
-
-BASE_IDT	equ 0x00000000
-BASE_GDT	equ 0x00001000
-BASE_PML4	equ 0x00002000
-BASE_PDPT_L	equ 0x00003000
-BASE_PDPT_H	equ 0x00004000
-BASE_PD_FB	equ 0x0000F000
-BASE_PD_L	equ 0x00010000	;; Solo si pag 2MiB.
-BASE_PD_H	equ 0x00030000	;; Solo si pag 2MiB.
-
-PHYSICAL_ADDR_MAX_INITIALIZED equ 0x7FFFFFFFF	;; Por defecto se inicializan 32
-												;; GiB cuando page size = 2MiB.
-
-
-EOF:
-	db 0xDE, 0xAD, 0xC0, 0xDE
 
 ;; Pad to an even KB file
-times TSL_SIZE - ($ - $$) db 0x90
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;times TSL_SIZE - ($ - $$) db 0x90
 
 
-; =============================================================================
-; EOF

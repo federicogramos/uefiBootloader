@@ -2,36 +2,54 @@ ASM = nasm
 LD = ld
 
 ifndef FORCE_STEP_MODE
-FORCE_STEP_MODE = 0	# Step mode (prompteo durante boot) por defecto deshabilita\
-					# do salvo que sea forzado en la invocacion del makefile.
+FORCE_STEP_MODE = 0 # Step mode (prompteo durante boot) por defecto deshabilita\
+                    # do salvo que sea forzado en la invocacion del makefile.
 endif
 
+BUILD_DIR = ./build
+IMG_DIR = ./img
+OUT_DIR = ./out
+OBJ_DIR = ./obj
+ASM_DIR = ./asm
+LIB_DIR = ./asm/lib
+ELF_DIR = ./elf
+
 UEFI_SRC = uefi.asm
-UEFI_OBJ = $(UEFI_SRC:.asm=.o)
-UEFI_SYS = $(UEFI_SRC:.asm=.sys)
+UEFI_OBJ = $(OBJ_DIR)/$(UEFI_SRC:.asm=.o)
+UEFI_ELF = $(ELF_DIR)/$(UEFI_SRC:.asm=.elf)
+UEFI_SYS = $(BUILD_DIR)/$(UEFI_SRC:.asm=.sys)
 
-TSL_SYS = tsl.sys
+TSL_SRCS_LO = tsl_ap.asm tsl_start.asm
+TSL_SRCS_HI = tsl.asm
+TSL_OBJS_LO = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_LO))
+TSL_OBJS_HI = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_HI))
+TSL_ELF_LO = $(ELF_DIR)/tsl_lo.elf
+TSL_ELF_HI = $(ELF_DIR)/tsl_hi.elf
+TSL_SYS = $(BUILD_DIR)/tsl.sys
 
-all: uefi.sys tsl.sys
 
+all: $(UEFI_SYS) $(TSL_SYS)
 
-$(UEFI_SYS): build
-	$(ASM) -g -F DWARF -f elf64 ./asm/lib/lib.asm -o ./obj/lib.o
-	$(ASM) -g -F DWARF -f elf64 ./asm/lib/lib_efi.asm -o ./obj/lib_efi.o
-	$(ASM) -D STEP_MODE_INIT_VAL=$(FORCE_STEP_MODE) -g -F DWARF -f elf64 ./asm/uefi.asm -o ./obj/uefi.o
-#	$(LD) -T uefi.ld -o ./build/$(UEFI_SYS) ./obj/uefi.o
-#	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o ./obj/uefi.elf ./obj/uefi.o
-	$(LD) -T uefi.ld -o ./build/$(UEFI_SYS) ./obj/uefi.o ./obj/lib.o ./obj/lib_efi.o
-	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o ./obj/uefi.elf ./obj/uefi.o ./obj/lib.o ./obj/lib_efi.o
+$(OBJ_DIR)/%.o: $(ASM_DIR)/%.asm
+	$(ASM) -g -F DWARF -f elf64 $< -o $@
 
-$(TSL_SYS): $(UEFI_SYS)
-	$(ASM) ./asm/tsl.asm -o ./build/$(TSL_SYS)
+$(OBJ_DIR)/%.o: $(LIB_DIR)/%.asm
+	$(ASM) -g -F DWARF -f elf64 $< -o $@
 
+$(UEFI_SYS): build ./obj/lib.o ./obj/efi.o
+	$(ASM) -D STEP_MODE_INIT_VAL=$(FORCE_STEP_MODE) -g -F DWARF -f elf64 $(ASM_DIR)/uefi.asm -o $(UEFI_OBJ)
+	$(LD) -T uefi.ld -o $@ $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
+	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o $(OBJ_DIR)/uefi.elf $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
+
+$(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
+	$(LD) -T tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI)
+	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI)
+	$(LD) --oformat=elf64-x86-64 -T tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI)
 
 build:
-	mkdir build img out obj
-		
-clean:
-	rm -rf build img out obj
+	mkdir -p $(BUILD_DIR) $(IMG_DIR) $(OUT_DIR) $(OBJ_DIR) $(ELF_DIR) 
 
-.PHONY: all clean
+clean:
+	rm -rf $(BUILD_DIR) $(IMG_DIR) $(OUT_DIR) $(OBJ_DIR) $(ELF_DIR)
+
+.PHONY: all clean build

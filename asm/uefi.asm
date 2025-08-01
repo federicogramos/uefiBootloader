@@ -16,13 +16,16 @@
 ;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
 ;;  |         |        |       | transient  | packed     | 0x00 hasta |
 ;;  | Encabez | Codigo | Datos | system     | Kernel.bin | el fin     |
-;;  +---------+--------+-------+------------+------------+------------+
-;;  |^        |^       |^      |^           |^           |^          ^|
-;; 0x0      0x200   0x1000   0x4000      0x7000      0x40000      0xFFFFF
-;; 0        512B    4KiB     16KiB       28KiB       256KiB       1MiB-1
+;;  |         |        |       | low |  hi  |            |            |
+;;  +---------+--------+-------+-----+------+------------+------------+
+;;  |^        |^       |^      |^    |^     |^           |^          ^|
+;; 0x0    0x200   0x1000   0x4000  0x4400  0x7000     0x40000      0xFFFFF
+;; 0      512B    4KiB     16KiB   17KiB   28KiB      256KiB       1MiB-1
 ;;==============================================================================
 
-TSL_BASE_ADDRESS equ 0x800000
+TSL_BASE_ADDRESS		equ 0x800000
+TSL_BASE_ADDRESS_LOW	equ 0x8000
+
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
 
@@ -55,7 +58,7 @@ extern keyboard_command
 extern keyboard_get_key
 extern emptyKbBuffer
 
-;; lib_efi.asm
+;; efi.asm
 extern efi_print
 extern ventana_modo_step
 extern efi_prompt_step_mode
@@ -752,19 +755,31 @@ exit_uefi_services:
 	cli							;; Ya afuera.
 
 	;; Payload al destino. Maximo tamano 240KiB y por eso cuando armamos imagen 
-	;; se deberia revisar que no sea mayor. Un posible payload es:
-	;;  +--------------------+-----------------------------+
-	;;  |    tsl.sys    | kernel.bin + modulosUserland.bin |
-	;;  +--------------------+-----------------------------+
-	;;  |<--- 12KiB --->|<------------ 228KiB ------------>|
-	;;  |^              |^                                 |^
-	;; 0x800000     0x803000                           0x83C000         
-	mov rsi, PAYLOAD
-	mov rdi, TSL_BASE_ADDRESS
-	mov rcx, (240 * 1024)	;; 240KiB a partir de TSL_BASE_ADDRESS.
-	rep movsb				;; Ultimo byte escrito = TSL_BASE_ADDRESS + (240 * 1
-							;; 024) - 1 = 0x83BFFF
+	;; se deberia revisar que no sea mayor. Posible payload (previo copia):
+	;;  +-----------------------------------+--------------------+
+	;;  |              tsl.sys              |  packedKernel.bin  |
+	;;  | code | data | 00..0 | code | data | kernel | mods user |
+	;;  | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
+	;;  +-----------------------------------+--------------------+
+	;;  |<---240KiB -------------------------------------------->|
+	;;  |<-- 0x300 -->|       |<----------- 239KiB ------------->|
+	;;  |<-- 0x400 ---------->|                                  |
+	;;  |^                    |^                                 |^
+	;; 0x404000            0x404400                           0x440000
+	;; PAYLOAD
 
+	;; Low primeros 0x300 bytes de los 240 del payload.
+	mov rsi, PAYLOAD
+	mov rdi, TSL_BASE_ADDRESS_LOW
+	mov rcx, 0x300	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
+	rep movsb
+
+	;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
+	mov rsi, PAYLOAD + 0x400
+	mov rdi, TSL_BASE_ADDRESS
+	mov rcx, (239 * 1024)	;; 239KiB.
+	rep movsb
+	
 	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
 	;; qword [0x00005F00] = Frame buffer base
 	;; qword [0x00005F08] = Frame buffer size (bytes)
@@ -811,9 +826,6 @@ exit_uefi_services:
 	 xor rax, rax
 	 rep stosb
 
-	;;mov rax, 0x00000000000101F0
-	;;call keyboard_command
-
 	mov r9, msg_boot_services_exit_ok
 	call print
 
@@ -851,7 +863,7 @@ exit_uefi_services:
 	mov bl, 'U'
 
 to_transient_system:
-	mov rax, TSL_BASE_ADDRESS
+	mov rax, TSL_BASE_ADDRESS_LOW
 	jmp rax
 
 
@@ -907,6 +919,7 @@ halt:
 ;;==============================================================================
 
 section .data
+
 EFI_IMAGE_HANDLE:	    dq 0	;; rcx at entry point.
 EFI_SYSTEM_TABLE:	    dq 0	;; rdx at entry point.
 EFI_IMG_RET_ADDR:	    dq 0
@@ -925,16 +938,21 @@ HR:					    dq 0	;; Horizontal Resolution
 VR:					    dq 0	;; Vertical Resolution
 PPSL:				    dq 0	;; PixelsPerScanLine
 BPP:					dq 0	;; BitsPerPixel
-memmap:				dq 0x220000	;; Address donde quedara el mapa de memoria.
-memmapsize:			dq 32768	;; Tamano max del  buffer para memmap [bytes].
-memmapkey:			dq 0
-memmapdescsize:		dq 0
-memmapdescver:		dq 0
-vid_orig:			dq 0
-vid_index:			dq 0
-vid_max:			dq 0
-vid_size:			dq 0
-vid_info:			dq 0
+memmap:					dq 0x220000	;; Address donde quedara el mapa de memoria.
+memmapsize:				dq 32768	;; Tamano max de buffer para memmap [bytes].
+memmapkey:				dq 0
+memmapdescsize:			dq 0
+memmapdescver:			dq 0
+vid_orig:				dq 0
+vid_index:				dq 0
+vid_max:				dq 0
+vid_size:				dq 0
+vid_info:				dq 0
+
+;; Me interesa referenciarlo desde tsl.asm
+STEP_MODE_FLAG	db STEP_MODE_INIT_VAL	;; Lo activa presionar 's' al booteo. El
+										;; valor inicial es asignado durante la 
+										;; compilacion.
 
 ;; Para localizar el device path del text input.
 EFI_DEVICE_PATH_PROTOCOL_GUID:
@@ -959,10 +977,6 @@ EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID:
 ;; CHAR16	UnicodeChar;
 ;; } EFI_INPUT_KEY;
 EFI_INPUT_KEY	dw 0, 0
-
-STEP_MODE_FLAG	db STEP_MODE_INIT_VAL	;; Lo activa presionar 's' al booteo. El
-										;; valor inicial es asignado durante la 
-										;; compilacion.
 
 ;; Lo que pide al GOP por defecto si no encuentra EDID. Para qemu, cambiar esto 
 ;; va a cambiar la resolucion de la pantalla.
@@ -993,8 +1007,8 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID:
 	db 0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a
 
 
-msg_placeholder dw 0,0,0,0,0,0,0,0	;; Reserve 8 words for the buffer.
-msg_placeholder_len equ ($ - msg_placeholder)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;msg_placeholder dw 0,0,0,0,0,0,0,0	;; Reserve 8 words for the buffer.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;msg_placeholder_len equ ($ - msg_placeholder)
 
 print_pending_msg:	dq 0, 0	;; Espacio para los 2 argumentos de funcion print. U
 							;; til para establecer un mensaje distinto segun con

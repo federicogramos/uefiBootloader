@@ -400,18 +400,18 @@ emptyKbBuffer:
 
 section .data
 
-hexConvert8:				db "0123456789ABCDEF"
-print_cursor dq 0 ;; El cursor es tan solo puntero a framebuffer.
+hexConvert8:	db "0123456789ABCDEF"
+print_cursor	dq 0 ;; El cursor es tan solo puntero a framebuffer.
 
 ;; Hay otro con el mismo nombre en uefi.asm pero ese pertenece a efi_print.
 volatile_placeholder:
-times	64 dw 0x0000
+times			64 dw 0x0000
 
 ;;TODO: cuando genere la fuente, le recorte la linea inferior... o sea, por ejem
 ;; plo la letra g miniscula, tiene un chiquito recortada la curvatura inferior.
 ;; Regenerar la fuente.
 
-font_height	equ 16
+font_height		equ 16
 font_data:
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x00 uni0000
 	dd 0x00000000, 0x00000000, 0x00000000, 0x00000000 ;; 0x01 uni0001
