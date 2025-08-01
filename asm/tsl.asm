@@ -50,6 +50,7 @@ TSL_BASE_ADDRESS equ 0x8000
 
 
 start64:
+;;;;;;;;;;;;;;;;;;;;;;;;;; encontrar la dir del flag ;;;;;;;;;;;;;;;;mov al, [STEP_MODE_FLAG]
 	mov rsp, TSL_BASE_ADDRESS
 
 	;; El cursor quedo en el anterior loader.
@@ -1121,6 +1122,8 @@ section .data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some additional system vars.
 
+STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
+
 pd_fb_used:			db 0
 force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
 
@@ -1128,7 +1131,6 @@ force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
 addr_bits_physical:	db 0
 addr_bits_logical:	db 0
 
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
 
 ;;==============================================================================
 ;; System Variables

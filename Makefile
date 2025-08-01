@@ -19,7 +19,7 @@ UEFI_OBJ = $(OBJ_DIR)/$(UEFI_SRC:.asm=.o)
 UEFI_ELF = $(ELF_DIR)/$(UEFI_SRC:.asm=.elf)
 UEFI_SYS = $(BUILD_DIR)/$(UEFI_SRC:.asm=.sys)
 
-TSL_SRCS_LO = tsl_ap.asm tsl_start.asm
+TSL_SRCS_LO = tsl_start.asm tsl_ap.asm
 TSL_SRCS_HI = tsl.asm
 TSL_OBJS_LO = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_LO))
 TSL_OBJS_HI = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_HI))

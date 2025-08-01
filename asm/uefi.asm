@@ -305,6 +305,11 @@ entryPoint:
 ;; Ventana en la que se puede activar modo step presionando 's'.
 call ventana_modo_step
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;xxx:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;mov al, [STEP_MODE_FLAG]
+;;;;;;;;;;;;;;;;; encontrar la dir ;;;;;;;;;;;;;;;;;;;;;mov [PAYLOAD + 2 * 1024], al
+
+
 ;; Buscar info ACPI.
 acpi_get:
 	mov rax, [EFI_SYSTEM_TABLE]
