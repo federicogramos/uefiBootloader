@@ -3,7 +3,7 @@
 ;;=============================================================================
 ;; Recibe la informacion del sistema. Hace configuraciones basicas del mismo. Co
 ;; pia el kernel a su ubicacion final. Salta al punto de entrada _start del kern
-;; el en 0x100000.
+;; el en KERNEL_LOAD_ADDR.
 ;;=============================================================================
 
 ;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
@@ -48,11 +48,6 @@ section .text
 
 TSL_BASE_ADDRESS equ 0x8000
 
-
-;; AGREGAR ARCHIVOS DEBUG 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 start64:
 	mov rsp, TSL_BASE_ADDRESS
@@ -1061,15 +1056,11 @@ lfb_wc_end:
 	wbinvd				; Flush Cache
 
 
-	;; Kernel to its final location.
-	;;mov rsi, TSL_BASE_ADDRESS_HI + TSL_SIZE_HI	;; Offset to end of tsl.sys (res
-
 kernel_copy:
-	mov rsi, data_hi_end_addr	;; Offset to end of tsl.sys (res
-												;; t of hi part) and start of ke
-												;; rnel.
-	mov rdi, 0x100000							;; Kernel final destination.
-	mov rcx, 239 * 1024	;; 239KiB menos lo que ocupa cod + data = Kernel + Userland
+	mov rsi, data_hi_end_addr	;; Offset to end of tsl.sys (rest of hi part) an
+								;; d start of kernel.
+	mov rdi, KERNEL_LOAD_ADDR	;; Kernel final destination.
+	mov rcx, 239 * 1024			;; 239KiB menos lo que ocupa cod + data = Kernel + Userland
 	sub rcx, code_data_hi_size	;; 239KiB menos lo que ocupa cod hi + data hi = Kernel + Userland
 												;; No puede dividir por 8 ahora porque debe esperar
 												;; a la linkedicion, por lo q copio byte a byte.
@@ -1103,7 +1094,7 @@ clear_regs:
 
 	call keyboard_get_key
 
-	mov rax, 0x100000
+	mov rax, KERNEL_LOAD_ADDR
 	jmp rax	;; Long jump to kernel.
 
 
@@ -1244,6 +1235,10 @@ msg_test_num:				db "Value = 0x%d", 0x0A, 0
 msg_test_below:				db "String de prueba: below", 0x0A, 0
 msg_test_above:				db "String de prueba: above", 0x0A, 0
 
+
+
+;; Algunos equ para luego pasar a archivo separado quiza.
+KERNEL_LOAD_ADDR	equ 0x100000
 
 
 
