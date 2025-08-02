@@ -2,13 +2,13 @@
 
 ## Uso
 
-*Genera la imagen /img/x64_arq.img (entre otras).*
+**Genera la imagen /img/x64_arq.img (entre otras).**
 ```bash
 ./build.sh
 
 
-*Corre en qemu la imagen /img/x64_arq.qcow2*
-'''bash
+**Corre en qemu la imagen /img/x64_arq.qcow2**
+```bash
 ./run.sh
 
 
