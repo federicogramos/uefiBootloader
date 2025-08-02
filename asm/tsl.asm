@@ -847,8 +847,8 @@ uefi_round:
 	stosq
 	stosq
 
-	mov r9, msg_ready
-	call print
+	;;mov r9, msg_ready
+	;;call print
 
 
 ;; Create the High Page-Directory-Pointer-Table Entries (PDPTE). High PDPTE is s

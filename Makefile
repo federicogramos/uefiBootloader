@@ -1,6 +1,10 @@
 ASM = nasm
 LD = ld
 
+# El unico argumento que recibe build.sh es -d o --debug que fuerza a que el boo
+# teo sea con el "modo step" el cual promptea para avanzar y permite leer los me
+# nsajes de inicializacion. Si se arma sin flag, entonces el modo step aun se pu
+# ede usar, y acciona presionando tecla 's' durante el arranque. 
 ifndef FORCE_STEP_MODE
 FORCE_STEP_MODE = 0 # Step mode (prompteo durante boot) por defecto deshabilita\
                     # do salvo que sea forzado en la invocacion del makefile.
