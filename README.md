@@ -3,7 +3,7 @@
 ## Uso
 
 *Genera la imagen /img/x64_arq.img (entre otras).*
-'''bash
+```bash
 ./build.sh
 
 
