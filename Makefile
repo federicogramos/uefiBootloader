@@ -17,6 +17,7 @@ OBJ_DIR = ./obj
 ASM_DIR = ./asm
 LIB_DIR = ./asm/lib
 ELF_DIR = ./elf
+LD_DIR = ./ldScript
 
 UEFI_SRC = uefi.asm
 UEFI_OBJ = $(OBJ_DIR)/$(UEFI_SRC:.asm=.o)
@@ -42,13 +43,13 @@ $(OBJ_DIR)/%.o: $(LIB_DIR)/%.asm
 
 $(UEFI_SYS): build ./obj/lib.o ./obj/efi.o
 	$(ASM) -D STEP_MODE_INIT_VAL=$(FORCE_STEP_MODE) -g -F DWARF -f elf64 -o $(UEFI_OBJ) $(ASM_DIR)/uefi.asm
-	$(LD) -T uefi.ld -o $@ $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
-	$(LD) --oformat=elf64-x86-64 -T uefi.ld -o $(UEFI_ELF) $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
+	$(LD) -T $(LD_DIR)/uefi.ld -o $@ $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
+	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/uefi.ld -o $(UEFI_ELF) $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
 
 $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
-	$(LD) -T tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
-	$(LD) --oformat=elf64-x86-64 -T tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
-	$(LD) --oformat=elf64-x86-64 -T tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
+	$(LD) -T $(LD_DIR)/tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
+	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
+	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 
 build:
 	mkdir -p $(BUILD_DIR) $(IMG_DIR) $(OUT_DIR) $(OBJ_DIR) $(ELF_DIR) 
