@@ -1,19 +1,25 @@
 OUTPUT_FORMAT("binary")
 SECTIONS
 {
-	text_hi_start_addr = 0x800000;
+	code_hi_start_reloc = 0x800000;
+
+
 	.text 0x800000 : AT (0x800000) {
 		*(.text)
 	}
 	text_size = SIZEOF (.text);
 
-	. = ALIGN(0x1000);
-	data_hi_start = .;
-	.data : {
+
+	. = ALIGN(0x1000); /* 0x
+	data_hi_start_reloc_aligned = . ;
+	data_hi_start_load = 0x8000;
+	.data data_hi_start_reloc_aligned : AT (data_hi_start_load) {
 		*(.data)
 	}
-	data_hi_end_addr = . ;
-	code_data_hi_size = data_hi_end_addr - text_hi_start_addr;
+	/* data_size = SIZEOF (.data); */
+	/* data_hi_end_addr = data_hi_start_addr + data_size;*/
+	data_hi_end_reloc = . ;
+	code_data_hi_size = data_hi_end_reloc - code_hi_start_reloc;
 
 	. = ALIGN(0x1000);
 	.bss : {
