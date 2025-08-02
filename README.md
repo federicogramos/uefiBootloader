@@ -1,11 +1,13 @@
 # Bootloader UEFI para procesadores Intel x86-64
 
 ## Uso
+
 ./build.sh
 Genera la imagen /img/x64_arq.img (entre otras).
 
 ./run.sh
 Corre en qemu la imagen /img/x64_arq.qcow2
+
 ## Referencias y documentacion
 
 ### Codigo
