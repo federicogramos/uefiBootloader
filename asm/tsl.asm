@@ -34,7 +34,7 @@ extern keyboard_get_key
 extern emptyKbBuffer
 
 ;; linker
-extern data_hi_end_addr
+extern data_hi_end_reloc
 extern code_data_hi_size
 
 global GDTR64
@@ -50,7 +50,7 @@ TSL_BASE_ADDRESS equ 0x8000
 
 
 start64:
-;;;;;;;;;;;;;;;;;;;;;;;;;; encontrar la dir del flag ;;;;;;;;;;;;;;;;mov al, [STEP_MODE_FLAG]
+mov al, [STEP_MODE_FLAG]
 	mov rsp, TSL_BASE_ADDRESS
 
 	;; El cursor quedo en el anterior loader.
@@ -1058,7 +1058,7 @@ lfb_wc_end:
 
 
 kernel_copy:
-	mov rsi, data_hi_end_addr	;; Offset to end of tsl.sys (rest of hi part) an
+	mov rsi, data_hi_end_reloc	;; Offset to end of tsl.sys (rest of hi part) an
 								;; d start of kernel.
 	mov rdi, KERNEL_LOAD_ADDR	;; Kernel final destination.
 	mov rcx, 239 * 1024			;; 239KiB menos lo que ocupa cod + data = Kernel + Userland
@@ -1122,8 +1122,10 @@ section .data
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some additional system vars.
 
-STEP_MODE_FLAG		db 1	;; Lo activa presionar 's' al booteo.
-
+STEP_MODE_FLAG:		db 1	;; Lo activa presionar 's' al booteo. Este byte es f
+							;; orwardeado desde uefi.asm hacia aqui porque se ut
+							;; iliza en ambos lugares y la inicializacion se hac
+							;; e una unica vez desde tsl.ld.
 pd_fb_used:			db 0
 force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
 

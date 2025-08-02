@@ -305,9 +305,10 @@ entryPoint:
 ;; Ventana en la que se puede activar modo step presionando 's'.
 call ventana_modo_step
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;xxx:
-;;;;;;;;;;;;;;;;;;;;;;;;;;;mov al, [STEP_MODE_FLAG]
-;;;;;;;;;;;;;;;;; encontrar la dir ;;;;;;;;;;;;;;;;;;;;;mov [PAYLOAD + 2 * 1024], al
+;; Copio a la section data de la payload el flag cuyo valor es seteado en linked
+;; icion para que este disponible cuando se pase a tsl.sys
+mov al, [STEP_MODE_FLAG]
+mov [DATA_HI_START_LOAD], al
 
 
 ;; Buscar info ACPI.
@@ -766,7 +767,8 @@ exit_uefi_services:
 	;;  | code | data | 00..0 | code | data | kernel | mods user |
 	;;  | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
 	;;  +-----------------------------------+--------------------+
-	;;  |<---240KiB -------------------------------------------->|
+	;;  |<-- 0x2400 ---------------->|
+	;;  |<-- 240KiB -------------------------------------------->|
 	;;  |<-- 0x300 -->|       |<----------- 239KiB ------------->|
 	;;  |<-- 0x400 ---------->|                                  |
 	;;  |^                    |^                                 |^

@@ -21,10 +21,6 @@
 
 %include "./asm/include/tsl.inc"
 
-
-section .text
-
-
 ;; tsl_ap.asm
 extern bootmode_branch
 
