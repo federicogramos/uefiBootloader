@@ -171,7 +171,7 @@ gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/elf/uefi.elf 0x400200
 #gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/obj/tsl_lo.elf 0x8000')
 
 gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/elf/tsl_hi.elf 0x800000')
-gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/sys/kernel.elf 0x100000')
+gdb.execute(f'add-symbol-file /home/fgr/arq/uefiBootloader/extern/kernel.elf 0x100000')
 
 #gdb.execute(f'add-symbol-file Userland/0000-sampleCodeModule.elf 0x400000')
 

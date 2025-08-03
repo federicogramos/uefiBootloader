@@ -59,7 +59,7 @@ function build_all {
 
 	init_imgs $BMFS_SIZE
 
-	cat ./build/tsl.sys ./sys/kernel.bin > ./out/payload.sys
+	cat ./build/tsl.sys ./extern/kernel.bin > ./out/payload.sys
 	payload_size=$(wc -c <./out/payload.sys)
 	if [ $payload_size -gt 32768 ]; then
 		echo "Warning - payload binary is larger than 32768 bytes!"
@@ -71,7 +71,7 @@ function build_all {
 	dd if=./out/payload.sys of=./out/BOOTX64.EFI bs=16384 seek=1 conv=notrunc > /dev/null 2>&1
 
 	echo -n "Formatting BMFS disk... "
-	./sys/bmfs ./img/bmfs.img format
+	./extern/bmfs ./img/bmfs.img format
 	echo "OK"
 
 	img_install

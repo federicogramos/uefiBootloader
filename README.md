@@ -6,7 +6,7 @@
 
 `./run.sh` *corre en qemu la imagen /img/x64_arq.qcow2*
 
-El repositorio tiene en /sys/kernel.bin un payload de SO para probar rapidamente, el cual usa cuando se hace el armado.
+El repositorio tiene en /extern/kernel.bin un payload de SO para probar rapidamente, el cual usa cuando se hace el armado.
 ## Referencias y documentacion
 
 ### Codigo
