@@ -2,10 +2,9 @@
 ;; Definitions for Transient System Load | @file /include/tsl.inc
 ;;=============================================================================
 
-;; TODO: esto sacarlo o definirlo en tsl.ld
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;TSL_SIZE equ 0x3000	;; 12KiB
-TSL_SIZE_HI:			equ 1
-TSL_BASE_ADDRESS_HI:	equ 0x800000
+TSL_SIZE_HI					equ 1
+TSL_BASE_ADDRESS_HI			equ 0x800000
+KERNEL_LOAD_ADDR			equ 0x100000
 
 
 ;; EFI_MEMORY_TYPE

@@ -492,7 +492,7 @@ cr3_load:
 	xor r14, r14
 	xor r15, r15
 
-	mov ax, 0x10	;; TODO Is this needed?
+	mov ax, 0x10	;; TODO: is this needed?
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
@@ -1124,14 +1124,12 @@ clear_regs:
 %include "./asm/interrupts.asm"
 
 
-
-
-
+;;==============================================================================
+;; System Variables | @file /asm/sysvar.asm
+;;==============================================================================
 
 section .data
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some additional system vars.
 
 STEP_MODE_FLAG:		db 1	;; Lo activa presionar 's' al booteo. Este byte es f
@@ -1252,15 +1250,5 @@ msg_test_num:				db "Value = 0x%d", 0x0A, 0
 msg_test_below:				db "String de prueba: below", 0x0A, 0
 msg_test_above:				db "String de prueba: above", 0x0A, 0
 
-
-
-;; Algunos equ para luego pasar a archivo separado quiza.
-KERNEL_LOAD_ADDR	equ 0x100000
-
-
-
-
-;; Pad to an even KB file
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;times TSL_SIZE - ($ - $$) db 0x90
 
 

@@ -1,5 +1,5 @@
 ;;==============================================================================
-;; AP startup | @file /asm/tsl_ap.asm
+;; ap startup | @file /asm/tsl_ap.asm
 ;;=============================================================================
 ;; AP's will start execution at TSL_BASE_ADDRESS and fall through to this code.
 ;; 1KiB reservado en 0x8000 para booteo en 16 bits de los ap. Terminado ese codi
@@ -12,9 +12,24 @@
 
 global bootmode_branch
 
+;; sysvar.asm
+extern GDTR64
+extern SYS64_CODE_SEL
+extern IDTR64
+
+;; cpu.asm
+extern init_cpu
+
+;; tsl.asm
+extern start64
+
 
 section .text
 
+
+;;=============================================================================
+;;
+;;=============================================================================
 
 BITS 16
 
@@ -35,63 +50,54 @@ ap_startup:
 	mov esp, 0x7000
 
 
-; =============================================================================
-; INIT SMP AP
-; =============================================================================
-
-;; sysvar.asm
-;;extern GDTR32
-extern GDTR64
-extern SYS64_CODE_SEL
-extern IDTR64
-
-;; cpu.asm
-extern init_cpu
-;; tsl.asm
-extern start64
+;;==============================================================================
+;; INIT SMP AP
+;;==============================================================================
 
 BITS 16
 
 init_smp_ap:
-
-	; Check boot method of BSP
+	;; Check boot method of BSP.
 	cmp byte [p_BootMode], 'U'
-	je skip_a20_ap			; If UEFI, then skip A20 code
+	je skip_a20_ap				;; If UEFI, then skip A20 code.
 
-	; Enable the A20 gate
+;; Enable the A20 gate.
 set_A20_ap:
 	in al, 0x64
 	test al, 0x02
 	jnz set_A20_ap
 	mov al, 0xD1
 	out 0x64, al
+
 check_A20_ap:
 	in al, 0x64
 	test al, 0x02
 	jnz check_A20_ap
 	mov al, 0xDF
 	out 0x60, al
+
+;; Done with real mode and BIOS interrupts. Jump to 32-bit mode.
 skip_a20_ap:
+	lgdt [cs:GDTR32]
 
-	; At this point we are done with real mode and BIOS interrupts. Jump to 32-bit mode.
-	lgdt [cs:GDTR32]		; Load GDT register
-
-	mov eax, cr0 			; Switch to 32-bit protected mode
+	mov eax, cr0
 	or al, 1
 	mov cr0, eax
 
 	jmp 8:startap32
 
+
+;;==============================================================================
+;; 32-bit mode
+;;==============================================================================
+
 align 16
 
-
-; =============================================================================
-; 32-bit mode
 BITS 32
 
 startap32:
-	mov eax, 16			; Load 4 GB data descriptor
-	mov ds, ax			; to all data segment registers
+	mov eax, 16			;; 4 GB data descriptor.
+	mov ds, ax			;; To data segment registers.
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
@@ -103,50 +109,49 @@ startap32:
 	xor esi, esi
 	xor edi, edi
 	xor ebp, ebp
-	mov esp, 0x7000			; Set a known free location for the temporary stack (shared by all APs)
+	mov esp, 0x7000		;; Set a known free location for the temporary stack (sh
+						;; ared by all APs)
 
-	; Load the GDT
 	lgdt [GDTR64]
 
-	; Enable extended properties
 	mov eax, cr4
-	or eax, 0x0000000B0		; PGE (Bit 7), PAE (Bit 5), and PSE (Bit 4)
+	or eax, 0x0000000B0	;; PGE (Bit 7), PAE (Bit 5), and PSE (Bit 4).
 	mov cr4, eax
 
-	; Point cr3 at PML4
-	mov eax, 0x00002008		; Write-thru (Bit 3)
-	mov cr3, eax
+	mov eax, 0x00002008	;; Write-thru (Bit 3)
+	mov cr3, eax		;; cr3 points PML4.
 
-	; Enable long mode and SYSCALL/SYSRET
-	mov ecx, 0xC0000080		; EFER MSR number
-	rdmsr				; Read EFER
-	or eax, 0x00000101 		; LME (Bit 8)
-	wrmsr				; Write EFER
+	;; Enable long mode and syscall/sysret.
+	mov ecx, 0xC0000080	;; EFER MSR number.
+	rdmsr				;; Read EFER.
+	or eax, 0x00000101	;; LME (Bit 8).
+	wrmsr				;; Write EFER.
 
-	; Enable paging to activate long mode
 	mov eax, cr0
-	or eax, 0x80000000		; PG (Bit 31)
+	or eax, 0x80000000	;; Enable paging to activate long mode. PG (Bit 31).
 	mov cr0, eax
 
-	; Make the jump directly from 16-bit real mode to 64-bit long mode
-	jmp SYS64_CODE_SEL:startap64
+	jmp SYS64_CODE_SEL:startap64	;; Jump from 16-bit real mode to 64-bit long
+									;; mode.
+
+
+;;==============================================================================
+;; 64-bit mode
+;;==============================================================================
 
 align 16
 
-
-; =============================================================================
-; 64-bit mode
 BITS 64
 
 startap64:
-	xor eax, eax
-	xor ebx, ebx
-	xor ecx, ecx
-	xor edx, edx
-	xor esi, esi
-	xor edi, edi
-	xor ebp, ebp
-	xor esp, esp
+	xor rax, rax
+	xor rbx, rbx
+	xor rcx, rcx
+	xor rdx, rdx
+	xor rsi, rsi
+	xor rdi, rdi
+	xor rbp, rbp
+	xor rsp, rsp
 	xor r8, r8
 	xor r9, r9
 	xor r10, r10
@@ -156,8 +161,8 @@ startap64:
 	xor r14, r14
 	xor r15, r15
 
-	mov ax, 0x10		; TODO Is this needed?
-	mov ds, ax			; Clear the legacy segment registers
+	mov ax, 0x10	;; TODO: is this needed?
+	mov ds, ax		;; Clear the legacy segment registers.
 	mov es, ax
 	mov ss, ax
 	mov fs, ax
@@ -171,29 +176,34 @@ startap64:
 	lodsd				;; Load a 32-bit value. We only want the high 8 bits.
 	shr rax, 24			;; al = CPU APIC ID.
 	shl rax, 10			;; Shift left 10 bits for a 1024 byte stack.
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;add rax, 0x00090000
 	add rax, 0x00050000
-	mov rsp, rax		;; 0x50000 - 0x9FFFF free so we use that
+	mov rsp, rax		;; 0x50000 - 0x9FFFF free so we use that.
 
-	lgdt [GDTR64]		;; Load the GDT
-	lidt [IDTR64]		;; Load the IDT
+	lgdt [GDTR64]
+	lidt [IDTR64]
 
-	call init_cpu		;; Setup CPU
+	call init_cpu		;; Setup CPU.
 
-	sti					;; Activate interrupts for SMP
+	sti					;; Interrupts for SMP.
 	jmp ap_sleep
+
+
+;;==============================================================================
+;;
+;;==============================================================================
 
 align 16
 
 ap_sleep:
-	hlt				; Suspend CPU until an interrupt is received. opcode for hlt is 0xF4
-	jmp ap_sleep			; just-in-case of an NMI
+	hlt				;; Suspend CPU until an interrupt is received.
+	jmp ap_sleep	;; just-in-case of NMI.
 
 
 ;;==============================================================================
 ;; 32-bit code. Instructions must also be 64 bit compatible. If a 'U' is stored 
 ;; at 0x5FFF then we know it was a UEFI boot and immediately proceed to start64.
 ;; Otherwise we need to set up a minimal 64-bit environment.
+;;==============================================================================
 
 BITS 32
 
@@ -210,11 +220,9 @@ bootmode_branch:
 ;; System Variables | @file /asm/sysvar.asm
 ;;==============================================================================
 
-
 section .data
 
 
-align 16
 GDTR32:										;; Global Descriptors Table Register
 				dw gdt32_end - gdt32 - 1	;; Limit.
 				dq gdt32					;; Linear address of GDT
