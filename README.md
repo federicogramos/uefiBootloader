@@ -10,7 +10,7 @@ El repositorio tiene en /extern/kernel.bin un payload de SO para probar rapidame
 
 **Imagen para booteo en pc fisica**
 
-Copiar la imagen raw a un pendrive usando dd. Si tiene secure boot en la maquina, debera desactivarlo para utilizar el disco.
+Copiar la imagen raw a un pendrive usando dd.
 
 `sudo dd if=./img/x64_arq.img of=/dev/sda status=progress`
 
