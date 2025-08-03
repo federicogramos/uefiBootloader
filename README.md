@@ -12,7 +12,7 @@ El repositorio tiene en /extern/kernel.bin un payload de SO para probar rapidame
 
 Copiar la imagen raw a un pendrive usando dd.
 
-`sudo dd if=./img/x64_arq.img of=</dev/sd?> status=progress`
+`sudo dd if=./img/x64_arq.img of=</dev/sda> status=progress`
 
 ## Referencias y documentacion
 
