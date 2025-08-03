@@ -16,6 +16,7 @@ global print_cursor
 global num2hexStr
 global num2str
 global print
+global print_color
 global memsetFramebuffer
 global keyboard_command
 global keyboard_get_key
@@ -227,7 +228,7 @@ print_color:
 	jc .setPixel
 
 .resetPixel:
-	mov dword [rax + 4 * rcx], PRINT_COLOR_BK
+	mov dword [rax + 4 * rcx], PRINT_COLOR_BLK
 	jmp .nextPixel
 .setPixel:
 	mov dword [rax + 4 * rcx], r11d

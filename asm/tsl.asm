@@ -12,6 +12,7 @@
 
 %include "./asm/include/sysvar.inc"
 %include "./asm/include/tsl.inc"
+%include "./asm/include/lib.inc"
 
 
 global STEP_MODE_FLAG
@@ -28,6 +29,7 @@ extern print_cursor
 extern num2hexStr
 extern num2str
 extern print
+extern print_color
 extern memsetFramebuffer
 extern keyboard_command
 extern keyboard_get_key
@@ -123,7 +125,8 @@ set_pit_initial_freq:
 	out 0x40, al
 
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 	mov r9, msg_clearing_space_sys_tables
 	call print
@@ -139,7 +142,8 @@ set_pit_initial_freq:
 	rep stosd		
 
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 	;; CR4 info
 	;;mov rax, cr4
@@ -442,7 +446,8 @@ pd_fb:
 
 paging_tables_ready:
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 
 load_gdt:
@@ -450,14 +455,13 @@ load_gdt:
 	call print
 	lgdt [GDTR64]
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 	mov rsi, cr3
 	mov r9, msg_cr3_at_this_point
 	call print
 
-	mov r9, msg_ready
-	call print
 
 cr3_load:
 	mov r9, msg_cr3_load
@@ -599,7 +603,8 @@ idt_reg:
 	lidt [IDTR64]
 
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 
 ;; TODO: revisar que este pisando bien.
@@ -616,7 +621,8 @@ patch_ap_code:
 								;; they can reach their starting code.
 
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 
 ;;cli 
@@ -758,7 +764,8 @@ parse_uefi_memmap:
 	stosq
 
 	mov r9, msg_ready
-	call print
+	mov r11, PRINT_COLOR_GRN
+	call print_color
 
 	mov r9, msg_mm_info
 	call print
@@ -846,9 +853,6 @@ uefi_round:
 	xor eax, eax		;; Blank record.
 	stosq
 	stosq
-
-	;;mov r9, msg_ready
-	;;call print
 
 
 ;; Create the High Page-Directory-Pointer-Table Entries (PDPTE). High PDPTE is s
@@ -1090,8 +1094,16 @@ clear_regs:
 	xor r14, r14
 	xor r15, r15
 
-	mov r9, msg_system_setup_ready
+	mov r9, msg_system_setup
 	call print
+
+	mov r9, msg_ready
+	mov r11, PRINT_COLOR_GRN
+	call print_color
+
+	mov r9, msg_jumping
+	call print
+
 
 	call keyboard_get_key
 
@@ -1171,11 +1183,12 @@ IDTR64:									;; Interrupt Descriptor Table Register
 ;; Messages
 
 msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
-msg_system_setup_ready:	db "System setup ready: jumping to kernel...", 0x0A
+msg_system_setup:		db "System setup... ", 0
+msg_jumping:			db "Jumping to kernel...", 0x0A
 						db "[press 'n' to continue...]", 0x0A, 0
 msg_clearing_space_sys_tables:	db "Clearing space for system tables... ", 0
 msg_setup_pic_and_irq:	db "Init PIC, masks and IRQs... ", 0
-msg_ready: 				db "ready", 0x0A, 0
+msg_ready: 				db "[ready]", 0x0A, 0
 msg_entries:			db "entries... ", 0
 msg_gdt:				db "Setting up sys tables... GDT... ", 0
 msg_pml4:				db "PML4... ", 0
