@@ -135,13 +135,30 @@ num2str:
 	ret
 
 
+
 ;;==============================================================================
-;; print - impresion utf8 a buffer de video luego de ExitBootSerivces()
+;; print - wrapper print_color, imprime por defecto con texto PRINT_COLOR_WHT.
 ;;==============================================================================
 ;; Argumentos:
 ;; -- r9 = cadena fmt
 ;; -- rsi = 2do argumento en caso de haber %.
-;; -- r10 = text color in rgb32.
+;; Retorno:
+;; -- rax = cursor (address fb) siguiente a la ultima posicion escrita.
+;;==============================================================================
+
+print:
+	mov r11, PRINT_COLOR_WHT
+	call print_color
+	ret
+
+
+;;==============================================================================
+;; print_color - impresion utf8 a buffer de video luego de ExitBootSerivces()
+;;==============================================================================
+;; Argumentos:
+;; -- r9 = cadena fmt
+;; -- rsi = 2do argumento en caso de haber %.
+;; -- r11 = text color in rgb32.
 ;; Retorno:
 ;; -- rax = cursor (address fb) siguiente a la ultima posicion escrita.
 ;;
@@ -157,7 +174,7 @@ num2str:
 ;; qword (durante efi) o word (post-efi).
 ;;==============================================================================
 
-print:
+print_color:
 	mov rax, [print_cursor]
 	mov rdi, [PPSL]
 	and rdi, 0x0000FFFF	;; No necesario durante efi, pero si necesario durante 2
@@ -213,7 +230,7 @@ print:
 	mov dword [rax + 4 * rcx], PRINT_COLOR_BK
 	jmp .nextPixel
 .setPixel:
-	mov dword [rax + 4 * rcx], PRINT_COLOR_WHT
+	mov dword [rax + 4 * rcx], r11d
 .nextPixel:
 	inc rcx
 	jmp .loop_font_horizontal_pixel
@@ -260,7 +277,7 @@ print:
 	call num2str
 	add rsp, 8 * 2
 	mov r9, volatile_placeholder
-	call print
+	call print_color
 	pop r9
 	pop r8
 	pop rdi
@@ -278,7 +295,7 @@ print:
 	call num2hexStr
 	add rsp, 8 * 2
 	mov r9, volatile_placeholder
-	call print
+	call print_color
 	pop r9
 	pop r8
 	pop rdi
@@ -294,179 +311,7 @@ print:
 	push r8
 	push r9
 	mov r9, rsi
-	call print
-	pop r9
-	pop r8
-	pop rdi
-
-	mov [rsp], rax			;; Actualiza cursor.
-	jmp .avance_next_char
-
-.string_flush_end:
-	add rsp, 8				;; Quita push de rax q se hace para cada caracter.
-	mov [print_cursor], rax	;; Update cursor to current position.
-	ret
-
-
-;;==============================================================================
-;; ____BACK____print - impresion utf8 a buffer de video luego de ExitBootSerivces()
-;;==============================================================================
-;; Argumentos:
-;; -- r9 = cadena fmt
-;; -- rsi = 2do argumento en caso de haber %.
-;; Retorno:
-;; -- rax = cursor (address fb) siguiente a la ultima posicion escrita.
-;;
-;; El comportamiento si la cadena de fmt tiene % huerfano (no hay ninguna de las
-;; siguientes a continuacion: d, h, c, s) es: ignora el % y sigue imprimiendo. S
-;; i tiene muchos % siempre va a usar el mismo argumento para la conversion (el 
-;; unico que recibe en rsi).
-;;
-;; El cursor para esta funcion, es la direccion del pixel superior izquierdo del
-;; bounding box del caracter de la fuente.
-;;
-;; Aclaracion: de la memoria de video usa PPSL el cual puede ser indistintamente
-;; qword (durante efi) o word (post-efi).
-;;==============================================================================
-
-___BACK___print:
-	mov rax, [print_cursor]
-	mov rdi, [PPSL]
-	and rdi, 0x0000FFFF	;; No necesario durante efi, pero si necesario durante 2
-						;; do loader puesto que en 0x5F00 queda  HR, VR y PPSL e
-						;; n tamanos de dato word.
-	mov r8, 0	;; ix src str.
-	
-.loop_read_string_char:
-	push rax	;; FB cursor, apunta a inicio de char (pixel exactamente) a come
-				;; nzar imprimir.
-	mov rcx, 0	;; Blanqueo de parte alta para uso en resolucion de addrress en 
-				;; .print_next_font.
-	mov cl, [r9 + r8]
-	cmp cl, 0
-	je .string_flush_end
-
-	cmp cl, 0x0A
-	je .linefeed
-	cmp cl, '%'
-	jne .print_next_font
-	inc r8
-	mov cl, [r9 + r8]
-	mov [print_cursor], rax	;; Update cursor to current position.
-
-	cmp cl, 'd'
-	je .integer
-	cmp cl, 'h'
-	je .hexadecimal
-	cmp cl, 'c'
-	je .character
-	cmp cl, 's'
-	je .string
-		
-.print_next_font:
-	lea r10, [font_data + 8 * rcx]	;; r10 p2fontLine 16px chars.
-	lea r10, [r10 + 8 * rcx]
-	mov rdx, 0
-
-.loop_font_vertical_line:
-	cmp rdx, font_height
-	je .char_flush_end
-	mov rcx, 0
-	mov rbx, 0
-	mov bl, [r10 + rdx]
-
-.loop_font_horizontal_pixel:
-	cmp rcx, 8
-	je .next_line
-	bt rbx, rcx
-	jc .setPixel
-
-.resetPixel:
-	mov dword [rax + 4 * rcx], 0x00000000
-	jmp .nextPixel
-.setPixel:
-	mov dword [rax + 4 * rcx], 0x00E0E0E0
-.nextPixel:
-	inc rcx
-	jmp .loop_font_horizontal_pixel
-
-.next_line:
-	inc rdx
-	lea rax, [rax + 4 * rdi]
-	jmp .loop_font_vertical_line
-
-.char_flush_end:
-	add qword [rsp], 32	;; rax += 8px * 4bytes/px
-
-.avance_next_char:
-	pop rax
-	inc r8
-	jmp .loop_read_string_char
-
-.linefeed:
-	mov rdx, 0			;; rdx:rax = 0:rax
-	sub rax, [FB]
-	mov rbx, [PPSL]
-	and rbx, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
-	lea rbx, [4 * rbx]	;; 4b/px * ppsl
-	div rbx				;; rdx = offset desde comienzo de linea.
-
-	sub [rsp], rdx		;; Carriage return.
-
-	mov rbx, [PPSL]
-	and rbx, 0x0000FFFF	;; No necesario durante efi, si en 2do loader.
-
-	mov rax, 4 * 16		;; Bajar 16px.
-	mov rdx, 0
-	mul rbx				;; rax = offset_bytes
-	add [rsp], rax
-	jmp .avance_next_char
-
-.integer:
-	push rdi
-	push r8
-	push r9
-	
-	push volatile_placeholder
-	push rsi
-	call num2str
-	add rsp, 8 * 2
-	mov r9, volatile_placeholder
-	call print
-	pop r9
-	pop r8
-	pop rdi
-
-	mov [rsp], rax			;; Actualiza cursor.
-	jmp .avance_next_char
-
-.hexadecimal:
-	push rdi
-	push r8
-	push r9
-	
-	push volatile_placeholder
-	push rsi
-	call num2hexStr
-	add rsp, 8 * 2
-	mov r9, volatile_placeholder
-	call print
-	pop r9
-	pop r8
-	pop rdi
-
-	mov [rsp], rax			;; Actualiza cursor.
-	jmp .avance_next_char
-
-.character:
-	;; No necesario por el momento.
-
-.string:
-	push rdi
-	push r8
-	push r9
-	mov r9, rsi
-	call print
+	call print_color
 	pop r9
 	pop r8
 	pop rdi
