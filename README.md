@@ -8,7 +8,7 @@
 
 El repositorio tiene en /extern/kernel.bin un payload de SO para probar rapidamente, el cual usa cuando se hace el armado.
 
-**Imagen para booteo en pc fisica**
+**Booteo en pc fisica**
 
 Copiar la imagen raw a un pendrive usando dd.
 
