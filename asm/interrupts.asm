@@ -3,41 +3,45 @@
 ;;==============================================================================
 
 
+;;==============================================================================
+;; Default exception handler
+;;==============================================================================
 
-
-; -----------------------------------------------------------------------------
-; Default exception handler
 exception_gate:
 exception_gate_halt:
 
 	;;mov r9, msg_exception_occurred
 	;;call print
 
-	cli				; Disable interrupts
-	hlt				; Halt the system
+	cli
+	hlt
 	jmp exception_gate_halt
-; -----------------------------------------------------------------------------
 
 
-; -----------------------------------------------------------------------------
-; Default interrupt handler
-interrupt_gate:				; handler for all other interrupts
+;;==============================================================================
+;; Default interrupt handler | handler for all interrupts
+;;==============================================================================
+
+interrupt_gate:
 	iretq
-; -----------------------------------------------------------------------------
 
 
-; -----------------------------------------------------------------------------
-; Floppy drive interrupt. IRQ 0x06, INT 0x26
-; This IRQ runs when floppy drive reads from or writes to whole disk
+;;==============================================================================
+;; Floppy drive interrupt | IRQ 0x06, INT 0x26
+;;==============================================================================
+;; This IRQ runs when floppy drive reads from or writes to whole disk
+;;==============================================================================
+
 %ifdef BIOS
 align 16
+
 floppy_irq:
 	push rdi
 	push rbx
 	push rax
 
 	mov word [int_done], 1
-	mov al, 0x20			; Acknowledge the IRQ
+	mov al, 0x20			;; Acknowledge the IRQ
 	out 0x20, al
 
 	pop rax
@@ -45,19 +49,22 @@ floppy_irq:
 	pop rdi
 	iretq
 %endif
-; -----------------------------------------------------------------------------
 
+;;==============================================================================
+;; Spurious interrupt. INT 0xFF
+;;==============================================================================
 
-; -----------------------------------------------------------------------------
-; Spurious interrupt. INT 0xFF
 align 16
-spurious:				; handler for spurious interrupts
+
+spurious:
 	iretq
-; -----------------------------------------------------------------------------
 
 
-; -----------------------------------------------------------------------------
-; CPU Exception Gates
+
+;;==============================================================================
+;; Exception Gates
+;;==============================================================================
+
 exception_gate_00:
 	mov al, 0x00
 	jmp exception_gate_main
@@ -146,42 +153,53 @@ exception_gate_21:
 	mov al, 0x15
 	jmp exception_gate_main
 
-exception_gate_offset	equ exception_gate_01 - exception_gate_00
+
+;;==============================================================================
+;;
+;;==============================================================================
 
 exception_gate_main:
-	; Set screen to Red
-	mov rdi, [0x00005F00]		; Frame buffer base
-	mov rcx, [0x00005F08]		; Frame buffer size
-	shr rcx, 2			; Quick divide by 4
-	mov eax, 0x00FF0000		; 0x00RRGGBB
+	;; Set screen to Red
+	mov rdi, [0x00005F00]	;; Frame buffer base
+	mov rcx, [0x00005F08]	;; Frame buffer size
+	shr rcx, 2				;; Quick divide by 4
+	mov eax, 0x00FF0000		;; 0x00RRGGBB
 	rep stosd
+
+
+;;==============================================================================
+;;
+;;==============================================================================
+
 exception_gate_main_hang:
 	hlt
-	jmp exception_gate_main_hang	; Hang. User must reset machine at this point
-; -----------------------------------------------------------------------------
+	jmp exception_gate_main_hang	;; User must reset machine at this point.
 
 
-; -----------------------------------------------------------------------------
-; create_gate
-; rax = address of handler
-; rdi = gate # to configure
+;;==============================================================================
+;; create_gate
+;;==============================================================================
+;; -- rax = address of handler
+;; -- rdi = gate # to configure
+;;==============================================================================
+
 create_gate:
 	push rdi
 	push rax
 
-	shl rdi, 4			; quickly multiply rdi by 16
-	stosw				; store the low word (15:0)
+	shl rdi, 4		;; Multiply.
+	stosw
 	shr rax, 16
-	add rdi, 4			; skip the gate marker
-	stosw				; store the high word (31:16)
+	add rdi, 4		;; Skip gate marker.
+	stosw			;; High word [31:16].
 	shr rax, 16
-	stosd				; store the high dword (63:32)
+	stosd			;; High dword [63:32].
 
 	pop rax
 	pop rdi
 	ret
-; -----------------------------------------------------------------------------
 
 
-; =============================================================================
-; EOF
+exception_gate_offset	equ exception_gate_01 - exception_gate_00
+
+
