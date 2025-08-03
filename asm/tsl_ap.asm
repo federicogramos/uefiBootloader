@@ -2,6 +2,8 @@
 ;; AP startup | @file /asm/tsl_ap.asm
 ;;=============================================================================
 ;; AP's will start execution at TSL_BASE_ADDRESS and fall through to this code.
+;; 1KiB reservado en 0x8000 para booteo en 16 bits de los ap. Terminado ese codi
+;; go, se salta a 0x800000.
 ;;=============================================================================
 
 
@@ -11,14 +13,10 @@
 global bootmode_branch
 
 
-;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
-;; codigo, se salta a 0x800000.
-
-
 section .text
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BITS 16
+BITS 16
 
 ap_startup:
 	cli
