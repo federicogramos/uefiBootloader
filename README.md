@@ -9,6 +9,7 @@
 El repositorio tiene en /extern/kernel.bin un payload de SO para probar rapidamente, el cual usa cuando se hace el armado.
 
 Si se quiere bootear en pc fisica, copiar la imagen raw a un pendrive usando dd.
+
 `sudo dd if=./img/x64_arq.img of=/dev/sda status=progress` *si tiene secure boot en la maquina, debera desactivarlo para utilizar este disco.*
 
 ## Referencias y documentacion
