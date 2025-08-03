@@ -1111,10 +1111,10 @@ clear_regs:
 	jmp rax	;; Long jump to kernel.
 
 
-%include "./asm/init/acpi.asm"
-%include "./asm/init/cpu.asm"
-%include "./asm/init/hpet.asm"
-%include "./asm/init/smp.asm"
+%include "./asm/cpu/acpi.asm"
+%include "./asm/cpu/cpu.asm"
+%include "./asm/cpu/hpet.asm"
+%include "./asm/cpu/smp.asm"
 
 %ifdef BIOS
 %include "./asm/bios/dma.asm"
