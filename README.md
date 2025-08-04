@@ -35,6 +35,8 @@ Va directo a usar GOP, no revisa EDID.
 [Implementacion C++ con UEFI boot services](https://github.com/kiznit/rainbow-os)
 Ver /boot/src/boot.cpp
 
+[C implemented loader](https://github.com/KunYi/Simple-UEFI-Bootloader/tree/master/Simple_UEFI_Bootloader/src)
+
 ### Documentos
 
 [Pagina oficial de la especificacion UEFI](https://uefi.org/uefi)
@@ -99,3 +101,4 @@ Me fui un poco por las ramas, pero linda tabla con comandos varios para mouse, l
 
 [i386-stub.c ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/gdb/html_node/gdb_125.html)
 Para driver debug en pc fisica.
+[i386-stub.c](https://github.com/bminor/binutils-gdb/blob/master/gdb/stubs/i386-stub.c)
