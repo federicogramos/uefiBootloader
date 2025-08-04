@@ -1177,8 +1177,10 @@ IDTR64:									;; Interrupt Descriptor Table Register
 				dw 256 * 16 - 1			;; Limit = 4096 - 1
 				dq 0x0000000000000000	;; linear address of IDT
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;==============================================================================
 ;; Messages
+;;==============================================================================
 
 msg_transient_sys_load:	db "Transient system load starting", 0x0A, 0
 msg_system_setup:		db "System setup... ", 0
