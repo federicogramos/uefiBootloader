@@ -3,6 +3,8 @@
 ;;==============================================================================
 
 
+;; Revisar diagrama de pagina 20. Ruteo de senales de activacion de local apic.
+
 init_smp:
 	cmp byte [cfg_smpinit], 1	;; Check if SMP should be enabled.
 	jne noMP					;; If not then skip SMP init.

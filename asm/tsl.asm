@@ -912,7 +912,10 @@ pde_next_range:
 
 ;; Check for x2APIC support.
 	mov eax, 1
+
 	cpuid					;; x2APIC is supported if bit 21 is set.
+	;; TODO: informar si x2APIC es soportado.
+
 	shr ecx, 21
 	and cl, 1
 	mov byte [p_x2APIC], cl
