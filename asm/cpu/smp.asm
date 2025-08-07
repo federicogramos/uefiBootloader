@@ -36,8 +36,8 @@ smp_send_INIT:
 	mov dword [rdi + 0x300], eax	;; Irq Command Register (ICR); bits 31-0
 
 smp_send_INIT_verify:
-	mov eax, [rdi + 0x300]		;; Interrupt Command Register (ICR); bits 31-0
-	bt eax, 12					;; Verify that the command completed.
+	mov eax, [rdi + 0x300]			;; Irq Command Register (ICR); bits 31-0
+	bt eax, 12						;; Verify that the command completed.
 	jc smp_send_INIT_verify
 
 smp_send_INIT_skipcore:
