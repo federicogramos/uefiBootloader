@@ -47,6 +47,7 @@ Ver /boot/src/boot.cpp
 
 [Repositorio EDKII con los protocolos](https://github.com/tianocore/edk2/tree/master/MdePkg/Include/Protocol)
 
+[APIC](https://coconucos.cs.uni-duesseldorf.de/lehre/abschlussarbeiten/BA-Urlacher-23.pdf)
 
 ### Info extra varia
 
