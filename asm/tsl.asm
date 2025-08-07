@@ -911,8 +911,21 @@ pde_next_range:
 	mov [p_LocalAPICAddress], rax
 
 ;; Check for x2APIC support.
-	mov eax, 1
 
+	mov rax, 1
+	cpuid					;; Bit 21 = x2APIC supported.
+	mov rax, rcx
+	bt rax, 21
+	lahf
+	mov al, ah
+	and rax, 0x00000001
+	mov [p_x2APIC], al
+	mov rsi, rax
+	mov r9, msg_support_x2apic
+	call print
+
+	;; TODO: ya tengo p_x2APIC, no requiero cpuid denuevo.
+	mov eax, 1
 	cpuid					;; x2APIC is supported if bit 21 is set.
 	;; TODO: informar si x2APIC es soportado.
 
@@ -923,7 +936,7 @@ pde_next_range:
 	call init_acpi
 	call init_cpu
 	call init_hpet
-	;;call init_smp	;; Here there is a bug.
+	;;call init_smp	;;;;;;;;;;;;;;;;;; Here there is a bug.
 
 	;; Reset rsp the proper location (was set to TSL_BASE_ADDRESS previously).
 	mov rsi, [p_LocalAPICAddress]	;; We would call p_smp_get_id here but stack
@@ -1201,6 +1214,7 @@ msg_support_1g_pages:	db "Support for 1GB pages = %d", 0
 msg_pages_will_be:		db " | Page size %s", 0
 msg_pages_size:			db "= 2MiB", 0x0A, 0
 						db "= 1GiB", 0x0A, 0
+msg_support_x2apic:	db "Support x2APIC = %d", 0x0A, 0
 
 msg_load_gdt:			db "Load gdt... ", 0
 msg_idt:				db "Setting up IDT... ", 0
