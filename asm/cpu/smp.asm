@@ -13,7 +13,7 @@ init_smp:
 	mov rsi, [p_LocalAPICAddress]
 	mov eax, [rsi + 0x20]		;; Add the offset for the APIC ID location.
 	shr rax, 24					;; APIC ID is stored in bits 31:24.
-	mov dl, al					;; Store BSP APIC ID in DL.
+	mov dl, al					;; Store BSP APIC ID in dl.
 
 	mov esi, IM_DetectedCoreIDs
 	xor eax, eax
