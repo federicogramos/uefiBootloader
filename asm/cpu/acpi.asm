@@ -53,7 +53,7 @@ foundACPI:			;; Found a Pointer Structure, verify the checksum
 	dec cl
 	jnz .next
 	cmp bl, 0		;; Checksum tiene q dar cero.
-	jne acpiFail
+	jne acpiFail	;; TODO: msg checksum not zero.
 	
 	pop rsi			;; rsi = RSDP[checksum]
 
@@ -62,17 +62,17 @@ foundACPI:			;; Found a Pointer Structure, verify the checksum
 	lodsw			;; OEMID (Last 2 bytes).
 	lodsb			;; Revision (0 is v1.0, 1 is v2.0, 2 is v3.0, etc)
 	cmp al, 0
-	je foundACPIv1	;; If AL is 0 then the system is using ACPI v1.0
+	je foundACPIv1	;; If al is 0 then the system is using ACPI v1.0
 	jmp foundACPIv2	;; Otherwise it is v2.0 or higher.
 
 ;; TODO: el foundACPIvN se puede juntar en 1 sola funcion o macro que contemple
 ;; las pocas diferencias que hay que considerar.
 foundACPIv1:		;; Root System Description Table (RSDT)
 	xor eax, eax
-	lodsd			;; RsdtAddress - 32 bit physical address of the RSDT (Offset 16)
+	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (offset 16).
 	mov rsi, rax	;; RSI now points to the RSDT.
 	lodsd			;; Load Signature.
-	cmp eax, 'RSDT'
+	cmp eax, "RSDT"
 	jne novalidacpi	;; Not the same, out.
 	sub rsi, 4
 	mov [p_ACPITableAddress], rsi	;; Save RSDT Table Address.
@@ -99,7 +99,7 @@ foundACPIv2:		;; Extended System Description Table (XSDT).
 	lodsq			;; XsdtAddress - 64 bit physical addr of XSDT (Offset 24).
 	mov rsi, rax	;; RSI now points to the XSDT.
 	lodsd			;; Load Signature.
-	cmp eax, 'XSDT'	;; Make sure the signature is valid.
+	cmp eax, "XSDT"	;; Make sure the signature is valid.
 	jne novalidacpi	;; Not the same? Bail out.
 	sub rsi, 4
 	mov [p_ACPITableAddress], rsi	;; Save the XSDT Table Address.
@@ -128,16 +128,16 @@ nextACPITable:
 	pop rsi					;; Pop an Entry address from the stack
 	lodsd
 	add ecx, 1
-	mov ebx, 'APIC'			;; Signature for the Multiple APIC Description Table
+	mov ebx, "APIC"			;; Signature for the Multiple APIC Description Table
 	cmp eax, ebx
 	je foundAPICTable
-	mov ebx, 'HPET'			;; Signature for the HPET Description Table
+	mov ebx, "HPET"			;; Signature for the HPET Description Table
 	cmp eax, ebx
 	je foundHPETTable
-	mov ebx, 'MCFG'			;; Signature for the PCIe Enhanced Config Mechanism
+	mov ebx, "MCFG"			;; Signature for the PCIe Enhanced Config Mechanism
 	cmp eax, ebx
 	je foundMCFGTable
-	mov ebx, 'FACP'			;; Signature for the Fixed ACPI Description Table
+	mov ebx, "FACP"			;; Signature for the Fixed ACPI Description Table
 	cmp eax, ebx
 	je foundFADTTable
 	jmp nextACPITable
@@ -162,6 +162,7 @@ init_smp_acpi_done:
 	ret
 
 acpiFail:
+	;; TODO:msg acpi failure no acpi table.
 novalidacpi:
 
 	mov rdi, [0x00005F00]	;; Frame buffer base

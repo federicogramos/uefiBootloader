@@ -935,7 +935,7 @@ pde_next_range:
 									;; value directly.
 	add rsi, 0x20
 	lodsd				;; Load a 32-bit value. We only want the high 8 bits.
-	shr rax, 24			;; Shift to the right and AL now holds the CPU's APIC ID
+	shr rax, 24			;; Shift to the right and al now holds the CPU's APIC ID
 	shl rax, 10			;; shift left 10 bits for a 1024 byte stack.
 	add rax, 0x00050400
 	mov rsp, rax		;; Leave 0x50000-0x9FFFF free to use.

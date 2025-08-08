@@ -30,7 +30,7 @@ smp_send_INIT:
 	cmp al, dl						;; Is it the BSP?
 	je smp_send_INIT_skipcore
 
-	;; Send 'INIT' IPI to APIC ID in al.
+	;; Send "INIT" IPI to APIC ID in al.
 	mov rdi, [p_LocalAPICAddress]
 	shl eax, 24
 	mov dword [rdi + 0x310], eax	;; Irq Command Register (ICR); bits 63-32
@@ -63,7 +63,7 @@ smp_send_SIPI:
 	cmp al, dl						;; Is it the BSP?
 	je smp_send_SIPI_skipcore
 
-	;; Send 'Startup' IPI to destination using vector 0x08 to specify entry-poin
+	;; Send "Startup" IPI to destination using vector 0x08 to specify entry-poin
 	;; t is at the memory-address 0x8000
 	mov rdi, [p_LocalAPICAddress]
 	shl eax, 24
