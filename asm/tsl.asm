@@ -1142,8 +1142,9 @@ STEP_MODE_FLAG:		db 1	;; Lo activa presionar 's' al booteo. Este byte es f
 							;; orwardeado desde uefi.asm hacia aqui porque se ut
 							;; iliza en ambos lugares y la inicializacion se hac
 							;; e una unica vez desde tsl.ld.
-pd_fb_used:			db 0
+pd_fb_used:			db 0	;; Page directory for framebuffer used.
 force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
+
 
 ;;section .bss
 addr_bits_physical:	db 0

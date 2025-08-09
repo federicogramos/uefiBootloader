@@ -13,23 +13,23 @@ bits 64
 init_acpi:
 	mov al, [p_BootMode]	;; How the system was booted.
 	cmp al, 'U'				;; UEFI.
-	je .uefi_rsdp_validate
+	je uefi_rsdp_validate
 
 	;; Find the ACPI RSDP Structure on a BIOS system.
 	mov esi, 0x000E0000		;; Look for the Root Sys Desc Pointer Structure.
 	mov rbx, "RSD PTR "		;; ACPI Struct Tab Signature (0x2052545020445352).
-.search_acpi:
+search_acpi:
 	lodsq						;; Load qword from rsi, store in rax, inc rsi 8.
 	cmp rax, rbx				;; Verify Signature.
-	je .rsdp_parse
+	je rsdp_parse
 
 	mov r9, msg_acpi_rsd_ptr	;; Err message in case of acpi_fail_msg taken.
 	cmp esi, 0x000FFFFF			;; Keep looking until we get here.
 	jae acpi_fail_msg			;; ACPI tables couldn't be found, fail.
-	jmp .search_acpi
+	jmp search_acpi
 
 ;; ACPI found from UEFI boot.
-.uefi_rsdp_validate:
+uefi_rsdp_validate:
 	mov rsi, [0x400000 + 4 * 1024 + 8 * 6]	;; TODO: simbolizar. 0x400000 = base
 											;; addr donde imagen efi se carga. E
 											;; l 4 es KiB que ocupa seccion de c
@@ -42,17 +42,17 @@ init_acpi:
 	jne acpi_fail_msg
 
 ;; Root System Description Pointer (RSDP) Structure (5.2.5.3 in acpi spec).
-.rsdp_parse:
+rsdp_parse:
 	push rsi		;; rsi = RSDP[checksum]
 	xor rbx, rbx
 	mov rcx, 20		;; First 20 bytes [19..0] matter. These must sum to zero.
 	sub rsi, 8		;; rsi = RSDP[0]. Revisar suma cero bytes 0..19.
 
-.rsdp_next_checksum:
+.next:
 	lodsb			;; Checksum byte.
 	add bl, al
 	dec cl
-	jnz .rsdp_next_checksum
+	jnz .next
 
 	mov r9, msg_acpi_rsdp_checksum
 	cmp bl, 0						;; Checksum tiene q dar cero.
@@ -92,7 +92,7 @@ found_acpi_v1:		;; Root System Description Table (RSDT)
 	mov rdx, rax	;; RDX is the entry count
 	xor ecx, ecx
 
-found_acpi_v1_next_entry:
+found_acpi_v1_nextentry:
 
 ;;;;;;;;; cuidado, entry 32b
 	lodsd			;; Load a 32-bit Entry address
@@ -101,7 +101,7 @@ found_acpi_v1_next_entry:
 	add ecx, 1
 	cmp ecx, edx
 	je findACPITables
-	jmp found_acpi_v1_next_entry
+	jmp found_acpi_v1_nextentry
 
 found_acpi_v2:		;; Extended System Description Table (XSDT).
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (Offset 16).
@@ -126,19 +126,19 @@ found_acpi_v2:		;; Extended System Description Table (XSDT).
 	mov rdx, rax	;; RDX is the entry count.
 	xor ecx, ecx
 
-found_acpi_v2_next_entry:
+found_acpi_v2_nextentry:
 
 ;;;;;;;;; cuidado, entry 64b
 	lodsq			;; Load a 64-bit Entry address
 	push rax		;; Push it to the stack
 	add ecx, 1
 	cmp ecx, edx
-	jne found_acpi_v2_next_entry
+	jne found_acpi_v2_nextentry
 
 findACPITables:
 	xor ecx, ecx
 
-acpi_next_table:
+nextACPITable:
 	cmp ecx, edx			;; Compare current count to entry count.
 	je init_smp_acpi_done
 	pop rsi					;; Pop an Entry address from the stack.
@@ -156,23 +156,23 @@ acpi_next_table:
 	mov ebx, "FACP"			;; Signature for the Fixed ACPI Description Table.
 	cmp eax, ebx
 	je foundFADTTable
-	jmp acpi_next_table
+	jmp nextACPITable
 
 foundAPICTable:
 	call parseAPICTable
-	jmp acpi_next_table
+	jmp nextACPITable
 
 foundHPETTable:
 	call parseHPETTable
-	jmp acpi_next_table
+	jmp nextACPITable
 
 foundMCFGTable:
 	call parseMCFGTable
-	jmp acpi_next_table
+	jmp nextACPITable
 
 foundFADTTable:
 	call parseFADTTable
-	jmp acpi_next_table
+	jmp nextACPITable
 
 init_smp_acpi_done:
 	ret

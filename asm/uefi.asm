@@ -933,7 +933,7 @@ EFI_IMG_RET_ADDR:	    dq 0
 EFI_BOOT_SERVICES:	    dq 0    ;; *BootServices
 RTS:				    dq 0	;; *RuntimeServices;
 CONFIG_TABLE:		    dq 0	;; *ConfigurationTable
-ACPI:				    dq 0	;; ACPI table address
+ACPI:				    dq 0	;; ACPI table address (*RSDP Structure)
 CONOUT_INTERFACE:	    dq 0	;; Output services
 CONIN_INTERFACE_HANDLE:	dq 0	;; ConsoleInHandle
 CONIN_INTERFACE:	    dq 0	;; Input services
