@@ -54,9 +54,9 @@ rsdp_parse:
 	dec cl
 	jnz .next
 
-	mov rsi, msg_acpi_rdsp_checksum
+	mov r9, msg_acpi_rsdp_checksum
 	cmp bl, 0		;; Checksum tiene q dar cero.
-	jne acpi_fail	;; TODO: msg checksum not zero.
+	jne acpi_fail_msg	;; TODO: msg checksum not zero.
 	
 	pop rsi			;; rsi = RSDP[checksum]
 
