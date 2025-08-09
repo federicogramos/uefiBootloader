@@ -106,19 +106,19 @@ sys_table_load:
 
 cant_tables:
 	add rsi, 4
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;xor eax, eax
+	xor rax, rax
 	lodsd			;; Length [bytes]
 	add rsi, 28		;; Skip to the Entry offset
-	sub eax, 36		;; eax = sdt size. Subtract the header size to and obtain nu
+	sub rax, 36		;; eax = sdt size. Subtract the header size to and obtain nu
 					;; mber of bytes occupied by pointers to other tables.
 
 	cmp byte [acpi_version_flag], 0
 	jne .v2
 .v1:
-	shr eax, 2		;; Addresses are dw.
+	shr rax, 2		;; Addresses are dw.
 	jmp parse_entries
 .v2:
-	shr eax, 3		;; Addresses are qw.
+	shr rax, 3		;; Addresses are qw.
 
 parse_entries:
 	mov rdx, rax	;; rdx is the entry count
