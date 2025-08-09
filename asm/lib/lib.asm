@@ -173,6 +173,15 @@ print:
 ;;
 ;; Aclaracion: de la memoria de video usa PPSL el cual puede ser indistintamente
 ;; qword (durante efi) o word (post-efi).
+;;
+;; Ademas de los mismos % que printf acepta, hay uno adicional que es %r y sirve
+;; para cargar el registro rsi directo con un string de 7 caracteres + null u 8
+;; caracteres (el 1ero que ocurra) y sea ese string el utilizado en la cadena de
+;; formato. Modo de uso: dado que la instruccion mov rsi, "someStr" no permite c
+;; oncatenar en el segundo operando 2 valores como "someStr" y 0x00, por lo tant
+;; o lo que debe hacer es primero blanqueo de rsi, y luego la carga, de modo que
+;; el registro quede paddeado con ceros.
+
 ;;==============================================================================
 
 print_color:
@@ -208,6 +217,8 @@ print_color:
 	je .character
 	cmp cl, 's'
 	je .string
+	cmp cl, 'r'
+	je .register
 		
 .print_next_font:
 	lea r10, [font_data + 8 * rcx]	;; r10 p2fontLine 16px chars.
@@ -312,6 +323,21 @@ print_color:
 	push r8
 	push r9
 	mov r9, rsi
+	call print_color
+	pop r9
+	pop r8
+	pop rdi
+
+	mov [rsp], rax			;; Actualiza cursor.
+	jmp .avance_next_char
+
+.register:
+	push rdi
+	push r8
+	push r9
+	mov [volatile_placeholder], rsi
+	mov byte [volatile_placeholder + 8], 0	;; Para permitir 8 chars en el arg.
+	mov r9, volatile_placeholder
 	call print_color
 	pop r9
 	pop r8

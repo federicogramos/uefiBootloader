@@ -1110,6 +1110,7 @@ fmt_test:					dw utf16("test step = %d"), 13, 0x0A, 0
 fmt_test_hex:				dw utf16("test step = 0x%h"), 13, 0x0A, 0
 fmt_test_uefi:				dw utf16("test uefi"), 13, 0x0A, 0
 
+fmt_test_reg:				db "test reg = %r", 0x0A, 0
 
 ;;==============================================================================
 ;; Here goes the payload
