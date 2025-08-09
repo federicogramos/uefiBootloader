@@ -1,6 +1,9 @@
 ;;==============================================================================
 ;; @file /asm/cpu/acpi.asm
 ;;==============================================================================
+;; Toma la informacion de acpi y busca de sus tablas las requeridas para la mini
+;; ma inicializacion del sistema.
+;;
 ;; Documentos:
 ;; -- Advanced Configuration and Power Interface (ACPI) Spec Release 6.5
 ;;    https://uefi.org/sites/default/files/resources/ACPI_Spec_6_5_Aug29.pdf
@@ -9,6 +12,11 @@
 
 
 bits 64
+
+
+;;==============================================================================
+;;
+;;==============================================================================
 
 init_acpi:
 	mov al, [p_BootMode]	;; How the system was booted.
@@ -19,8 +27,8 @@ init_acpi:
 	mov esi, 0x000E0000		;; Look for the Root Sys Desc Pointer Structure.
 	mov rbx, "RSD PTR "		;; ACPI Struct Tab Signature (0x2052545020445352).
 .search_acpi:
-	lodsq						;; Load qword from rsi, store in rax, inc rsi 8.
-	cmp rax, rbx				;; Verify Signature.
+	lodsq					;; Load qword from rsi, store in rax, inc rsi 8.
+	cmp rax, rbx			;; Verify Signature.
 	je .rsdp_parse
 
 	mov r9, msg_acpi_rsd_ptr	;; Err message in case of acpi_fail_msg taken.
@@ -55,10 +63,10 @@ init_acpi:
 	jnz .rsdp_next_checksum
 
 	mov r9, msg_acpi_rsdp_checksum
-	cmp bl, 0						;; Checksum tiene q dar cero.
-	jne acpi_fail_msg				;; TODO: msg checksum not zero.
+	cmp bl, 0					;; Checksum tiene q dar cero.
+	jne acpi_fail_msg			;; TODO: msg checksum not zero.
 	
-	pop rsi							;; rsi = RSDP[checksum]
+	pop rsi						;; rsi = RSDP[checksum]
 
 .acpi_get_version:
 	lodsb						;; Checksum.
@@ -68,12 +76,11 @@ init_acpi:
 	cmp al, 0
 	jne .set_acpi_version_flag
 	jmp sys_table_load
+
 .set_acpi_version_flag:
 	mov byte [acpi_version_flag], 1	;; V2.0 or higher.
 
 sys_table_load:
-	;;;;;;;;;je found_acpi_v1		;; If al is 0 then the system is using ACPI v1.0
-	;;;;;;;;;jmp found_acpi_v2		;; Otherwise it is v2.0 or higher.
 	cmp byte [acpi_version_flag], 0
 	jne .v2
 .v1:
@@ -96,17 +103,6 @@ sys_table_load:
 	jne acpi_fail_msg	;; Not the same, out.
 	sub rsi, 4
 	mov [p_ACPITableAddress], rsi	;; *RSDT Table.
-
-
-;; TODO: el found_acpi_vN se puede juntar en 1 sola funcion o macro que contemple
-;; las pocas diferencias que hay que considerar.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;found_acpi_v1:		;; Root System Description Table (RSDT)
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;xor eax, eax	;; not necessary
-
-;;;;;;;;; aqui iguales, solo vectorizar el string
-;;;;;;;;;;;;;;;;;;;;	cmp eax, "RSDT"
-
-;;;;;;;;;; a partir de aqui iguales v1 y v2+
 
 cant_tables:
 	add rsi, 4
@@ -191,6 +187,8 @@ acpi_next_table:
 
 init_smp_acpi_done:
 	ret
+
+
 
 acpi_fail_msg:
 	mov rsi, r9
