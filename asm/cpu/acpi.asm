@@ -123,21 +123,21 @@ findACPITables:
 	xor ecx, ecx
 
 nextACPITable:
-	cmp ecx, edx			;; Compare current count to entry count
+	cmp ecx, edx			;; Compare current count to entry count.
 	je init_smp_acpi_done
-	pop rsi					;; Pop an Entry address from the stack
+	pop rsi					;; Pop an Entry address from the stack.
 	lodsd
 	add ecx, 1
-	mov ebx, "APIC"			;; Signature for the Multiple APIC Description Table
+	mov ebx, "APIC"			;; Signature for the Multiple APIC Description Tab.
 	cmp eax, ebx
 	je foundAPICTable
-	mov ebx, "HPET"			;; Signature for the HPET Description Table
+	mov ebx, "HPET"			;; Signature for the HPET Description Table.
 	cmp eax, ebx
 	je foundHPETTable
-	mov ebx, "MCFG"			;; Signature for the PCIe Enhanced Config Mechanism
+	mov ebx, "MCFG"			;; Signature for the PCIe Enhanced Config Mechanism.
 	cmp eax, ebx
 	je foundMCFGTable
-	mov ebx, "FACP"			;; Signature for the Fixed ACPI Description Table
+	mov ebx, "FACP"			;; Signature for the Fixed ACPI Description Table.
 	cmp eax, ebx
 	je foundFADTTable
 	jmp nextACPITable

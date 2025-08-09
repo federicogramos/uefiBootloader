@@ -2,6 +2,8 @@
 ;; Definitions for Transient System Load | @file /include/tsl.inc
 ;;=============================================================================
 
+UEFI_LOAD_ADDRESS			equ 0x400000
+
 TSL_SIZE_HI					equ 1
 TSL_BASE_ADDRESS_HI			equ 0x800000
 KERNEL_LOAD_ADDR			equ 0x100000
