@@ -39,7 +39,7 @@ VR:			equ 0x0000000000005F12	;; 2 bytes, Screen Y
 PPSL:		equ 0x0000000000005F14	;; 2 bytes, PixelsPerScanLine
 
 ;; DQ - Starting at offset 0, increments by 0x8
-p_ACPITableAddress:	equ SystemVariables + 0x00
+p_ACPITableAddress:	equ SystemVariables + 0x00	;; *RSDT Table
 p_LocalAPICAddress:	equ SystemVariables + 0x10
 p_Counter_Timer:	equ SystemVariables + 0x18
 p_Counter_RTC:		equ SystemVariables + 0x20

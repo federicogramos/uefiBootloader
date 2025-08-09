@@ -58,120 +58,135 @@ init_acpi:
 	cmp bl, 0						;; Checksum tiene q dar cero.
 	jne acpi_fail_msg				;; TODO: msg checksum not zero.
 	
-	pop rsi					;; rsi = RSDP[checksum]
+	pop rsi							;; rsi = RSDP[checksum]
 
-	lodsb					;; Checksum.
-	lodsd					;; OEMID (First 4 bytes).
-	lodsw					;; OEMID (Last 2 bytes).
-	lodsb					;; Revision (0 = v1.0, 1 = v2.0, 2 = v3.0, etc).
+.acpi_get_version:
+	lodsb						;; Checksum.
+	lodsd						;; OEMID (First 4 bytes).
+	lodsw						;; OEMID (Last 2 bytes).
+	lodsb						;; Revision (0 = v1.0, 1 = v2.0, 2 = v3.0, etc).
 	cmp al, 0
-	je found_acpi_v1		;; If al is 0 then the system is using ACPI v1.0
-	jmp found_acpi_v2		;; Otherwise it is v2.0 or higher.
+	jne .set_acpi_version_flag
+	jmp sys_table_load
+.set_acpi_version_flag:
+	mov byte [acpi_version_flag], 1	;; V2.0 or higher.
 
-;; TODO: el found_acpi_vN se puede juntar en 1 sola funcion o macro que contemple
-;; las pocas diferencias que hay que considerar.
-found_acpi_v1:		;; Root System Description Table (RSDT)
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;xor eax, eax	;; not necessary
+sys_table_load:
+	;;;;;;;;;je found_acpi_v1		;; If al is 0 then the system is using ACPI v1.0
+	;;;;;;;;;jmp found_acpi_v2		;; Otherwise it is v2.0 or higher.
+	cmp byte [acpi_version_flag], 0
+	jne .v2
+.v1:
+	xor rax, rax
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (offset 16).
-
-;;;;;;;;; aqui iguales, solo vectorizar el string
-	mov rsi, rax	;; rsi now points to the RSDT.
-	lodsd			;; Load Signature.
-	cmp eax, "RSDT"
-
-;;;;;;;;;; a partir de aqui iguales v1 y v2+
-	jne novalidacpi	;; Not the same, out.
-	sub rsi, 4
-	mov [p_ACPITableAddress], rsi	;; Save RSDT Table Address.
-	add rsi, 4
-	xor eax, eax
-	lodsd			;; Length
-	add rsi, 28		;; Skip to the Entry offset
-	sub eax, 36		;; EAX holds the table size. Subtract the preamble
-	shr eax, 2		;; Divide by 4
-	mov rdx, rax	;; RDX is the entry count
-	xor ecx, ecx
-
-found_acpi_v1_next_entry:
-
-;;;;;;;;; cuidado, entry 32b
-	lodsd			;; Load a 32-bit Entry address
-
-	push rax		;; Push it to the stack as a 64-bit value
-	add ecx, 1
-	cmp ecx, edx
-	je findACPITables
-	jmp found_acpi_v1_next_entry
-
-found_acpi_v2:		;; Extended System Description Table (XSDT).
+	jmp .sys_table_signature
+.v2:
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (Offset 16).
 	lodsd			;; Length.
 	lodsq			;; XsdtAddress - 64 bit physical addr of XSDT (Offset 24).
 
-;;;;;;;;; aqui iguales, solo vectorizar el string
-	mov rsi, rax	;; rsi now points to the XSDT.
+.sys_table_signature:
+	mov rsi, rax	;; rsi now points to the RSDT (V1) / XSDT (V2)
 	lodsd			;; Load Signature.
-	cmp eax, "XSDT"	;; Make sure the signature is valid.
+	xor rbx, rbx
+	mov bl, [acpi_version_flag]
+	cmp eax, [acpi_sdt_signature + 4 * rbx]	;; Son 4 chars.
 
-	;;;;;;;;;; a partir de aqui iguales v1 y v2+
-	jne novalidacpi	;; Not the same? Bail out.
+	mov r9, msg_acpi_sdt_signature	;; Load msg antes por si debe indicar error.
+	jne acpi_fail_msg	;; Not the same, out.
 	sub rsi, 4
-	mov [p_ACPITableAddress], rsi	;; Save the XSDT Table Address.
+	mov [p_ACPITableAddress], rsi	;; *RSDT Table.
+
+
+;; TODO: el found_acpi_vN se puede juntar en 1 sola funcion o macro que contemple
+;; las pocas diferencias que hay que considerar.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;found_acpi_v1:		;; Root System Description Table (RSDT)
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;xor eax, eax	;; not necessary
+
+;;;;;;;;; aqui iguales, solo vectorizar el string
+;;;;;;;;;;;;;;;;;;;;	cmp eax, "RSDT"
+
+;;;;;;;;;; a partir de aqui iguales v1 y v2+
+
+cant_tables:
 	add rsi, 4
-	xor eax, eax
-	lodsd			;; Length.
-	add rsi, 28		;; Skip to the start of the Entries (offset 36).
-	sub eax, 36		;; EAX holds the table size. Subtract the preamble.
-	shr eax, 3
-	mov rdx, rax	;; RDX is the entry count.
-	xor ecx, ecx
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;xor eax, eax
+	lodsd			;; Length [bytes]
+	add rsi, 28		;; Skip to the Entry offset
+	sub eax, 36		;; eax = sdt size. Subtract the header size to and obtain nu
+					;; mber of bytes occupied by pointers to other tables.
 
-found_acpi_v2_next_entry:
+	cmp byte [acpi_version_flag], 0
+	jne .v2
+.v1:
+	shr eax, 2		;; Addresses are dw.
+	jmp parse_entries
+.v2:
+	shr eax, 3		;; Addresses are qw.
 
-;;;;;;;;; cuidado, entry 64b
-	lodsq			;; Load a 64-bit Entry address
-	push rax		;; Push it to the stack
-	add ecx, 1
-	cmp ecx, edx
-	jne found_acpi_v2_next_entry
+parse_entries:
+	mov rdx, rax	;; rdx is the entry count
+	xor rax, rax	;; En caso de usar lodsd.
+	xor rcx, rcx
 
-findACPITables:
-	xor ecx, ecx
+.next_entry:
+	cmp byte [acpi_version_flag], 0
+	jne .v2
+.v1:
+	lodsd			;; 32-bit entry.
+	jmp .continue
+.v2:
+	lodsq			;; 64-bit entry.
+
+.continue:
+	push rax
+	inc rcx
+	cmp rcx, rdx
+	jne .next_entry
+
+acpi_tab_find:
+	xor rcx, rcx
 
 acpi_next_table:
-	cmp ecx, edx			;; Compare current count to entry count.
+	cmp rcx, rdx			;; Compare current count to entry count.
 	je init_smp_acpi_done
-	pop rsi					;; Pop an Entry address from the stack.
+
+	pop rsi					;; Pop an entry address from the stack.
 	lodsd
-	add ecx, 1
+	inc rcx
+
 	mov ebx, "APIC"			;; Signature for the Multiple APIC Description Tab.
 	cmp eax, ebx
-	je foundAPICTable
+	je .table_apic_found
+
 	mov ebx, "HPET"			;; Signature for the HPET Description Table.
 	cmp eax, ebx
-	je foundHPETTable
+	je .table_hpet_found
+
 	mov ebx, "MCFG"			;; Signature for the PCIe Enhanced Config Mechanism.
 	cmp eax, ebx
-	je foundMCFGTable
+	je .table_mcfg_found
+
 	mov ebx, "FACP"			;; Signature for the Fixed ACPI Description Table.
 	cmp eax, ebx
-	je foundFADTTable
+	je .table_facp_found
+
 	jmp acpi_next_table
 
-foundAPICTable:
-	call parseAPICTable
+.table_apic_found:
+	call table_apic_parse
 	jmp acpi_next_table
 
-foundHPETTable:
-	call parseHPETTable
+.table_hpet_found:
+	call table_hpet_parse
 	jmp acpi_next_table
 
-foundMCFGTable:
-	call parseMCFGTable
+.table_mcfg_found:
+	call table_mcfg_parse
 	jmp acpi_next_table
 
-foundFADTTable:
-	call parseFADTTable
+.table_facp_found:
+	call table_facp_parse
 	jmp acpi_next_table
 
 init_smp_acpi_done:
@@ -196,7 +211,7 @@ acpi_fail:
 ;; 5.2.12 Multiple APIC Description Table (MADT). Chapter 5.2.12
 ;;==============================================================================
 
-parseAPICTable:
+table_apic_parse:
 	push rcx
 	push rdx
 
@@ -218,7 +233,7 @@ parseAPICTable:
 
 readAPICstructures:
 	cmp ebx, ecx
-	jae parseAPICTable_done
+	jae table_apic_parse_done
 	lodsb						;; APIC Structure Type
 	cmp al, 0x00				;; Processor Local APIC
 	je APICapic
@@ -350,7 +365,7 @@ APICignore:
 	sub rsi, 2				;; For the two bytes just read
 	jmp readAPICstructures	;; Read the next structure.
 
-parseAPICTable_done:
+table_apic_parse_done:
 	pop rdx
 	pop rcx
 	ret
@@ -362,7 +377,7 @@ parseAPICTable_done:
 ;; cations/software-developers-hpet-spec-1-0a.pdf
 ;;==============================================================================
 
-parseHPETTable:
+table_hpet_parse:
 	lodsd						;; Length of HPET in bytes.
 	lodsb						;; Revision.
 	lodsb						;; Checksum.
@@ -394,7 +409,7 @@ parseHPETTable:
 ;; https://picture.iczhiku.com/resource/eetop/SYkDTqhOLhpUTnMx.pdf
 ;;==============================================================================
 
-parseMCFGTable:
+table_mcfg_parse:
 	push rdi
 	push rcx
 	xor eax, eax
@@ -419,7 +434,7 @@ parseMCFGTable:
 	lodsq						;; Reserved.
 
 ;; Loop through each entry.
-parseMCFGTable_next:
+table_mcfg_parse_next:
 	lodsq					;; Base address of enhanced configuration mechanism.
 	stosq
 	lodsw					;; PCI Segment Group Number.
@@ -431,7 +446,7 @@ parseMCFGTable_next:
 	lodsd					;; Reserved.
 	stosd
 	sub ecx, 1
-	jnz parseMCFGTable_next
+	jnz table_mcfg_parse_next
 	xor eax, eax
 	not rax					;; 0xFFFFFFFFFFFFFFFF
 	stosq					;; Mark the end of the table.
@@ -447,14 +462,14 @@ parseMCFGTable_next:
 ;;==============================================================================
 
 ;; At this point rsi points to offset 4 for the FADT.
-parseFADTTable:
+table_facp_parse:
 
 	sub rsi, 4			;; Set rsi back to start to make offsets easier below
 
 	;; Gather IAPC_BOOT_ARCH
 	mov eax, [rsi + 10]			;; Check start of OEMID.
 	cmp eax, 0x48434F42			;; Is it "BOCH"?
-	je parseFADTTable_end		;; If so, bail out.
+	je table_facp_parse_end		;; If so, bail out.
 	mov ax, [rsi + 109]			;; IAPC_BOOT_ARCH (IA-PC Boot Architecture Flags
 								;; - 5.2.9.3).
 	mov [p_IAPC_BOOT_ARCH], ax	;; Save the IAPC_BOOT_ARCH word.
@@ -472,6 +487,6 @@ parseFADTTable:
 ;;	add rsi, 20
 ;;	lodsd			;; PM1a_CNT_BLK
 
-parseFADTTable_end:
+table_facp_parse_end:
 	ret
 

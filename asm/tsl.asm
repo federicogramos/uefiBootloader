@@ -1145,6 +1145,11 @@ STEP_MODE_FLAG:		db 1	;; Lo activa presionar 's' al booteo. Este byte es f
 pd_fb_used:			db 0	;; Page directory for framebuffer used.
 force_2mb_pages:	db 0	;; TODO: serviria para forzar en caso de requerir.
 
+acpi_version_flag	db 0	;; Zero by default is needed. V1.0 = 0 y V > 1.0 = 1
+							;; Usado en acpi.asm 
+acpi_sdt_signature	dd	"RSDT", "XSDT"	;; Selected using acpi_version_flag as i
+										;; ndex.
+
 
 ;;section .bss
 addr_bits_physical:	db 0
@@ -1263,7 +1268,7 @@ msg_test_above:				db "String de prueba: above", 0x0A, 0
 msg_acpi_fail:				db "ACPI failure. Err = %s", 0x0A, 0
 msg_acpi_rsd_ptr:			db "RSD pointer signature.", 0
 msg_acpi_rsdp_checksum:		db "RSDP checksum.", 0
-
+msg_acpi_sdt_signature:		db "RSDT/XSDT signature.", 0
 
 msg_sys_in_hlt:				db "System in halt. Reboot or shutdown.", 0x0A, 0
 
