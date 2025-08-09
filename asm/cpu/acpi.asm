@@ -13,24 +13,24 @@ bits 64
 init_acpi:
 	mov al, [p_BootMode]	;; How the system was booted.
 	cmp al, 'U'				;; UEFI.
-	je foundACPIfromUEFI
+	je uefi_acpi
 
 	;; Find the ACPI RSDP Structure on a BIOS system.
 	mov esi, 0x000E0000		;; Start looking for the Root System Description Poi
 							;; nter Structure
 	mov rbx, "RSD PTR "		;; This in the Signature for the ACPI Structure Tabl
 							;; e (0x2052545020445352)
-searchingforACPI:
+search_acpi:
 	lodsq					;; Load a quad word from RSI and store in RAX, then 
 							;; increment RSI by 8.
 	cmp rax, rbx			;; Verify Signature.
 	je foundACPI
 	cmp esi, 0x000FFFFF		;; Keep looking until we get here.
-	jae acpiFail			;; ACPI tables couldn't be found, fail.
-	jmp searchingforACPI
+	jae acpi_fail			;; ACPI tables couldn't be found, fail.
+	jmp search_acpi
 
 ;; Find the ACPI RSDP Structure on a UEFI system.
-foundACPIfromUEFI:
+uefi_acpi:
 	mov rsi, [0x400000 + 4 * 1024 + 8 * 6]	;; TODO: simbolizar. 0x400000 = base
 											;; addr donde imagen efi se carga. E
 											;; l 4 es KiB que ocupa seccion de c
@@ -38,7 +38,7 @@ foundACPIfromUEFI:
 	mov rbx, "RSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
 	lodsq				;; Carga signature. Luego de carga, apunta a checksum.
 	cmp rax, rbx
-	jne acpiFail		;; If it isn't a match then fail.
+	jne acpi_fail		;; If it isn't a match then fail.
 
 ;; Parse the Root System Description Pointer (RSDP) Structure (5.2.5.3)
 foundACPI:			;; Found a Pointer Structure, verify the checksum
@@ -53,7 +53,7 @@ foundACPI:			;; Found a Pointer Structure, verify the checksum
 	dec cl
 	jnz .next
 	cmp bl, 0		;; Checksum tiene q dar cero.
-	jne acpiFail	;; TODO: msg checksum not zero.
+	jne acpi_fail	;; TODO: msg checksum not zero.
 	
 	pop rsi			;; rsi = RSDP[checksum]
 
@@ -62,12 +62,12 @@ foundACPI:			;; Found a Pointer Structure, verify the checksum
 	lodsw			;; OEMID (Last 2 bytes).
 	lodsb			;; Revision (0 is v1.0, 1 is v2.0, 2 is v3.0, etc)
 	cmp al, 0
-	je foundACPIv1	;; If al is 0 then the system is using ACPI v1.0
-	jmp foundACPIv2	;; Otherwise it is v2.0 or higher.
+	je found_acpi_v1	;; If al is 0 then the system is using ACPI v1.0
+	jmp found_acpi_v2	;; Otherwise it is v2.0 or higher.
 
-;; TODO: el foundACPIvN se puede juntar en 1 sola funcion o macro que contemple
+;; TODO: el found_acpi_vN se puede juntar en 1 sola funcion o macro que contemple
 ;; las pocas diferencias que hay que considerar.
-foundACPIv1:		;; Root System Description Table (RSDT)
+found_acpi_v1:		;; Root System Description Table (RSDT)
 	xor eax, eax
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (offset 16).
 	mov rsi, rax	;; RSI now points to the RSDT.
@@ -85,15 +85,15 @@ foundACPIv1:		;; Root System Description Table (RSDT)
 	mov rdx, rax	;; RDX is the entry count
 	xor ecx, ecx
 
-foundACPIv1_nextentry:
+found_acpi_v1_nextentry:
 	lodsd			;; Load a 32-bit Entry address
 	push rax		;; Push it to the stack as a 64-bit value
 	add ecx, 1
 	cmp ecx, edx
 	je findACPITables
-	jmp foundACPIv1_nextentry
+	jmp found_acpi_v1_nextentry
 
-foundACPIv2:		;; Extended System Description Table (XSDT).
+found_acpi_v2:		;; Extended System Description Table (XSDT).
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (Offset 16).
 	lodsd			;; Length.
 	lodsq			;; XsdtAddress - 64 bit physical addr of XSDT (Offset 24).
@@ -112,12 +112,12 @@ foundACPIv2:		;; Extended System Description Table (XSDT).
 	mov rdx, rax	;; RDX is the entry count.
 	xor ecx, ecx
 
-foundACPIv2_nextentry:
+found_acpi_v2_nextentry:
 	lodsq			;; Load a 64-bit Entry address
 	push rax		;; Push it to the stack
 	add ecx, 1
 	cmp ecx, edx
-	jne foundACPIv2_nextentry
+	jne found_acpi_v2_nextentry
 
 findACPITables:
 	xor ecx, ecx
@@ -161,7 +161,7 @@ foundFADTTable:
 init_smp_acpi_done:
 	ret
 
-acpiFail:
+acpi_fail:
 	;; TODO:msg acpi failure no acpi table.
 novalidacpi:
 
