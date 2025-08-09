@@ -1269,6 +1269,8 @@ msg_acpi_fail:				db "ACPI failure. Err = %s", 0x0A, 0
 msg_acpi_rsd_ptr:			db "RSD pointer signature.", 0
 msg_acpi_rsdp_checksum:		db "RSDP checksum.", 0
 msg_acpi_sdt_signature:		db "RSDT/XSDT signature.", 0
+msg_pc_at_compat:			db "ACPI MADT 8259 PC-AT compat support = %d"
+							db 0x0A, 0
 
 msg_sys_in_hlt:				db "System in halt. Reboot or shutdown.", 0x0A, 0
 

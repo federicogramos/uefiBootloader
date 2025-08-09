@@ -143,7 +143,7 @@ parse_entries:
 acpi_tab_find:
 	xor rcx, rcx
 
-acpi_next_table:
+acpi_parse_table:
 	cmp rcx, rdx			;; Compare current count to entry count.
 	je .acpi_finish
 
@@ -167,23 +167,23 @@ acpi_next_table:
 	cmp eax, ebx
 	je .table_facp_found
 
-	jmp acpi_next_table
+	jmp acpi_parse_table
 
 .table_apic_found:
 	call table_apic_parse
-	jmp acpi_next_table
+	jmp acpi_parse_table
 
 .table_hpet_found:
 	call table_hpet_parse
-	jmp acpi_next_table
+	jmp acpi_parse_table
 
 .table_mcfg_found:
 	call table_mcfg_parse
-	jmp acpi_next_table
+	jmp acpi_parse_table
 
 .table_facp_found:
 	call table_facp_parse
-	jmp acpi_next_table
+	jmp acpi_parse_table
 
 .acpi_finish:
 	ret
@@ -226,8 +226,21 @@ table_apic_parse:
 	lodsd			;; OEM Revision
 	lodsd			;; Creator ID
 	lodsd			;; Creator Revision
-	lodsd			;; Local APIC Address (This should match what was pulled already via the MSR)
-	lodsd			;; Flags (1 = Dual 8259 Legacy PICs Installed)
+	lodsd			;; Local APIC Address. The 32-bit physical address at which 
+					;; each processor can access its local interrupt controller.
+					;; This should match what was pulled already via the MSR.
+	lodsd			;; A one indicates that the system also has a PC-AT-compat.
+					;; dual-8259 setup. The 8259 vectors must be disabled (that 
+					;; is, masked) when enabling the ACPI APIC operation.
+
+	;; TODO: esto no revise si requiere que backapee registros usados antes de p
+	;; rint.
+	mov rsi, rax
+	mov r9, msg_pc_at_compat
+	call print
+
+
+
 	add ebx, 44
 	mov rdi, 0x0000000000005100	;; Valid CPU IDs
 
