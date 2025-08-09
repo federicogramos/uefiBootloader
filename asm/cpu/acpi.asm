@@ -145,7 +145,7 @@ acpi_tab_find:
 
 acpi_next_table:
 	cmp rcx, rdx			;; Compare current count to entry count.
-	je init_smp_acpi_done
+	je .acpi_finish
 
 	pop rsi					;; Pop an entry address from the stack.
 	lodsd
@@ -185,9 +185,13 @@ acpi_next_table:
 	call table_facp_parse
 	jmp acpi_next_table
 
-init_smp_acpi_done:
+.acpi_finish:
 	ret
 
+
+;;==============================================================================
+;; ACPI error report
+;;==============================================================================
 
 
 acpi_fail_msg:
@@ -199,8 +203,6 @@ acpi_fail_msg:
 	mov r9, msg_sys_in_hlt
 	call print
 
-	;; TODO:msg acpi failure no acpi table.
-novalidacpi:
 acpi_fail:
 	jmp $
 
