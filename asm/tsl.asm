@@ -1259,5 +1259,6 @@ msg_test_num:				db "Value = 0x%d", 0x0A, 0
 msg_test_below:				db "String de prueba: below", 0x0A, 0
 msg_test_above:				db "String de prueba: above", 0x0A, 0
 
-
+msg_acpi_fail:				db "ACPI failure. Err = %r", 0x0A, 0
+msg_sys_in_hlt:				db "System in halt. Reboot or shutdown.", 0x0A, 0
 

@@ -16,17 +16,16 @@ init_acpi:
 	je uefi_acpi
 
 	;; Find the ACPI RSDP Structure on a BIOS system.
-	mov esi, 0x000E0000		;; Start looking for the Root System Description Poi
-							;; nter Structure
-	mov rbx, "RSD PTR "		;; This in the Signature for the ACPI Structure Tabl
-							;; e (0x2052545020445352)
+	mov esi, 0x000E0000		;; Look for the Root Sys Desc Pointer Structure.
+	mov rbx, "RSD PTR "		;; ACPI Struct Tab Signature (0x2052545020445352).
 search_acpi:
-	lodsq					;; Load a quad word from RSI and store in RAX, then 
-							;; increment RSI by 8.
+	lodsq					;; Load qword from rsi, store in rax, inc rsi 8.
 	cmp rax, rbx			;; Verify Signature.
-	je foundACPI
+	je acpi_found
+
+	mov r9, "RSD ptr"		;; Err message in case of acpi_fail_msg taken.
 	cmp esi, 0x000FFFFF		;; Keep looking until we get here.
-	jae acpi_fail			;; ACPI tables couldn't be found, fail.
+	jae acpi_fail_msg		;; ACPI tables couldn't be found, fail.
 	jmp search_acpi
 
 ;; Find the ACPI RSDP Structure on a UEFI system.
@@ -35,13 +34,14 @@ uefi_acpi:
 											;; addr donde imagen efi se carga. E
 											;; l 4 es KiB que ocupa seccion de c
 											;; odigo de uefi.
-	mov rbx, "RSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
+	mov rbx, "tSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
 	lodsq				;; Carga signature. Luego de carga, apunta a checksum.
+	mov r9, "RSD ptr"	;; Err message in case of acpi_fail_msg taken.
 	cmp rax, rbx
-	jne acpi_fail		;; If it isn't a match then fail.
+	jne acpi_fail_msg
 
 ;; Parse the Root System Description Pointer (RSDP) Structure (5.2.5.3)
-foundACPI:			;; Found a Pointer Structure, verify the checksum
+acpi_found:			;; Found a Pointer Structure, verify the checksum
 	push rsi		;; rsi = RSDP[checksum]
 	xor ebx, ebx
 	mov ecx, 20		;; As per the spec only the first 20 bytes matter
@@ -70,7 +70,7 @@ foundACPI:			;; Found a Pointer Structure, verify the checksum
 found_acpi_v1:		;; Root System Description Table (RSDT)
 	xor eax, eax
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (offset 16).
-	mov rsi, rax	;; RSI now points to the RSDT.
+	mov rsi, rax	;; rsi now points to the RSDT.
 	lodsd			;; Load Signature.
 	cmp eax, "RSDT"
 	jne novalidacpi	;; Not the same, out.
@@ -97,7 +97,7 @@ found_acpi_v2:		;; Extended System Description Table (XSDT).
 	lodsd			;; RsdtAddress - 32 bit physical addr of RSDT (Offset 16).
 	lodsd			;; Length.
 	lodsq			;; XsdtAddress - 64 bit physical addr of XSDT (Offset 24).
-	mov rsi, rax	;; RSI now points to the XSDT.
+	mov rsi, rax	;; rsi now points to the XSDT.
 	lodsd			;; Load Signature.
 	cmp eax, "XSDT"	;; Make sure the signature is valid.
 	jne novalidacpi	;; Not the same? Bail out.
@@ -161,15 +161,18 @@ foundFADTTable:
 init_smp_acpi_done:
 	ret
 
-acpi_fail:
+acpi_fail_msg:
+	mov rsi, r9
+	mov r9, msg_acpi_fail
+	mov r11, PRINT_COLOR_RED
+	call print_color
+
+	mov r9, msg_sys_in_hlt
+	call print
+
 	;; TODO:msg acpi failure no acpi table.
 novalidacpi:
-
-	mov rdi, [0x00005F00]	;; Frame buffer base
-	mov rcx, [0x00005F08]	;; Frame buffer size
-	shr rcx, 2
-	mov eax, 0x0000FFFF		;; 0x00RRGGBB screen to Teal.
-	rep stosd
+acpi_fail:
 	jmp $
 
 
@@ -427,10 +430,10 @@ parseMCFGTable_next:
 ;; Fixed ACPI Description Table (FADT). Chapter 5.2.9
 ;;==============================================================================
 
-;; At this point RSI points to offset 4 for the FADT.
+;; At this point rsi points to offset 4 for the FADT.
 parseFADTTable:
 
-	sub rsi, 4			;; Set RSI back to start to make offsets easier below
+	sub rsi, 4			;; Set rsi back to start to make offsets easier below
 
 	;; Gather IAPC_BOOT_ARCH
 	mov eax, [rsi + 10]			;; Check start of OEMID.
