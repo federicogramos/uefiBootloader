@@ -19,13 +19,13 @@ init_acpi:
 	mov esi, 0x000E0000		;; Look for the Root Sys Desc Pointer Structure.
 	mov rbx, "RSD PTR "		;; ACPI Struct Tab Signature (0x2052545020445352).
 search_acpi:
-	lodsq					;; Load qword from rsi, store in rax, inc rsi 8.
-	cmp rax, rbx			;; Verify Signature.
-	je acpi_found
+	lodsq						;; Load qword from rsi, store in rax, inc rsi 8.
+	cmp rax, rbx				;; Verify Signature.
+	je rsdp_parse
 
-	mov r9, "RSD ptr"		;; Err message in case of acpi_fail_msg taken.
-	cmp esi, 0x000FFFFF		;; Keep looking until we get here.
-	jae acpi_fail_msg		;; ACPI tables couldn't be found, fail.
+	mov r9, msg_acpi_rsd_ptr	;; Err message in case of acpi_fail_msg taken.
+	cmp esi, 0x000FFFFF			;; Keep looking until we get here.
+	jae acpi_fail_msg			;; ACPI tables couldn't be found, fail.
 	jmp search_acpi
 
 ;; Find the ACPI RSDP Structure on a UEFI system.
@@ -34,24 +34,27 @@ uefi_acpi:
 											;; addr donde imagen efi se carga. E
 											;; l 4 es KiB que ocupa seccion de c
 											;; odigo de uefi.
-	mov rbx, "tSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
+	mov rbx, "RSD PTR "	;; Root Sys Description Pointer Table (RSDT). Signature.
 	lodsq				;; Carga signature. Luego de carga, apunta a checksum.
-	mov r9, "RSD ptr"	;; Err message in case of acpi_fail_msg taken.
+
+	mov r9, msg_acpi_rsd_ptr	;; Err message in case of acpi_fail_msg taken.
 	cmp rax, rbx
 	jne acpi_fail_msg
 
-;; Parse the Root System Description Pointer (RSDP) Structure (5.2.5.3)
-acpi_found:			;; Found a Pointer Structure, verify the checksum
+;; Root System Description Pointer (RSDP) Structure (5.2.5.3 in acpi spec).
+rsdp_parse:
 	push rsi		;; rsi = RSDP[checksum]
-	xor ebx, ebx
-	mov ecx, 20		;; As per the spec only the first 20 bytes matter
+	xor rbx, rbx
+	mov rcx, 20		;; First 20 bytes [19..0] matter. These must sum to zero.
 	sub rsi, 8		;; rsi = RSDP[0]. Revisar suma cero bytes 0..19.
 
 .next:
-	lodsb			;; Checksum byte
+	lodsb			;; Checksum byte.
 	add bl, al
 	dec cl
 	jnz .next
+
+	mov rsi, msg_acpi_rdsp_checksum
 	cmp bl, 0		;; Checksum tiene q dar cero.
 	jne acpi_fail	;; TODO: msg checksum not zero.
 	
