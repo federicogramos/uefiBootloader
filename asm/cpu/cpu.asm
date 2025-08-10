@@ -110,6 +110,7 @@ init_cpu:
 	bt ecx, 28				;; AVX-1 is supported if bit 28 is set in ECX
 							;; AVX-2 is supported if bit 5 is set in EBX on CPUID (EAX=7, ECX=0)
 	jnc avx_not_supported	;; Skip activating AVX if not supported
+
 avx_supported:
 	mov rax, cr4
 	bts rax, 18				;; Enable OSXSAVE (Bit 18)
@@ -120,6 +121,7 @@ avx_supported:
 	bts rax, 1				;; Set SSE enable (Bit 1)
 	bts rax, 2				;; Set AVX enable (Bit 2)
 	xsetbv					;; Save XCR0 register
+
 avx_not_supported:
 
 	;; Enable AVX-512
@@ -128,6 +130,7 @@ avx_not_supported:
 	cpuid					;; Sets info in EBX, ECX, and EDX
 	bt ebx, 16				;; AVX-512 is supported if bit 16 is set in EBX
 	jnc avx512_not_supported
+
 avx512_supported:
 	xor ecx, ecx			;; Set load XCR0
 	xgetbv					;; Load XCR0 register
@@ -135,6 +138,7 @@ avx512_supported:
 	bts rax, 6				;; Set ZMM_Hi256 (Bit 6)
 	bts rax, 7				;; Set Hi16_ZMM (Bit 7)
 	xsetbv					;; Save XCR0 register
+
 avx512_not_supported:
 
 ;; Enable and Configure Local APIC
@@ -183,7 +187,7 @@ avx512_not_supported:
 	add rdi, rax				;; rdi points to InfoMap CPU area + APIC ID. ex 
 								;; 0x5E01 would be APIC ID 1
 	mov al, 1
-	stosb						;; Store a 1 as the core is activated
+	stosb						;; Store a 1 as the core is activated.
 
 	ret
 

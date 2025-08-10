@@ -244,9 +244,14 @@ table_apic_parse:
 
 	;; TODO: esto no revise si requiere que backapee registros usados antes de p
 	;; rint.
+
+	push rsi
+	push rcx
 	mov rsi, rax
 	mov r9, msg_pc_at_compat
 	call print
+	pop rcx
+	pop rsi
 
 	mov rbx, 44			;; rbx to keep track of current position in table. Compa
 						;; ring with length, we will know then end is reached.
@@ -259,7 +264,6 @@ apic_irq_struct_read:
 	jae .end
 
 	lodsb						;; First byte declares type of structure.
-
 	cmp al, 0x00				;; Processor Local APIC.
 	je table_apic_irq_struct_local_apic
 
@@ -270,28 +274,28 @@ apic_irq_struct_read:
 	je table_apic_irq_struct_irq_src_override
 
 ;;	cmp al, 0x03				;; Non-maskable Interrupt Source (NMI).
-;;	je APICnmi
+;;	je table_apic_irq_struct_nmi_src
 
 ;;	cmp al, 0x04				;; Local APIC NMI.
-;;	je APIClocalapicnmi
+;;	je table_apic_irq_struct_local_apic_nmi
 
 ;;	cmp al, 0x05				;; Local APIC Address Override.
-;;	je APICaddressoverride
+;;	je table_apic_irq_struct_local_apic_addr_override
 
 ;;	cmp al, 0x06				;; I/O SAPIC Structure.
-;;	je APICiosapic
+;;	je table_apic_irq_struct_io_sapic
 
 ;;	cmp al, 0x07				;; Local SAPIC Structure.
-;;	je APIClocalsapic
+;;	je table_apic_irq_struct_local_sapic
 
 ;;	cmp al, 0x08				;; Platform Interrupt Source Structure.
-;;	je APICplatformint
+;;	je table_apic_irq_struct_platform_irq_src
 
 ;;	cmp al, 0x0	9				;; Processor Local x2APIC.
-;;	je APICx2apic
+;;	je table_apic_irq_struct_local_x2apic
 
 ;;	cmp al, 0x0A				;; Local x2APIC NMI.
-;;	je APICx2nmi
+;;	je table_apic_irq_struct_local_x2apic_nmi
 
 .next:
 	xor rax, rax
@@ -310,23 +314,26 @@ apic_irq_struct_read:
 ;;==============================================================================
 ;; Processor Local APIC Structure - 5.2.12.2
 ;;==============================================================================
+;; Entry type 0.
+;;==============================================================================
 
-table_apic_irq_struct_local_apic:						;; Entry type 0.
+table_apic_irq_struct_local_apic:
 	xor rax,rax
 	xor rdx, rdx
-	lodsb						;; Second byte of the structure declares the len
-								;; gth (will be set to 8).
+	lodsb			;; Second byte of the structure declares the length (= 8).
 	add rbx, rax
-	lodsb						;; ACPI Processor ID
-	lodsb						;; APIC ID
-	xchg eax, edx				;; Save the APIC ID to EDX
-	lodsd						;; Flags (Bit 0 set if enabled/usable)
-	bt eax, 0					;; Test to see if usable
-	jnc apic_irq_struct_read		;; Read the next structure if CPU not usable
+	lodsb			;; ACPI Processor ID
+	lodsb			;; APIC ID
+	xchg eax, edx	;; Save the APIC ID to edx.
+	lodsd			;; Flags (bit 0 set if enabled, bit 1 capable).
+	bt eax, 0		;; Test to see if enabled. TODO: en realidad se podria revis
+					;; ar si bit 2 == 1 en caso de que no este habilitado, puest
+					;; o que en ese caso podria habilitarse.
+	jnc apic_irq_struct_read	;; Read the next structure if CPU not usable.
 	inc word [p_cpu_detected]
-	xchg eax, edx				;; Restore the APIC ID back to EAX
-	stosb						;; Store the 8-bit APIC ID
-	jmp apic_irq_struct_read	;; Read the next structure
+	xchg eax, edx				;; Restore the APIC ID back to eax.
+	stosb						;; Store the 8-bit APIC ID.
+	jmp apic_irq_struct_read	;; Read the next structure.
 
 
 ;;==============================================================================
@@ -387,7 +394,7 @@ table_apic_irq_struct_irq_src_override:	;; Entry type 2
 	jmp apic_irq_struct_read	;; Read the next structure
 
 ;; Processor Local x2APIC Structure - 5.2.12.12
-;;APICx2apic:			;; Entry type 9
+;;table_apic_irq_struct_local_x2apic:			;; Entry type 9
 ;;	xor eax, eax
 ;;	xor edx, edx
 ;;	lodsb				;; Length (will be set to 16)
@@ -397,10 +404,10 @@ table_apic_irq_struct_irq_src_override:	;; Entry type 2
 ;;	xchg eax, edx		;; Save the x2APIC ID to EDX
 ;;	lodsd				;; Flags (Bit 0 set if enabled/usable)
 ;;	bt eax, 0			;; Test to see if usable
-;;	jnc APICx2apicEnd	;; Read the next structure if CPU not usable
+;;	jnc table_apic_irq_struct_local_x2apicEnd	;; Read the next structure if CPU not usable
 ;;	xchg eax, edx		;; Restore the x2APIC ID back to EAX
 ;;;;;;;;;;;;;;;;;;;;;;;;;; TODO - Save the ID's somewhere
-;;APICx2apicEnd:
+;;table_apic_irq_struct_local_x2apicEnd:
 ;;	lodsd				;; ACPI Processor UID
 ;;	jmp apic_irq_struct_read	;; Read the next structure
 

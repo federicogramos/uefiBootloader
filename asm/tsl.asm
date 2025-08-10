@@ -940,6 +940,19 @@ pde_next_range:
 	add rax, 0x00050400
 	mov rsp, rax		;; Leave 0x50000-0x9FFFF free to use.
 
+
+;; Print some info:
+	movzx rsi, word [p_cpu_speed]
+	mov r9, fmt_acpi_core_speed
+	call print
+	movzx rsi, word [p_cpu_detected]
+	mov r9, fmt_acpi_core_detected
+	call print
+	movzx rsi, word [p_cpu_activated]
+	mov r9, fmt_acpi_core_active
+	call print
+
+
 ;; Build the InfoMap
 	xor edi, edi
 	mov di, 0x5000
@@ -1271,6 +1284,11 @@ msg_acpi_rsdp_checksum:		db "RSDP checksum.", 0
 msg_acpi_sdt_signature:		db "RSDT/XSDT signature.", 0
 msg_pc_at_compat:			db "ACPI MADT 8259 PC-AT compat support = %d"
 							db 0x0A, 0
+
+fmt_acpi_core_speed:		db "Core info | Speed = %d", 0
+fmt_acpi_core_detected:		db " | Detected = %d", 0
+fmt_acpi_core_active:		db " | Active = %d", 0x0A, 0
+
 
 msg_sys_in_hlt:				db "System in halt. Reboot or shutdown.", 0x0A, 0
 

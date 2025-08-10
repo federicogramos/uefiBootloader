@@ -7,7 +7,7 @@
 
 init_smp:
 	cmp byte [cfg_smpinit], 1	;; Check if SMP should be enabled.
-	jne noMP					;; If not then skip SMP init.
+	jne no_mp					;; If not then skip SMP init.
 
 	;; Start the AP's one by one.
 	xor eax, eax
@@ -84,7 +84,7 @@ smp_send_SIPI_done:
 	mov eax, 10000					;; Wait 10000us for the AP's to finish.
 	call os_hpet_delay
 
-noMP:
+no_mp:
 	;; Gather and store the APIC ID of the BSP
 	xor eax, eax
 	mov rsi, [p_LocalAPICAddress]
