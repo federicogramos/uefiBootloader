@@ -121,7 +121,7 @@ cant_tables:
 	shr rax, 3		;; Addresses are qw.
 
 parse_entries:
-	mov rdx, rax	;; rdx is the entry count
+	mov rdx, rax	;; rdx = entry count
 	xor rax, rax	;; En caso de usar lodsd.
 	xor rcx, rcx
 
@@ -135,55 +135,60 @@ parse_entries:
 	lodsq			;; 64-bit entry.
 
 .continue:
-	push rax
+	push rax		;; All entries to the stack.
 	inc rcx
 	cmp rcx, rdx
 	jne .next_entry
 
+
+;;==============================================================================
+;; At this point: all table entries addresses pushed into the stack.
+;==============================================================================
+
 acpi_tab_find:
 	xor rcx, rcx
 
-acpi_parse_table:
+.acpi_parse_table:
 	cmp rcx, rdx			;; Compare current count to entry count.
 	je .acpi_finish
 
 	pop rsi					;; Pop an entry address from the stack.
-	lodsd
+	lodsd					;; Signature.
 	inc rcx
 
 	mov ebx, "APIC"			;; Signature for the Multiple APIC Description Tab.
 	cmp eax, ebx
-	je .table_apic_found
+	je .apic_found
 
 	mov ebx, "HPET"			;; Signature for the HPET Description Table.
 	cmp eax, ebx
-	je .table_hpet_found
+	je .hpet_found
 
 	mov ebx, "MCFG"			;; Signature for the PCIe Enhanced Config Mechanism.
 	cmp eax, ebx
-	je .table_mcfg_found
+	je .mcfg_found
 
 	mov ebx, "FACP"			;; Signature for the Fixed ACPI Description Table.
 	cmp eax, ebx
-	je .table_facp_found
+	je .facp_found
 
-	jmp acpi_parse_table
+	jmp .acpi_parse_table
 
-.table_apic_found:
+.apic_found:
 	call table_apic_parse
-	jmp acpi_parse_table
+	jmp .acpi_parse_table
 
-.table_hpet_found:
+.hpet_found:
 	call table_hpet_parse
-	jmp acpi_parse_table
+	jmp .acpi_parse_table
 
-.table_mcfg_found:
+.mcfg_found:
 	call table_mcfg_parse
-	jmp acpi_parse_table
+	jmp .acpi_parse_table
 
-.table_facp_found:
+.facp_found:
 	call table_facp_parse
-	jmp acpi_parse_table
+	jmp .acpi_parse_table
 
 .acpi_finish:
 	ret
@@ -244,32 +249,40 @@ table_apic_parse:
 
 apic_structures_read:
 	cmp ebx, ecx
-	jae table_apic_parse_done
-	lodsb						;; APIC Structure Type
-	cmp al, 0x00				;; Processor Local APIC
+	jae .end
+
+	lodsb						;; APIC Structure Type.
+
+	cmp al, 0x00				;; Processor Local APIC.
 	je APICapic
-	cmp al, 0x01				;; I/O APIC
+	cmp al, 0x01				;; I/O APIC.
 	je APICioapic
-	cmp al, 0x02				;; Interrupt Source Override
+	cmp al, 0x02				;; Interrupt Source Override.
 	je APICinterruptsourceoverride
-;;	cmp al, 0x03				;; Non-maskable Interrupt Source (NMI)
+;;	cmp al, 0x03				;; Non-maskable Interrupt Source (NMI).
 ;;	je APICnmi
-;;	cmp al, 0x04				;; Local APIC NMI
+;;	cmp al, 0x04				;; Local APIC NMI.
 ;;	je APIClocalapicnmi
-;;	cmp al, 0x05				;; Local APIC Address Override
+;;	cmp al, 0x05				;; Local APIC Address Override.
 ;;	je APICaddressoverride
-;;	cmp al, 0x06				;; I/O SAPIC Structure
+;;	cmp al, 0x06				;; I/O SAPIC Structure.
 ;;	je APICiosapic
-;;	cmp al, 0x07				;; Local SAPIC Structure
+;;	cmp al, 0x07				;; Local SAPIC Structure.
 ;;	je APIClocalsapic
-;;	cmp al, 0x08				;; Platform Interrupt Source Structure
+;;	cmp al, 0x08				;; Platform Interrupt Source Structure.
 ;;	je APICplatformint
-;;	cmp al, 0x0	9				;; Processor Local x2APIC
+;;	cmp al, 0x0	9				;; Processor Local x2APIC.
 ;;	je APICx2apic
-;;	cmp al, 0x0A				;; Local x2APIC NMI
+;;	cmp al, 0x0A				;; Local x2APIC NMI.
 ;;	je APICx2nmi
 
 	jmp APICignore
+
+
+.end:
+	pop rdx
+	pop rcx
+	ret
 
 
 ;;==============================================================================
@@ -376,10 +389,6 @@ APICignore:
 	sub rsi, 2				;; For the two bytes just read
 	jmp apic_structures_read	;; Read the next structure.
 
-table_apic_parse_done:
-	pop rdx
-	pop rcx
-	ret
 
 ;;==============================================================================
 ;; High Precision Event Timer (HPET)
