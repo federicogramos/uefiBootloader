@@ -215,6 +215,11 @@ acpi_fail:
 ;;==============================================================================
 ;; 5.2.12 Multiple APIC Description Table (MADT). Chapter 5.2.12
 ;;==============================================================================
+;; Argumentos:
+;; -- rsi = puntero, apuntando a campo length de la tabla.
+;;
+;; Conserva el valor de rcx y rdx.
+;;==============================================================================
 
 table_apic_parse:
 	push rcx
@@ -245,39 +250,56 @@ table_apic_parse:
 
 	mov rbx, 44			;; rbx to keep track of current position in table. Compa
 						;; ring with length, we will know then end is reached.
-	mov rdi, 0x00005100	;; Array of bytes. Valid CPU IDs
+	mov rdi, 0x00005100	;; Array of bytes. Valid CPU IDs.
 
-apic_structures_read:
-	cmp ebx, ecx
+;; Ahora va a recorrer cada apic irq structure. Son mas tablas anidadas dentro d
+;; e la apic description table. rsi starts pointing to the 1st.
+apic_irq_struct_read:
+	cmp rbx, rcx
 	jae .end
 
-	lodsb						;; APIC Structure Type.
+	lodsb						;; First byte declares type of structure.
 
 	cmp al, 0x00				;; Processor Local APIC.
-	je APICapic
+	je table_apic_irq_struct_local_apic
+
 	cmp al, 0x01				;; I/O APIC.
-	je APICioapic
+	je table_apic_irq_struct_io_apic
+
 	cmp al, 0x02				;; Interrupt Source Override.
-	je APICinterruptsourceoverride
+	je table_apic_irq_struct_irq_src_override
+
 ;;	cmp al, 0x03				;; Non-maskable Interrupt Source (NMI).
 ;;	je APICnmi
+
 ;;	cmp al, 0x04				;; Local APIC NMI.
 ;;	je APIClocalapicnmi
+
 ;;	cmp al, 0x05				;; Local APIC Address Override.
 ;;	je APICaddressoverride
+
 ;;	cmp al, 0x06				;; I/O SAPIC Structure.
 ;;	je APICiosapic
+
 ;;	cmp al, 0x07				;; Local SAPIC Structure.
 ;;	je APIClocalsapic
+
 ;;	cmp al, 0x08				;; Platform Interrupt Source Structure.
 ;;	je APICplatformint
+
 ;;	cmp al, 0x0	9				;; Processor Local x2APIC.
 ;;	je APICx2apic
+
 ;;	cmp al, 0x0A				;; Local x2APIC NMI.
 ;;	je APICx2nmi
 
-	jmp APICignore
-
+.next:
+	xor rax, rax
+	lodsb						;; Length. Now 2 bytes after start of table.
+	sub rsi, 2					;; Back to the begginning.
+	add rsi, rax				;; This entry is none of the above. Point next.
+	add rbx, rax				;; Update bytes read.
+	jmp apic_irq_struct_read	;; Read the next structure.
 
 .end:
 	pop rdx
@@ -289,28 +311,29 @@ apic_structures_read:
 ;; Processor Local APIC Structure - 5.2.12.2
 ;;==============================================================================
 
-APICapic:						;; Entry Type 0
-	xor eax, eax
-	xor edx, edx
-	lodsb						;; Length (will be set to 8)
-	add ebx, eax
+table_apic_irq_struct_local_apic:						;; Entry type 0.
+	xor rax,rax
+	xor rdx, rdx
+	lodsb						;; Second byte of the structure declares the len
+								;; gth (will be set to 8).
+	add rbx, rax
 	lodsb						;; ACPI Processor ID
 	lodsb						;; APIC ID
 	xchg eax, edx				;; Save the APIC ID to EDX
 	lodsd						;; Flags (Bit 0 set if enabled/usable)
 	bt eax, 0					;; Test to see if usable
-	jnc apic_structures_read		;; Read the next structure if CPU not usable
+	jnc apic_irq_struct_read		;; Read the next structure if CPU not usable
 	inc word [p_cpu_detected]
 	xchg eax, edx				;; Restore the APIC ID back to EAX
 	stosb						;; Store the 8-bit APIC ID
-	jmp apic_structures_read		;; Read the next structure
+	jmp apic_irq_struct_read	;; Read the next structure
 
 
 ;;==============================================================================
 ;; I/O APIC Structure - 5.2.12.3
 ;;==============================================================================
 
-APICioapic:						;; Entry Type 1
+table_apic_irq_struct_io_apic:						;; Entry type 1
 	xor eax, eax
 	lodsb						;; Length (will be set to 12)
 	add ebx, eax
@@ -332,14 +355,14 @@ APICioapic:						;; Entry Type 1
 	stosd
 	pop rdi
 	inc byte [p_IOAPICCount]
-	jmp apic_structures_read		;; Read the next structure
+	jmp apic_irq_struct_read	;; Read the next structure
 
 
 ;;==============================================================================
 ;; Interrupt Source Override Structure - 5.2.12.5
 ;;==============================================================================
 
-APICinterruptsourceoverride:	;; Entry Type 2
+table_apic_irq_struct_irq_src_override:	;; Entry type 2
 	xor eax, eax
 	lodsb						;; Length (will be set to 10)
 	add ebx, eax
@@ -361,10 +384,10 @@ APICinterruptsourceoverride:	;; Entry Type 2
 	pop rcx
 	pop rdi
 	inc byte [p_IOAPICIntSourceC]
-	jmp apic_structures_read	;; Read the next structure
+	jmp apic_irq_struct_read	;; Read the next structure
 
 ;; Processor Local x2APIC Structure - 5.2.12.12
-;;APICx2apic:			;; Entry Type 9
+;;APICx2apic:			;; Entry type 9
 ;;	xor eax, eax
 ;;	xor edx, edx
 ;;	lodsb				;; Length (will be set to 16)
@@ -378,16 +401,9 @@ APICinterruptsourceoverride:	;; Entry Type 2
 ;;	xchg eax, edx		;; Restore the x2APIC ID back to EAX
 ;;;;;;;;;;;;;;;;;;;;;;;;;; TODO - Save the ID's somewhere
 ;;APICx2apicEnd:
-;;	lodsd					;; ACPI Processor UID
-;;	jmp apic_structures_read	;; Read the next structure
+;;	lodsd				;; ACPI Processor UID
+;;	jmp apic_irq_struct_read	;; Read the next structure
 
-APICignore:
-	xor eax, eax
-	lodsb					;; We have a type that we ignore, read the next byte
-	add ebx, eax
-	add rsi, rax
-	sub rsi, 2				;; For the two bytes just read
-	jmp apic_structures_read	;; Read the next structure.
 
 
 ;;==============================================================================
