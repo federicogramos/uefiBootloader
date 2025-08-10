@@ -215,9 +215,8 @@ table_apic_parse:
 	push rcx
 	push rdx
 
-	lodsd			;; Length of MADT in bytes
-	mov ecx, eax	;; Store the length in ECX
-	xor ebx, ebx	;; EBX is the counter
+	lodsd			;; Length of MADT in bytes.
+	mov ecx, eax	;; Store the length in ecx
 	lodsb			;; Revision
 	lodsb			;; Checksum
 	lodsd			;; OEMID (First 4 bytes)
@@ -239,12 +238,11 @@ table_apic_parse:
 	mov r9, msg_pc_at_compat
 	call print
 
+	mov rbx, 44			;; rbx to keep track of current position in table. Compa
+						;; ring with length, we will know then end is reached.
+	mov rdi, 0x00005100	;; Array of bytes. Valid CPU IDs
 
-
-	add ebx, 44
-	mov rdi, 0x0000000000005100	;; Valid CPU IDs
-
-readAPICstructures:
+apic_structures_read:
 	cmp ebx, ecx
 	jae table_apic_parse_done
 	lodsb						;; APIC Structure Type
@@ -288,11 +286,11 @@ APICapic:						;; Entry Type 0
 	xchg eax, edx				;; Save the APIC ID to EDX
 	lodsd						;; Flags (Bit 0 set if enabled/usable)
 	bt eax, 0					;; Test to see if usable
-	jnc readAPICstructures		;; Read the next structure if CPU not usable
+	jnc apic_structures_read		;; Read the next structure if CPU not usable
 	inc word [p_cpu_detected]
 	xchg eax, edx				;; Restore the APIC ID back to EAX
 	stosb						;; Store the 8-bit APIC ID
-	jmp readAPICstructures		;; Read the next structure
+	jmp apic_structures_read		;; Read the next structure
 
 
 ;;==============================================================================
@@ -321,7 +319,7 @@ APICioapic:						;; Entry Type 1
 	stosd
 	pop rdi
 	inc byte [p_IOAPICCount]
-	jmp readAPICstructures		;; Read the next structure
+	jmp apic_structures_read		;; Read the next structure
 
 
 ;;==============================================================================
@@ -350,7 +348,7 @@ APICinterruptsourceoverride:	;; Entry Type 2
 	pop rcx
 	pop rdi
 	inc byte [p_IOAPICIntSourceC]
-	jmp readAPICstructures	;; Read the next structure
+	jmp apic_structures_read	;; Read the next structure
 
 ;; Processor Local x2APIC Structure - 5.2.12.12
 ;;APICx2apic:			;; Entry Type 9
@@ -368,7 +366,7 @@ APICinterruptsourceoverride:	;; Entry Type 2
 ;;;;;;;;;;;;;;;;;;;;;;;;;; TODO - Save the ID's somewhere
 ;;APICx2apicEnd:
 ;;	lodsd					;; ACPI Processor UID
-;;	jmp readAPICstructures	;; Read the next structure
+;;	jmp apic_structures_read	;; Read the next structure
 
 APICignore:
 	xor eax, eax
@@ -376,7 +374,7 @@ APICignore:
 	add ebx, eax
 	add rsi, rax
 	sub rsi, 2				;; For the two bytes just read
-	jmp readAPICstructures	;; Read the next structure.
+	jmp apic_structures_read	;; Read the next structure.
 
 table_apic_parse_done:
 	pop rdx
@@ -434,7 +432,7 @@ table_mcfg_parse:
 	lodsd						;; Length of MCFG in bytes.
 	sub eax, 44					;; Subtract the size of the table header.
 	shr eax, 4
-	mov ecx, eax				;; ECX now stores the number of 16-byte records.
+	mov ecx, eax				;; ecx now stores the number of 16-byte records.
 	add word [p_PCIECount], cx
 	lodsb						;; Revision.
 	lodsb						;; Checksum.

@@ -13,8 +13,7 @@
 ;; 0x508E = word, bits ppx
 
 InfoMap:			equ 0x0000000000005000
-IM_DetectedCoreIDs:	equ 0x0000000000005100	;; 1 byte per entry. Each is the API
-											;; C ID of a core.
+IM_DetectedCoreIDs:	equ 0x0000000000005100	;; Byte array. APIC ID of each core.
 IM_PCIE:			equ 0x0000000000005400	;; 16 bytes per entry
 IM_IOAPICAddress:	equ 0x0000000000005600	;; 16 bytes per entry
 IM_IOAPICIntSource:	equ 0x0000000000005700	;; 8 bytes per entry
