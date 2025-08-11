@@ -607,10 +607,8 @@ idt_reg:
 	mov r11, PRINT_COLOR_GRN
 	call print_color
 
-
 ;; TODO: revisar que este pisando bien.
 ;; AP's will be told to start execution at TSL_BASE_ADDRESS.
-
 patch_ap_code:
 	mov r9, msg_patch
 	call print
@@ -787,9 +785,6 @@ parse_uefi_memmap:
 
 	add rsp, 8 * EfiMaxMemoryType	;; Devuvelvo space for an information array.
 
-;;cli
-;;hlt
-
 ;; Clear entries < 3MiB.
 clear_small:
 	mov rsi, 0x00200000		;; Memory map at 0x200000
@@ -927,7 +922,7 @@ pde_next_range:
 	call init_acpi
 	call init_cpu
 	call init_hpet
-	;;call init_smp	;;;;;;;;;;;;;;;;;; Here there is a bug.
+	call init_smp
 
 	;; Reset rsp the proper location (was set to TSL_BASE_ADDRESS previously).
 	mov rsi, [p_LocalAPICAddress]	;; We would call p_smp_get_id here but stack
@@ -1125,7 +1120,14 @@ clear_regs:
 
 
 	call keyboard_get_key
-
+																	
+									;; TODO: deteniendo aqui antes del salto a kernel
+									;; tenemos la misma condicion que la referencia,
+									;; y ahora debo comparar.	
+										;;mov r9, msg_jumping
+										;;call print
+						
+									;;jmp $
 	mov rax, KERNEL_LOAD_ADDR
 	jmp rax	;; Long jump to kernel.
 

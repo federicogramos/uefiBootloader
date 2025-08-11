@@ -6,6 +6,10 @@
 ;; go, se salta a 0x800000.
 ;;=============================================================================
 
+;; TODO: add elf so to specify BITS16 / 32 and qemu x32_64 be able to show i386
+;; disas correctly.
+;; https://gitlab.com/qemu-project/qemu/-/issues/141
+;; https://sourceware.org/bugzilla/show_bug.cgi?id=22869
 
 %include "./asm/include/sysvar.inc"
 
@@ -48,7 +52,7 @@ ap_startup:
 	mov fs, ax
 	mov gs, ax
 	mov esp, 0x7000
-
+	jmp 0x0000:init_smp_ap	;; Asi ya cambio el cs.
 
 ;;==============================================================================
 ;; INIT SMP AP
@@ -78,14 +82,19 @@ check_A20_ap:
 
 ;; Done with real mode and BIOS interrupts. Jump to 32-bit mode.
 skip_a20_ap:
+	;;mov ax, [GDTR32] 
+	;;mov ax, [cs:GDTR32] 
+	;;mov eax, [GDTR32] 
+	;;mov eax, [cs:GDTR32] 
 	lgdt [cs:GDTR32]
 
-	mov eax, cr0
+	mov eax, cr0		;; Protected mode.
 	or al, 1
 	mov cr0, eax
 
+	;;mov eax, startap32
 	jmp 8:startap32
-
+	;;jmp eax
 
 ;;==============================================================================
 ;; 32-bit mode
@@ -96,6 +105,7 @@ align 16
 BITS 32
 
 startap32:
+
 	mov eax, 16			;; 4 GB data descriptor.
 	mov ds, ax			;; To data segment registers.
 	mov es, ax
@@ -222,12 +232,14 @@ bootmode_branch:
 
 section .data
 
+align 16
 
-GDTR32:										;; Global Descriptors Table Register
-				dw gdt32_end - gdt32 - 1	;; Limit.
-				dq gdt32					;; Linear address of GDT
+GDTR32:										;; Global Descriptor Table Register.
+				dw gdt32_end - gdt32 - 1	;; Size.
+				dq gdt32					;; Linear address of GDT.
 
 align 16
+
 gdt32:
 SYS32_NULL_SEL:	equ $ - gdt32			;; Null Segment
 				dq 0x0000000000000000
