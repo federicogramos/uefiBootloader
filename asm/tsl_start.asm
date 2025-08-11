@@ -31,14 +31,8 @@ extern bootmode_branch
 
 section .text
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BITS 64
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;TSL_BASE_ADDRESS equ 0x800000
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;ORG TSL_BASE_ADDRESS
 
 start:
-;;db 0xAA
-;;dq start
 	jmp bootmode_branch	;; Pisado con "nop" para q comiencen los ap aqui (patch_
 						;; ap_code).
 	nop
