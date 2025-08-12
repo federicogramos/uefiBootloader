@@ -9,12 +9,13 @@
 ;;
 ;; Nota de gdb y el booteo de aps. Cuando un ap arranaca, lo hara en 0x8000. Gdb
 ;; muestra el codigo de 64 bits. El address que el procesador ejecuta se muestra
-;; como 0x0000 pero es un tema** de visualizacion de gdb, porque el que esta eje
-;; cutando es 0x8000 y en modo i8086. Como esta en modo real, y sipi indica vv =
-;; 08 entonces cs:ip = 0800:0000 lo cual se verifica en gdb. Y esto en modo real
-;; es 8 * 2^4 + 0 = 0x8000. Si se agarra el dump de memoria de 0x8000 y desensam
-;; bla para i8086, vamos simplemente a ver el codigo de aqui, pero no coincide c
-;; on la visualizacion de gdb, que es para x64.
+;; como 0x0000 pero es un tema** de visualizacion de gdb, porque el address que 
+;; esta ejecutando es 0x8000 y en modo real (arch i8086 mostraria bien todo). Co
+;; mo esta en modo real, y sipi indica vv = 08 entonces cs:ip = 0800:0000 lo cua
+;; l se verifica en gdb. Y esto en modo real es 8 * 2^4 + 0 = 0x8000. Si se agar
+;; ra el dump de memoria de 0x8000 y desensambla para i8086, vamos simplemente a
+;; ver el codigo de aqui, pero no coincide con la visualizacion de gdb, que es p
+;; ara x64.
 ;;
 ;; ** no lo llamaria error, dado que el target le indica i386:x86-64 a gdb y no 
 ;; se puede hacer set architecture porque al menos en gdb-9.2 el comando toma "e
