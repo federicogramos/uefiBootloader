@@ -48,7 +48,7 @@ smp_send_INIT_skipcore:
 
 smp_send_INIT_done:
 
-	mov eax, 500				;; Wait 500us.
+	mov eax, 500					;; Wait 500us.
 	call os_hpet_delay
 
 	mov esi, IM_DetectedCoreIDs

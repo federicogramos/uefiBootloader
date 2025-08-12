@@ -1,10 +1,23 @@
 ;;==============================================================================
 ;; ap startup | @file /asm/tsl_ap.asm
-;;=============================================================================
-;; AP's will start execution at TSL_BASE_ADDRESS and fall through to this code.
-;; 1KiB reservado en 0x8000 para booteo en 16 bits de los ap. Terminado ese codi
-;; go, se salta a 0x800000.
-;;=============================================================================
+;;==============================================================================
+;; APs comienzan en TSL_BASE_ADDRESS y luego vienen a este codigo.
+;;
+;; En memoria, hay 1KiB reservado en 0x8000 para booteo en 16 bits de los ap. Te
+;; rminado ese codigo, se salta a 0x800000.
+;;
+;; Nota de gdb y el booteo de aps. Cuando un ap arranaca, lo hara en 0x8000. Gdb
+;; muestra el codigo de 64 bits. El address que el procesador ejecuta se muestra
+;; como 0x0000 pero es un tema* de visualizacion de gdb, porque el que esta ejec
+;; utando es 0x8000 y en modo i8086. Si se agarra el dump de memoria de 0x8000, 
+;; y desensambla para i8086, coinciden los addr con el avance del ip.
+;;
+;; * no lo llamaria error, dado que el target le indica i386:x86-64 a gdb y no s
+;; e puede hacer set architecture porque al menos en gdb-9.2 el comando toma "el
+;; mas featureful" de los sets cuando son compatibles, y eso implica que nunca s
+;; e va a poder hacer set architecture i8086 mientras se encuentra en x64 y el t
+;; arget (qemu) se lo indica.
+;;==============================================================================
 
 ;; TODO: add elf so to specify BITS16 / 32 and qemu x32_64 be able to show i386
 ;; disas correctly.

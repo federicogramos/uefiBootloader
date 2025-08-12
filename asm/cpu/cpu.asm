@@ -181,15 +181,15 @@ avx512_not_supported:
 	lock inc word [p_cpu_activated]
 	mov ecx, APIC_ID
 	call apic_read				;; APIC ID is stored in bits 31:24
-	shr eax, 24					;; AL now holds the CPU's APIC ID (0 - 255)
+	shr eax, 24					;; al holds the CPU's APIC ID (0 - 255). BSP = 0
 	mov rdi, IM_ActivedCoreIDs	;; The location where the activated cores set th
 								;; eir record to 1.
-	add rdi, rax				;; rdi points to InfoMap CPU area + APIC ID. ex 
+	add rdi, rax				;; rdi points to InfoMap CPU area + APIC ID. Ej: 
 								;; 0x5E01 would be APIC ID 1
 	mov al, 1
 	stosb						;; Store a 1 as the core is activated.
-
 	ret
+
 
 ;;==============================================================================
 ;; apic_read -- Read from a register in the APIC
