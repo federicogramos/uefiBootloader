@@ -4,19 +4,23 @@
 ;; APs comienzan en TSL_BASE_ADDRESS y luego vienen a este codigo.
 ;;
 ;; En memoria, hay 1KiB reservado en 0x8000 para booteo en 16 bits de los ap. Te
-;; rminado ese codigo, se salta a 0x800000.
+;; rminado ese codigo, se salta a 0x800000 (el bsp, no los ap, los cuales se que
+;; dan aqui).
 ;;
 ;; Nota de gdb y el booteo de aps. Cuando un ap arranaca, lo hara en 0x8000. Gdb
 ;; muestra el codigo de 64 bits. El address que el procesador ejecuta se muestra
-;; como 0x0000 pero es un tema* de visualizacion de gdb, porque el que esta ejec
-;; utando es 0x8000 y en modo i8086. Si se agarra el dump de memoria de 0x8000, 
-;; y desensambla para i8086, coinciden los addr con el avance del ip.
+;; como 0x0000 pero es un tema** de visualizacion de gdb, porque el que esta eje
+;; cutando es 0x8000 y en modo i8086. Como esta en modo real, y sipi indica vv =
+;; 08 entonces cs:ip = 0800:0000 lo cual se verifica en gdb. Y esto en modo real
+;; es 8 * 2^4 + 0 = 0x8000. Si se agarra el dump de memoria de 0x8000 y desensam
+;; bla para i8086, vamos simplemente a ver el codigo de aqui, pero no coincide c
+;; on la visualizacion de gdb, que es para x64.
 ;;
-;; * no lo llamaria error, dado que el target le indica i386:x86-64 a gdb y no s
-;; e puede hacer set architecture porque al menos en gdb-9.2 el comando toma "el
-;; mas featureful" de los sets cuando son compatibles, y eso implica que nunca s
-;; e va a poder hacer set architecture i8086 mientras se encuentra en x64 y el t
-;; arget (qemu) se lo indica.
+;; ** no lo llamaria error, dado que el target le indica i386:x86-64 a gdb y no 
+;; se puede hacer set architecture porque al menos en gdb-9.2 el comando toma "e
+;; l mas featureful" de los sets cuando son compatibles, y eso implica que nunca
+;; se va a poder hacer set architecture i8086 mientras se encuentra en x64 y el 
+;; target (qemu) se lo indica.
 ;;==============================================================================
 
 ;; TODO: add elf so to specify BITS16 / 32 and qemu x32_64 be able to show i386
@@ -67,6 +71,7 @@ ap_startup:
 	mov esp, 0x7000
 	jmp 0x0000:init_smp_ap	;; Asi ya cambio el cs.
 
+
 ;;==============================================================================
 ;; INIT SMP AP
 ;;==============================================================================
@@ -108,6 +113,7 @@ skip_a20_ap:
 	;;mov eax, startap32
 	jmp 8:startap32
 	;;jmp eax
+
 
 ;;==============================================================================
 ;; 32-bit mode

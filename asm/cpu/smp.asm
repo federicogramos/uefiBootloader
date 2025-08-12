@@ -1,6 +1,10 @@
 ;;==============================================================================
 ;; @file /asm/cpu/smp.asm
 ;;==============================================================================
+;; Intel multiprocessor spec, info relevante: B.2 Operating System Booting and S
+;; elf-configuration, B.4 Application Processor Startup., B.3 Interrupt Mode Ini
+;; tialization and Handling.
+;;==============================================================================
 
 
 ;; Revisar diagrama de pagina 20. Ruteo de senales de activacion de local apic.
@@ -27,19 +31,27 @@ smp_send_INIT:
 	je smp_send_INIT_done
 	lodsb
 
-	cmp al, dl						;; Is it the BSP?
+	cmp al, dl						;; Check if it is the bsp.
 	je smp_send_INIT_skipcore
 
 	;; Send "INIT" IPI to APIC ID in al.
 	mov rdi, [p_LocalAPICAddress]
 	shl eax, 24
 	mov dword [rdi + 0x310], eax	;; Irq Command Register (ICR); bits 63-32
-	mov eax, 0x00004500
+	mov eax, 0x00004500				;; 10:8 = 101 (delivery mode = init)
+									;; 11 = 0 (dest mode = fisico)
+									;; 15 = 1 (level triggered)
+									;; 14 = 1 (level = assert)
 	mov dword [rdi + 0x300], eax	;; Irq Command Register (ICR); bits 31-0
+									
 
 smp_send_INIT_verify:
 	mov eax, [rdi + 0x300]			;; Irq Command Register (ICR); bits 31-0
-	bt eax, 12						;; Verify that the command completed.
+	bt eax, 12						;; Poll delivery status until dispatched. TO
+									;; DO: should not happen, but intel manual s
+									;; uggests break and report error if t > 20u
+									;; s (o reintentar). El error se puede gener
+									;; ar porque ningun apic responde en el bus.
 	jc smp_send_INIT_verify
 
 smp_send_INIT_skipcore:
@@ -60,7 +72,7 @@ smp_send_SIPI:
 	je smp_send_SIPI_done
 	lodsb
 
-	cmp al, dl						;; Is it the BSP?
+	cmp al, dl						;; Check if it is the bsp.
 	je smp_send_SIPI_skipcore
 
 	;; Send "Startup" IPI to destination using vector 0x08 to specify entry-poin
@@ -68,7 +80,11 @@ smp_send_SIPI:
 	mov rdi, [p_LocalAPICAddress]
 	shl eax, 24
 	mov dword [rdi + 0x310], eax	;; Irq Command Register (ICR); bits 63-32
-	mov eax, 0x00004608				;; Vector 0x08.
+	mov eax, 0x00004608				;; 7:0 = 8 (vector 0x08).
+									;; 10:8 = 110 (delivery mode)
+									;; 11 = 0 (dest mode = fisico)
+									;; 15 = 1 (edge triggered)
+									;; 14 = 1 (level = assert)
 	mov dword [rdi + 0x300], eax	;; Irq Command Register (ICR); bits 31-0
 
 smp_send_SIPI_verify:
@@ -85,7 +101,7 @@ smp_send_SIPI_done:
 	call os_hpet_delay
 
 no_mp:
-	;; Gather and store the APIC ID of the BSP
+	;; Gather and store the APIC ID of the BSP.
 	xor eax, eax
 	mov rsi, [p_LocalAPICAddress]
 	add rsi, 0x20		;; Add the offset for the APIC ID location.
@@ -93,7 +109,7 @@ no_mp:
 	shr rax, 24			;; AL now holds the CPU's APIC ID (0 - 255).
 	mov [p_BSP], eax	;; Store the BSP APIC ID.
 
-	;; Calculate base speed of CPU
+	;; Calculate base speed of cpu.
 	cpuid
 	xor edx, edx
 	xor eax, eax
