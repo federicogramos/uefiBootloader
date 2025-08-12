@@ -1118,16 +1118,8 @@ clear_regs:
 	mov r9, msg_jumping
 	call print
 
-
 	call keyboard_get_key
 																	
-									;; TODO: deteniendo aqui antes del salto a kernel
-									;; tenemos la misma condicion que la referencia,
-									;; y ahora debo comparar.	
-										;;mov r9, msg_jumping
-										;;call print
-						
-									;;jmp $
 	mov rax, KERNEL_LOAD_ADDR
 	jmp rax	;; Long jump to kernel.
 
