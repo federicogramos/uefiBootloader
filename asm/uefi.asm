@@ -13,7 +13,7 @@
 ;; ad (UEFI bootloader + packedKernel.bin) que se requiera. Archivo BOOTX64.EFI,
 ;; luego de agregado el payload queda:
 ;;  +--------------------------+-------------------------+------------+
-;;  |    binario BOOTX64.EFI   |         payload         | padeo de   |
+;;  |     binario uefi.sys     |         payload         | padeo de   |
 ;;  |         |        |       | transient  | packed     | 0x00 hasta |
 ;;  | Encabez | Codigo | Datos | system     | Kernel.bin | el fin     |
 ;;  |         |        |       | low |  hi  |            |            |
