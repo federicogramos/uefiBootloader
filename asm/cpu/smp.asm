@@ -34,7 +34,8 @@ smp_send_INIT:
 	cmp al, dl						;; Check if it is the bsp.
 	je smp_send_INIT_skipcore
 
-	;; Send "INIT" IPI to APIC ID in al.
+	;; Send "INIT" IPI to APIC ID in al. Sets ap to known state before start of 
+	;; execution.
 	mov rdi, [p_LocalAPICAddress]
 	shl eax, 24
 	mov dword [rdi + 0x310], eax	;; Irq Command Register (ICR); bits 63-32
