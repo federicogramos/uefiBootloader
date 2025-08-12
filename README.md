@@ -4,7 +4,7 @@
 
 `./build.sh` *genera la imagen /img/x64_arq.img (entre otras).*
 
-`./run.sh` *corre en qemu la imagen /img/x64_arq.qcow2 (usar argumento "-c <n>" correr con <n> cores en QEMU, valor por defecto = 1)*
+`./run.sh` *corre en qemu la imagen /img/x64_arq.qcow2 (puede usar argumento "-c cant_cores" default = 1)*
 
 El repositorio tiene en /extern/kernel.bin un payload de SO para probar rapidamente, el cual usa cuando se hace el armado.
 
