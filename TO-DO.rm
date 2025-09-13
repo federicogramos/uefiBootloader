@@ -1,0 +1,18 @@
+# Integracion uefi + bios
+
+-- revisar si tengo GPT partition table for the USB drive. This allows for both UEFI and Legacy BIOS booting.
+
+-- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).
+
+-- create fat32 partition
+-- add mbr
+-- revisar que la particion este marcada como booteable.
+
+# Revisar
+
+-- si el orden de las particiones en la tabla tiene importancia.
+-- Tener en cuenta: A Protective MBR is a legacy Master Boot Record placed at the beginning of a GUID Partition Table (GPT) disk to provide backward compatibility and prevent older, MBR-based disk utilities from misinterpreting and accidentally overwriting GPT data. It contains a single partition entry that spans the entire disk, identified as a partition of type EEh, which signals that it is a GPT disk to these older tools, thereby protecting the underlying GPT structure from accidental modification.
+
+# Mas adelante
+
+-- Payload Partition y que cada uno la levante de alli.
