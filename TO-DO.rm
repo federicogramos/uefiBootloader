@@ -3,9 +3,31 @@
 -- revisar si tengo GPT partition table for the USB drive. This allows for both UEFI and Legacy BIOS booting.
 
 -- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).
+-- si tuviera que crearla:
+    sudo sgdisk --zap-all /dev/sdX
+    sudo sgdisk -n 1:0:+512MiB -t 1:ef00 -c 1:"EFI System Partition" /dev/sdX
+    sudo mkfs.fat -F32 /dev/sdX1 # Format ESP
 
--- create fat32 partition
--- add mbr
+    sudo mkdir /mnt/efi
+    sudo mount /dev/sdX1 /mnt/efi
+
+	sudo mkdir -p /mnt/efi/EFI/BOOT
+	sudo cp MyCustomBootloader.efi /mnt/efi/EFI/BOOT/BOOTX64.EFI
+
+    sudo umount /mnt/efi
+
+-- create fat32 partition --> no, primero probar de usar la misma particion que efi
+-- small (e.g., 1MB) unformatted partition for the BIOS bootloader. This must be a "BIOS boot partition" type (GUID 21686148-6449-6E6F-744E-45444F4F5421).
+
+    sudo sgdisk -n 3:0:+1MiB -t 3:ef02 -c 3:"BIOS Boot Partition" /dev/sdX
+
+-- add mbr --> primero probar meter en el mbr de efi, quiza permite usar el protective mbr para booteo.
+
+        # Write your custom MBR bootloader to the MBR
+        sudo dd if=my_mbr_bootloader.bin of=/dev/sdX bs=440 count=1
+        # Write additional stages to the BIOS boot partition if needed
+        sudo dd if=my_stage2_bootloader.bin of=/dev/sdX3
+
 -- revisar que la particion este marcada como booteable.
 
 # Revisar
