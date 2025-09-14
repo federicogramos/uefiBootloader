@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 # El unico argumento que recibe build.sh es -d o --debug que fuerza a que el boo
 # teo sea con el "modo step" el cual promptea para avanzar y permite leer los me
 # nsajes de inicializacion. Si se arma sin flag, entonces el modo step aun se pu
@@ -8,10 +9,13 @@
 set +e
 
 
+# Revisar, tengo esto pero las particiones estan hardcodeadas.
 # See if DISK_IMG_SIZE was defined for custom disk sizes.
 if [ "x$DISK_IMG_SIZE" = x ]; then
 	DISK_IMG_SIZE=256
 fi
+
+
 
 
 # Initialize disk images. Arg 1 is BMFS size in MiB.
@@ -102,9 +106,12 @@ function img_install {
 
 
 
-
+	echo "Attaching loop device..."
 	loop_device=$(sudo losetup --find)
-	sudo losetup -P $loop_device ./img/x64_arq.img
+	if ! sudo losetup -P $loop_device ./img/x64_arq.img; then
+		echo "Error: Failed to attach loop device. Exiting."
+		exit 1
+	fi
 
 	sudo parted $loop_device mklabel gpt > /dev/null 2>&1	# Create GPT partition table (parted writes a protective MBR).
 
@@ -123,11 +130,39 @@ function img_install {
 
 	sudo cp ./out/BOOTX64.EFI /mnt/efi/EFI/BOOT/BOOTX64.EFI
 
+
+
+	
+
+
+echo "Overwriting the protective MBR on $loop_device with bmfs_mbr.sys..."
+##if ! sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=512 count=1 conv=notrunc; then
+ #   echo "Error: Failed to write MBR. Exiting."
+    # Ensure cleanup even on error
+ #   sudo losetup -d "$loop_device"
+  #  exit 1
+#fi
+
+
+# Hasta 446 bytes, luego no bootea uefi.
+sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=1 count=446 conv=notrunc
+
+echo "MBR replacement successful."
+
+
+
+
+
+
+
 	sudo umount /mnt/efi
 	sudo rm -r /mnt/efi
 	sudo losetup -d $loop_device
 	unset loop_device
 
+
+
+	
 }
 
 
@@ -140,9 +175,6 @@ function convert_img {
 	qemu-img convert -f vmdk -O qcow2 ./img/x64_arq.vmdk ./img/x64_arq.qcow2
 
 	echo "OK"
-
-
-
 }
 
 
