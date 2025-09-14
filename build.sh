@@ -8,13 +8,13 @@
 set +e
 
 
-# See if BMFS_SIZE was defined for custom disk sizes.
+# See if BMFS_SIZE [MiB] was defined for custom disk sizes.
 if [ "x$BMFS_SIZE" = x ]; then
 	BMFS_SIZE=128
 fi
 
 
-# Initialize disk images. Arg 1 is BMFS size in MiB.
+# Initialize disk images. Arg 1 is BMFS size [MiB].
 function init_imgs { 
 
 	echo -n "Creating disk image files... "
@@ -28,9 +28,7 @@ function init_imgs {
 	if [ $retVal -ne 0 ]; then
 		echo -n "no UEFI support (due to bad mtools), "
 	fi
-	echo "\EFI\BOOT\BOOTX64.EFI" > startup.nsh
-	mcopy -i ./img/fat32.img startup.nsh ::/
-	rm startup.nsh
+	mcopy -i ./img/fat32.img "\EFI\BOOT\BOOTX64.EFI" ::/
 
 	echo "OK"
 }
