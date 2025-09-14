@@ -18,6 +18,7 @@ done
 qemu-system-x86_64 -bios extern/OVMF.fd -hda img/x64_arq.qcow2 -m 512 \
 	-name "arq64 uefi" $debug_flags  -smp "$cant_cores"
 
+### Dejar esto para probar el booteo con bios, luego, agregar flag para seleccionar uno u otro.
 ##qemu-system-x86_64 -hda img/gpt_with_pmbr.qcow2 -m 512 \
 ##	-name "arq64 uefi" $debug_flags  -smp "$cant_cores"
 
