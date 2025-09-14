@@ -1,6 +1,6 @@
 # Integracion uefi + bios
  
--- revisar si tengo GPT partition table for the USB drive. This allows for both UEFI and Legacy BIOS booting.
+-- hacer imagen en usb y testear en pc real esta oka.
 
 -- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).
 -- si tuviera que crearla:
