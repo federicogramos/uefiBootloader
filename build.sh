@@ -134,44 +134,34 @@ function img_install {
 
 	
 
+	# Protective MBR
+	# 0x000..	0x1b7	boot code
+	# 0x1b8..	0x1bd	unused
+	# 0x1be..	0x1cd	Partition Record 1
+	# 0x1ce..	0x1dd	zero (unused partition record 2)
+	# 0x1de..	0x1ed	zero (unused partition record 3)
+	# 0x1ee..	0x1fd	zero (unused partition record 4)
+	# 0x1fe..	0x1ff	magic number 0xaa55
 
-echo "Overwriting the protective MBR on $loop_device with bmfs_mbr.sys..."
-##if ! sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=512 count=1 conv=notrunc; then
- #   echo "Error: Failed to write MBR. Exiting."
-    # Ensure cleanup even on error
- #   sudo losetup -d "$loop_device"
-  #  exit 1
-#fi
+	echo "Overwriting the protective MBR on $loop_device with bmfs_mbr.sys..."
 
+	# Hasta 440 bytes.
+	if ! sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=1 count=440 conv=notrunc > /dev/null 2>&1; then
+		echo "Error: Failed to write MBR. Exiting."
+		cleanup	# Also, cleanup on error.
+		exit 1
+	fi
+	echo "MBR replacement successful."
 
-# Protective MBR
-# 0x000..	0x1b7	boot code
-# 0x1b8..	0x1bd	unused
-# 0x1be..	0x1cd	Partition Record 1
-# 0x1ce..	0x1dd	zero (unused partition record 2)
-# 0x1de..	0x1ed	zero (unused partition record 3)
-# 0x1ee..	0x1fd	zero (unused partition record 4)
-# 0x1fe..	0x1ff	magic number 0xaa55
-
-# Hasta 440 bytes.
-sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=1 count=440 conv=notrunc
-
-echo "MBR replacement successful."
+	cleanup
+}
 
 
-
-
-
-
-
+function cleanup {
 	sudo umount /mnt/efi
 	sudo rm -r /mnt/efi
 	sudo losetup -d $loop_device
 	unset loop_device
-
-
-
-	
 }
 
 
