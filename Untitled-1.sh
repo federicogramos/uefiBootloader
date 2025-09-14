@@ -10,7 +10,7 @@ set +e
 
 # See if BMFS_SIZE [MiB] was defined for custom disk sizes.
 if [ "x$BMFS_SIZE" = x ]; then
-	BMFS_SIZE=128
+	BMFS_SIZE=256
 fi
 
 
@@ -20,6 +20,13 @@ fi
 function init_imgs { 
 
 	echo -n "Creating disk image files... "
+
+	#### para gpt
+	dd if=/dev/zero of=./img/gpt_with_pmbr.img count=$1 bs=1048576
+
+
+
+
 
 	dd if=/dev/zero of=./img/bmfs.img count=$1 bs=1048576 > /dev/null 2>&1
 
@@ -93,6 +100,37 @@ function img_install {
 
 	cat ./img/fat32.img ./img/bmfs.img > ./img/x64_arq.img
 	###cat ./img/fat32.img > ./img/x64_arq.img
+
+
+
+
+
+	loop_device=$(losetup --find)
+	sudo losetup -P $loop_device ./img/gpt_with_pmbr.img
+
+	sudo parted $loop_device mklabel gpt	# Create GPT partition table (parted writes a protective MBR)
+
+	sudo parted $loop_device mkpart primary fat32 2048s 128MiB	# New 127M partition (efi system partition)
+	sudo parted $loop_device set 1 esp on
+	sudo parted $loop_device set 1 boot on
+
+	sudo parted $loop_device mkpart primary fat32 128MiB 100%	# 2nd partition.
+
+
+	sudo mkfs.fat -F 32 ${loop_device}p1	# Format.
+	sudo mkfs.fat -F 32 ${loop_device}p2	# Format.
+
+	##sudo mkfs.ext4 ${loop_device}p1
+
+	sudo mkdir /mnt/efi
+	sudo mount ${loop_device}p1 /mnt/efi
+	sudo mkdir -p /mnt/efi/EFI/BOOT
+	echo copy
+	sudo cp ./out/BOOTX64.EFI /mnt/efi/EFI/BOOT/BOOTX64.EFI
+
+	sudo umount /mnt/efi
+	sudo losetup -d $loop_device
+
 }
 
 
