@@ -8,18 +8,20 @@
 set +e
 
 
-# See if BMFS_SIZE [MiB] was defined for custom disk sizes.
+# See if BMFS_SIZE was defined for custom disk sizes.
 if [ "x$BMFS_SIZE" = x ]; then
 	BMFS_SIZE=128
 fi
 
 
-# Initialize disk images:
-# -- bmfs.img
-# Arg 1 is BMFS size [MiB].
+# Initialize disk images. Arg 1 is BMFS size in MiB.
 function init_imgs { 
 
 	echo -n "Creating disk image files... "
+
+
+
+
 
 	dd if=/dev/zero of=./img/bmfs.img count=$1 bs=1048576 > /dev/null 2>&1
 
@@ -30,7 +32,9 @@ function init_imgs {
 	if [ $retVal -ne 0 ]; then
 		echo -n "no UEFI support (due to bad mtools), "
 	fi
-	mcopy -i ./img/fat32.img "\EFI\BOOT\BOOTX64.EFI" ::/
+	echo "\EFI\BOOT\BOOTX64.EFI" > startup.nsh
+	mcopy -i ./img/fat32.img startup.nsh ::/
+	rm startup.nsh
 
 	echo "OK"
 }
@@ -92,7 +96,46 @@ function img_install {
 	fi
 
 	cat ./img/fat32.img ./img/bmfs.img > ./img/x64_arq.img
-	###cat ./img/fat32.img > ./img/x64_arq.img
+
+
+
+
+
+
+	#### para gpt
+	#dd if=/dev/zero of=./img/gpt_with_pmbr.img count=$1 bs=1048576
+	dd if=/dev/zero of=./img/gpt_with_pmbr.img count=256 bs=1048576
+
+	loop_device=$(sudo losetup --find)
+	sudo losetup -P $loop_device ./img/gpt_with_pmbr.img
+
+	sudo parted $loop_device mklabel gpt	# Create GPT partition table (parted writes a protective MBR)
+
+	sudo parted $loop_device mkpart primary fat32 2048s 128MiB	# New 127M partition (efi system partition)
+	sudo parted $loop_device set 1 esp on
+	sudo parted $loop_device set 1 boot on
+
+	sudo parted $loop_device mkpart primary fat32 128MiB 100%	# 2nd partition.
+
+	sudo mkfs.fat -F 32 ${loop_device}p1	# Format.
+	sudo mkfs.fat -F 32 ${loop_device}p2	# Format.
+
+	##sudo mkfs.ext4 ${loop_device}p1
+
+	sudo mkdir /mnt/efi
+	sudo mount ${loop_device}p1 /mnt/efi
+	sudo mkdir -p /mnt/efi/EFI/BOOT
+
+	sudo cp ./out/BOOTX64.EFI /mnt/efi/EFI/BOOT/BOOTX64.EFI
+
+	sudo umount /mnt/efi
+	sudo rm -r /mnt/efi
+	sudo losetup -d $loop_device
+	unset loop_device
+
+
+
+
 }
 
 
@@ -101,6 +144,11 @@ function convert_img {
 	qemu-img convert -O vmdk ./img/x64_arq.img ./img/x64_arq.vmdk
 	qemu-img convert -f vmdk -O qcow2 ./img/x64_arq.vmdk ./img/x64_arq.qcow2
 	echo "OK"
+
+
+
+	qemu-img convert -O vmdk ./img/gpt_with_pmbr.img ./img/gpt_with_pmbr.vmdk
+	qemu-img convert -f vmdk -O qcow2 ./img/gpt_with_pmbr.vmdk ./img/gpt_with_pmbr.qcow2
 }
 
 
