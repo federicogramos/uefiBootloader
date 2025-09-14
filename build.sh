@@ -144,8 +144,17 @@ echo "Overwriting the protective MBR on $loop_device with bmfs_mbr.sys..."
 #fi
 
 
-# Hasta 446 bytes, luego no bootea uefi.
-sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=1 count=446 conv=notrunc
+# Protective MBR
+# 0x000..	0x1b7	boot code
+# 0x1b8..	0x1bd	unused
+# 0x1be..	0x1cd	Partition Record 1
+# 0x1ce..	0x1dd	zero (unused partition record 2)
+# 0x1de..	0x1ed	zero (unused partition record 3)
+# 0x1ee..	0x1fd	zero (unused partition record 4)
+# 0x1fe..	0x1ff	magic number 0xaa55
+
+# Hasta 440 bytes.
+sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=1 count=440 conv=notrunc
 
 echo "MBR replacement successful."
 
