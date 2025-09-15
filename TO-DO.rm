@@ -38,3 +38,12 @@
 # Mas adelante
 
 -- Payload Partition y que cada uno la levante de alli.
+
+# Revisar
+
+-- aqui tengo un bootloader para mbr empieza igual q pure
+https://github.com/zmarcantel/doric/blob/master/boot.asm
+https://github.com/yjxqwed/myOS/blob/master/boot/boot.s
+
+https://github.com/EightyVice/RoOS
+https://github.com/TTaket/U-FAT32-Bootdisk/blob/main/Test_boot/boot.asm
