@@ -33,7 +33,7 @@ TSL_ELF_HI = $(ELF_DIR)/tsl_hi.elf
 TSL_SYS = $(BUILD_DIR)/tsl.sys
 
 
-all: $(UEFI_SYS) $(TSL_SYS)
+all: $(UEFI_SYS) $(TSL_SYS) mbr
 
 $(OBJ_DIR)/%.o: $(ASM_DIR)/%.asm
 	$(ASM) -g -F DWARF -f elf64 $< -o $@
@@ -50,6 +50,10 @@ $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
 	$(LD) -T $(LD_DIR)/tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
+
+mbr:
+	$(ASM) -g -F DWARF -f elf64 ./asm/bios/mbr.asm -o ./obj/mbr.o
+	$(LD) -T $(LD_DIR)/mbr.ld -o ./out/mbr.sys $(OBJ_DIR)/mbr.o
 
 build:
 	mkdir -p $(BUILD_DIR) $(IMG_DIR) $(OUT_DIR) $(OBJ_DIR) $(ELF_DIR) 

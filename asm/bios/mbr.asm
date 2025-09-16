@@ -10,8 +10,8 @@
 ; ckeck is made to make sure Pure64 was loaded by comparing a signiture.
 ; =============================================================================
 
-USE16
-org 0x7C00
+BITS 16
+;;;;;;;;;;;;;;;;;;;;;;;;;;;ORG 0x7C00
 
 entry:
 	cli				; Disable interrupts
