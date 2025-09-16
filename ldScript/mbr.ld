@@ -1,19 +1,8 @@
 OUTPUT_FORMAT("binary")
 SECTIONS
 {
-	. = 0x400000;
-	headerStart = .;
-	.header : {
-		aux = .;
-		header = .;
-		*(.header)
-	}
-
-	headerSize = . - headerStart;
-
-	. = ALIGN(0x200);
+	. = 0x7C00;
 	codeStart = .;
-	codeOffset = codeStart - headerStart;
 
 	.text :	{
 		text = .;
@@ -24,7 +13,7 @@ SECTIONS
 
 	. = ALIGN(0x1000);
 	dataStart = .;
-	dataOffset = dataStart - headerStart;
+	dataOffset = dataStart - codeStart;
 
 	.data : {
 		data = .;
@@ -44,5 +33,5 @@ SECTIONS
 		*(EXCLUDE_FILE (*.o) COMMON)
 	}
 
-	fileSize = . - headerStart;
+	fileSize = . - codeStart;
 }
