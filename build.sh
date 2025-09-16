@@ -143,10 +143,10 @@ function img_install {
 	# 0x1ee..	0x1fd	zero (unused partition record 4)
 	# 0x1fe..	0x1ff	magic number 0xaa55
 
-	echo "Overwriting the protective MBR on $loop_device with bmfs_mbr.sys..."
+	echo "Overwriting the protective MBR on $loop_device with mbr.sys..."
 
 	# Hasta 440 bytes.
-	if ! sudo dd if=./extern/bmfs_mbr.sys of=$loop_device bs=1 count=440 conv=notrunc > /dev/null 2>&1; then
+	if ! sudo dd if=./out/mbr.sys of=$loop_device bs=1 count=440 conv=notrunc > /dev/null 2>&1; then
 		echo "Error: Failed to write MBR. Exiting."
 		cleanup	# Also, cleanup on error.
 		exit 1
