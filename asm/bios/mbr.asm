@@ -11,7 +11,6 @@
 ; =============================================================================
 
 BITS 16
-;;;;;;;;;;;;;;;;;;;;;;;;;;;ORG 0x7C00
 
 entry:
 	cli				; Disable interrupts
@@ -163,16 +162,16 @@ print_string_16:			; Output string in SI to screen
 ;------------------------------------------------------------------------------
 
 
-msg_Load db "BMFS MBR v1.0 - Loading Pure64", 0
+msg_Load db "MBR - Reading sectors...", 0
 msg_LoadDone db " - done.", 13, 10, "Executing...", 0
 msg_MagicFail db " - Not found!", 0
 DriveNumber db 0x00
 
-times 446-$+$$ db 0
+times 446 - $ + $$	db 0
 
 ; False partition table entry required by some BIOS vendors.
 db 0x80, 0x00, 0x01, 0x00, 0xEB, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF
 
-times 510-$+$$ db 0
+times 510 - $ + $$	db 0
 
 sign dw 0xAA55
