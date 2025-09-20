@@ -1,5 +1,5 @@
 # Integracion uefi + bios
- 
+  
 -- hacer imagen en usb y testear en pc real esta oka.
 
 -- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).
