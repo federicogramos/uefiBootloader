@@ -28,7 +28,8 @@ entry:
 	call print_string_16
 
 	mov eax, 512		; Number of sectors to load. 512 sectors = 262144 bytes = 256 KiB
-	mov ebx, 16			; Start immediately after directory (offset 8192)
+	;;mov ebx, 16			; Start immediately after directory (offset 8192)
+	mov ebx, 6117			; Start immediately after directory (offset 8192)
 	mov cx, 0x8000		; Pure64 expects to be loaded at 0x8000
 
 load_nextsector:
@@ -38,7 +39,8 @@ load_nextsector:
 	jnz load_nextsector
 
 	mov eax, [0x8000]
-	cmp eax, 0xC03166FA		; Match against the Pure64 binary
+	cmp eax, 0x00014ee9		; Match against the Pure64 binary
+;; Reemplazar por el comienzo de tsl.sys, 4x 1eros bytes.
 	jne magic_fail
 
 	mov ax, 0x0800		; Segment where the bootloader and payload are loaded

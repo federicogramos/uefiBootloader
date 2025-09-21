@@ -77,6 +77,7 @@ function build_all {
 	# la posicion indicada en uefi.asm 
 	cp ./build/uefi.sys ./out/BOOTX64.EFI
 	dd if=./out/payload.sys of=./out/BOOTX64.EFI bs=16384 seek=1 conv=notrunc > /dev/null 2>&1
+	# Probar de usar load en bios 6117 sector. tsl_start ubicado en la imagen en byte 0x2fca00.
 
 	#echo -n "Formatting BMFS disk... "
 	#./extern/bmfs ./img/bmfs.img format
