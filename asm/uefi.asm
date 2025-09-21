@@ -614,7 +614,7 @@ print_video_information:
 verifica_payload:
 	mov rsi, PAYLOAD + 6
 	mov rax, [rsi]
-	mov rbx, "UEFIBOOT"	;; Chequeo simple de payload en lugar.
+	mov rbx, "BOOTLOAD"	;; Chequeo simple de payload en lugar.
 	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64...
 	jne payloadSignatureFail
 

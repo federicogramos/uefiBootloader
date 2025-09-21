@@ -73,12 +73,14 @@ function build_all {
 		echo "Warning - payload binary is larger than 32768 bytes!"
 	fi
 
-	# Prepara UEFI loader (uefi += bootloader + kernel + userland). Colocar en 
-	# la posicion indicada en uefi.asm 
+	# Para uefi: prepara UEFI loader (uefi += bootloader + kernel + userland). C
+	# olocar en la posicion indicada en uefi.asm
+	# Para bios: debe levantar sector donde comienza tsl dentro de la imagen.
+	# Usar load en bios sector = 6117 (tsl_start ubicado en la imagen en byte 0x
+	# 2fca00).
 	cp ./build/uefi.sys ./out/BOOTX64.EFI
 	dd if=./out/payload.sys of=./out/BOOTX64.EFI bs=16384 seek=1 conv=notrunc > /dev/null 2>&1
-	# Probar de usar load en bios 6117 sector. tsl_start ubicado en la imagen en byte 0x2fca00.
-
+	
 	#echo -n "Formatting BMFS disk... "
 	#./extern/bmfs ./img/bmfs.img format
 	#echo "OK"

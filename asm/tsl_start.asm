@@ -36,7 +36,7 @@ start:
 	jmp bootmode_branch	;; Pisado con "nop" para q comiencen los ap aqui (patch_
 						;; ap_code).
 	nop
-	db "UEFIBOOT"		;; Marca para un simple chequeo de que hay payload.
+	db "BOOTLOAD"		;; Marca para un simple chequeo de que hay payload.
 	nop
 	nop
 
