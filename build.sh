@@ -16,29 +16,13 @@ if [ "x$DISK_IMG_SIZE" = x ]; then
 fi
 
 
-
-
-# Initialize disk images. Arg 1 is BMFS size in MiB.
+# Initialize disk images. Arg 1 is size in MiB.
 function init_imgs { 
 
 	echo -n "Creating disk image files... "
 
-	dd if=/dev/zero of=./img/x64_arq.img count=256 bs=1048576 > /dev/null 2>&1	# para gpt.
-
-
-
-	#dd if=/dev/zero of=./img/bmfs.img count=$1 bs=1048576 > /dev/null 2>&1
-
-	#mformat -t 128 -h 2 -s 1024 -C -F -i ./img/fat32.img
-	#mmd -i ./img/fat32.img ::/EFI > /dev/null 2>&1
-	#mmd -i ./img/fat32.img ::/EFI/BOOT > /dev/null 2>&1
-	#retVal=$?
-	#if [ $retVal -ne 0 ]; then
-	#	echo -n "no UEFI support (due to bad mtools), "
-	#fi
-	#echo "\EFI\BOOT\BOOTX64.EFI" > startup.nsh
-	#mcopy -i ./img/fat32.img startup.nsh ::/
-	#rm startup.nsh
+	# Para gpt.
+	dd if=/dev/zero of=./img/x64_arq.img count=256 bs=1048576 > /dev/null 2>&1
 
 	echo "OK"
 }
@@ -81,10 +65,6 @@ function build_all {
 	cp ./build/uefi.sys ./out/BOOTX64.EFI
 	dd if=./out/payload.sys of=./out/BOOTX64.EFI bs=16384 seek=1 conv=notrunc > /dev/null 2>&1
 	
-	#echo -n "Formatting BMFS disk... "
-	#./extern/bmfs ./img/bmfs.img format
-	#echo "OK"
-
 	img_install
 	convert_img
 }
@@ -93,22 +73,6 @@ function build_all {
 # Dejar lista imagen de disco.
 function img_install {
 
-	# Copy UEFI boot to disk image.
-	#if [ -x "$(command -v mcopy)" ]; then
-#		mcopy -oi ./img/fat32.img ./out/BOOTX64.EFI ::/EFI/BOOT/BOOTX64.EFI > /dev/null 2>&1
-#		retVal=$?
-#		if [ $retVal -ne 0 ]; then
-#			echo -n "no UEFI support (due to bad mtools), "
-#		fi
-#	fi
-
-#	cat ./img/fat32.img ./img/bmfs.img > ./img/x64_arq.img
-
-
-
-
-
-
 	echo "Attaching loop device..."
 	loop_device=$(sudo losetup --find)
 	if ! sudo losetup -P $loop_device ./img/x64_arq.img; then
@@ -116,13 +80,18 @@ function img_install {
 		exit 1
 	fi
 
-	sudo parted $loop_device mklabel gpt > /dev/null 2>&1	# Create GPT partition table (parted writes a protective MBR).
+	# Create GPT partition table (parted writes a protective MBR).
+	sudo parted $loop_device mklabel gpt > /dev/null 2>&1
 
-	sudo parted $loop_device mkpart primary fat32 2048s 128MiB > /dev/null 2>&1	# New 127M partition (efi system partition).
+	# New 128M partition (efi system partition).
+	sudo parted $loop_device mkpart primary fat32 2048s 128MiB > /dev/null 2>&1
 	sudo parted $loop_device set 1 esp on > /dev/null 2>&1
-	sudo parted $loop_device set 1 boot on > /dev/null 2>&1	# Por el momento sin uso.
 
-	sudo parted $loop_device mkpart primary fat32 128MiB 100% > /dev/null 2>&1	# 2nd partition.
+	# Por el momento sin uso.
+	# sudo parted $loop_device set 1 boot on > /dev/null 2>&1
+
+	# 2nd partition. Por el momento sin uso, pero no la descarto.
+	sudo parted $loop_device mkpart primary fat32 128MiB 100% > /dev/null 2>&1
 
 	sudo mkfs.fat -F 32 ${loop_device}p1 > /dev/null 2>&1	# Format.
 	sudo mkfs.fat -F 32 ${loop_device}p2 > /dev/null 2>&1	# Format.
@@ -132,10 +101,6 @@ function img_install {
 	sudo mkdir -p /mnt/efi/EFI/BOOT
 
 	sudo cp ./out/BOOTX64.EFI /mnt/efi/EFI/BOOT/BOOTX64.EFI
-
-
-
-	
 
 	# Protective MBR
 	# 0x000..	0x1b7	boot code
@@ -170,8 +135,6 @@ function cleanup {
 
 function convert_img {
 	echo -n "Creating VMDK and QCOW2 images... "
-#	qemu-img convert -O vmdk ./img/x64_arq.img ./img/x64_arq.vmdk
-#	qemu-img convert -f vmdk -O qcow2 ./img/x64_arq.vmdk ./img/x64_arq.qcow2
 
 	qemu-img convert -O vmdk ./img/x64_arq.img ./img/x64_arq.vmdk
 	qemu-img convert -f vmdk -O qcow2 ./img/x64_arq.vmdk ./img/x64_arq.qcow2
