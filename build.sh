@@ -75,7 +75,7 @@ function build_all {
 
 	# Para uefi: prepara UEFI loader (uefi += bootloader + kernel + userland). C
 	# olocar en la posicion indicada en uefi.asm
-	# Para bios: debe levantar sector donde comienza tsl dentro de la imagen.
+	# Para bios: debeg levantar sector donde comienza tsl dentro de la imagen.
 	# Usar load en bios sector = 6117 (tsl_start ubicado en la imagen en byte 0x
 	# 2fca00).
 	cp ./build/uefi.sys ./out/BOOTX64.EFI
