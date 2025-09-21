@@ -39,8 +39,8 @@ load_nextsector:
 	jnz load_nextsector
 
 	mov eax, [0x8000]
-	cmp eax, 0x00014ee9		; Match against the Pure64 binary
-;; Reemplazar por el comienzo de tsl.sys, 4x 1eros bytes.
+	cmp eax, 0x00014ee9		; Match against the tsl_start.sys binary
+;; Reemplazar por el comienzo de tsl_start.sys, 4x 1eros bytes.
 	jne magic_fail
 
 	mov ax, 0x0800		; Segment where the bootloader and payload are loaded
