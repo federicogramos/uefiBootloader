@@ -126,7 +126,7 @@ pde_low_32:				; Create a 2 MiB page
 	jne pde_low_32			; Create 2048 2 MiB page maps.
 
 ; Load the GDT
-	lgdt [tGDTR64]
+	lgdt [tmpGDTR64]
 
 ; Enable extended properties
 	mov eax, cr4

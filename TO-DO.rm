@@ -1,5 +1,19 @@
 # Integracion uefi + bios
-  
+
+-- importante a resolver de inmediato:
+fgr@br1100f:~/arq/uefiBootloader$ ./build.sh
+make: Entering directory '/home/fgr/arq/uefiBootloader'
+rm -rf ./build ./img ./out ./obj ./elf
+make: Leaving directory '/home/fgr/arq/uefiBootloader'
+make: *** [Makefile:50: build/tsl.sys] Error 1
+ Error: tsl.sys no generado!
+fgr@br1100f:~/arq/uefiBootloader$ ld -T ./ldScript/tsl.ld -o ./build/tsl.sys ./obj/tsl_start.o ./obj/tsl_ap.o ./obj/tsl.o ./obj/lib.o
+ld: section .data_low LMA [0000000000000100,0000000000000127] overlaps section .text_low LMA [0000000000000000,000000000000026d]
+fgr@br1100f:~/arq/uefiBootloader$ 
+
+en tsl_ap.asm comente el codigo bios, pero este es el que genera la nueva restriccion de memoria.
+tsl_ap.asm linea 253
+
 -- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).
 -- si tuviera que crearla:
     sudo sgdisk --zap-all /dev/sdX

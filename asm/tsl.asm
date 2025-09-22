@@ -39,6 +39,7 @@ extern emptyKbBuffer
 extern data_hi_end_reloc
 extern code_data_hi_size
 
+global tmpGDTR64	;; For bios boot. See line 1178 TO-DO.
 global GDTR64
 global SYS64_CODE_SEL
 global IDTR64
@@ -1172,7 +1173,9 @@ cfg_smpinit:	db 1	; By default SMP is enabled. Set to 0 to disable.
 
 align 16
 
-tGDTR64:									;; Global Descriptors Table Register
+;; TO-DO: (revisar) si esto se puede optimizar, no es necesario definir una temp
+;; ral q apunte a gdt64. Ver posibilidad de usar una unica zona de mem.
+tmpGDTR64:									;; Global Descriptors Table Register
 				dw gdt64_end - gdt64 - 1	;; Limit.
 				dq gdt64					;; linear address of GDT
 
