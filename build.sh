@@ -8,6 +8,7 @@
 
 set +e
 
+# In Kilobytes.
 PAYLOAD_SIZE_LIMIT=240
 
 # Revisar, tengo esto pero las particiones estan hardcodeadas.
@@ -54,8 +55,8 @@ function build_all {
 
 	cat ./build/tsl.sys ./extern/kernel.bin > ./out/payload.sys
 	payload_size=$(wc -c <./out/payload.sys)
-	if [ $payload_size -gt $PAYLOAD_SIZE_LIMIT ]; then
-		echo -e "\e[38;5;214mWarning - payload binary is larger than  bytes!\e[0m"
+	if (( payload_size > PAYLOAD_SIZE_LIMIT * 1024 )); then
+		echo -e "\e[38;5;214mWarning - payload binary is larger than ${PAYLOAD_SIZE_LIMIT} KiB!\e[0m"
 	fi
 
 	# Para uefi: prepara UEFI loader (uefi += bootloader + kernel + userland). C
