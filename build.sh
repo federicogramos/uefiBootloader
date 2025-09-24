@@ -8,6 +8,7 @@
 
 set +e
 
+PAYLOAD_SIZE_LIMIT=((240 * 1024))
 
 # Revisar, tengo esto pero las particiones estan hardcodeadas.
 # See if DISK_IMG_SIZE was defined for custom disk sizes.
@@ -53,7 +54,7 @@ function build_all {
 
 	cat ./build/tsl.sys ./extern/kernel.bin > ./out/payload.sys
 	payload_size=$(wc -c <./out/payload.sys)
-	if [ $payload_size -gt 32768 ]; then
+	if [ $payload_size -gt $PAYLOAD_SIZE_LIMIT ]; then
 		echo "Warning - payload binary is larger than 32768 bytes!"
 	fi
 
@@ -111,7 +112,7 @@ function img_install {
 	# 0x1ee..	0x1fd	zero (unused partition record 4)
 	# 0x1fe..	0x1ff	magic number 0xaa55
 
-	echo "Overwriting the protective MBR on $loop_device with mbr.sys..."
+	echo "Replacing empty protective MBR on $loop_device with mbr.sys..."
 
 	# Hasta 440 bytes.
 	if ! sudo dd if=./out/mbr.sys of=$loop_device bs=1 count=440 conv=notrunc > /dev/null 2>&1; then
