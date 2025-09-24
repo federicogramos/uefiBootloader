@@ -23,8 +23,10 @@
 ;; 0      512B    4KiB     16KiB   17KiB   28KiB      256KiB       1MiB-1
 ;;==============================================================================
 
+
 TSL_BASE_ADDRESS		equ 0x800000
 TSL_BASE_ADDRESS_LOW	equ 0x8000
+TSL_LO_SIZE				equ 0x400
 
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
@@ -778,7 +780,7 @@ exit_uefi_services:
 	;; Low primeros 0x300 bytes de los 240 del payload.
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS_LOW
-	mov rcx, 0x300	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
+	mov rcx, TSL_LO_SIZE	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
 	rep movsb
 
 	;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.

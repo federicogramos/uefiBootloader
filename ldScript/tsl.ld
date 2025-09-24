@@ -8,11 +8,11 @@ SECTIONS
 		./obj/tsl_ap.o (.text)
 	}
 
-	. = ALIGN(0x100); /* 0x8200 */
+	. = ALIGN(0x100); /* 0x8200 ---- con ultima modif bios va a 0x300*/
 	code_lo_end_reloc_aligned = . ;
 	code_lo_size_aligned = code_lo_end_reloc_aligned - code_lo_start_reloc;
 	data_lo_start_reloc_aligned = . ;
-	data_lo_start_load = code_lo_start_load + data_lo_size_aligned;
+	data_lo_start_load = code_lo_start_load + code_lo_size_aligned;
 	.data_low data_lo_start_reloc_aligned : AT (data_lo_start_load) {
 		./obj/tsl_ap.o (.data)
 	}
