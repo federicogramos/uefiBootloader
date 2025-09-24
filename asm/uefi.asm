@@ -777,14 +777,14 @@ exit_uefi_services:
 	;; 0x404000            0x404400                           0x440000
 	;; PAYLOAD
 
-	;; Low primeros 0x300 bytes de los 240 del payload.
+	;; Low primeros TSL_LO_SIZE bytes de los 240 del payload.
 	mov rsi, PAYLOAD
 	mov rdi, TSL_BASE_ADDRESS_LOW
 	mov rcx, TSL_LO_SIZE	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
 	rep movsb
 
 	;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
-	mov rsi, PAYLOAD + 0x400
+	mov rsi, PAYLOAD + TSL_LO_SIZE
 	mov rdi, TSL_BASE_ADDRESS
 	mov rcx, (239 * 1024)	;; 239KiB.
 	rep movsb
