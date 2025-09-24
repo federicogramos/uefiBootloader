@@ -8,7 +8,7 @@
 
 set +e
 
-PAYLOAD_SIZE_LIMIT=((240 * 1024))
+PAYLOAD_SIZE_LIMIT=240
 
 # Revisar, tengo esto pero las particiones estan hardcodeadas.
 # See if DISK_IMG_SIZE was defined for custom disk sizes.
@@ -43,10 +43,10 @@ function build_all {
 	echo "$make_output" | grep --color=always -i "error" || echo "$make_output"
 
 	if [ ! -f "./build/uefi.sys" ]; then # Simple check of files generated ok.
-		echo -e "\e[1;31m Error: uefi.sys no generado!\e[0m"
+		echo -e "\e[31mError: uefi.sys no generado!\e[0m"
 		exit 1
 	elif [ ! -f "./build/tsl.sys" ]; then
-		echo -e "\e[1;31m Error: tsl.sys no generado!\e[0m"
+		echo -e "\e[31mError: tsl.sys no generado!\e[0m"
 		exit 1
 	fi
 
@@ -55,7 +55,7 @@ function build_all {
 	cat ./build/tsl.sys ./extern/kernel.bin > ./out/payload.sys
 	payload_size=$(wc -c <./out/payload.sys)
 	if [ $payload_size -gt $PAYLOAD_SIZE_LIMIT ]; then
-		echo "Warning - payload binary is larger than 32768 bytes!"
+		echo -e "\e[38;5;214mWarning - payload binary is larger than  bytes!\e[0m"
 	fi
 
 	# Para uefi: prepara UEFI loader (uefi += bootloader + kernel + userland). C
