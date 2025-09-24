@@ -1,5 +1,9 @@
 # Integracion uefi + bios
 
+-- el primer jump desde tsl start por bios me salta diferente si el salto es corto o si es largo, 
+fijarse por que.
+-- veo que tengo que ajustar ubicacion de tables de mapeo, revisar. 
+
 -- importante a resolver de inmediato:
 fgr@br1100f:~/arq/uefiBootloader$ ./build.sh
 make: Entering directory '/home/fgr/arq/uefiBootloader'

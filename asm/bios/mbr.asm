@@ -38,9 +38,9 @@ load_nextsector:
 	cmp eax, 0
 	jnz load_nextsector
 
-	mov eax, [0x8000 + 6]
-	cmp eax, "BOOT"		; Match against the tsl_start.sys binary
-	jne magic_fail
+	;;mov eax, [0x8000 + 6]
+	;;cmp eax, "BOOT"		; Match against the tsl_start.sys binary
+	;;jne magic_fail
 
 	mov ax, 0x0800		; Segment where the bootloader and payload are loaded
 	mov cx, 0x6000		; Segment where the bootloader and payload will be copied

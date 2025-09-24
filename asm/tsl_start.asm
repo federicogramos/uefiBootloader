@@ -16,8 +16,9 @@
 ;;  |<-------------- 4KiB -------------->|        |<----   KiB ---->|
 ;; 0x8000                      0x8200  0x2000   0x800000
 ;; 
-;; code 0 a 0x200 , data 0x200 a 300\
-;; y en 0x300 aparece tsl que se carga en 800000
+;; 20250924:
+;; code 0 a 0x300 , data 0x300 a 400
+;; y en 0x400 aparece tsl que se carga en 800000
 
 %include "./asm/include/tsl.inc"
 
@@ -30,6 +31,8 @@ extern bootmode_branch
 
 
 section .text
+
+;;BITS 32
 
 
 start:

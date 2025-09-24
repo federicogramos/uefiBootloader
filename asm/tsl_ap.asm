@@ -238,11 +238,19 @@ ap_sleep:
 
 BITS 32
 
+nop
+nop
+nop
 bootmode_branch:
+;;jmp start32
+
+
 	cmp bl, 'U'	;; If uefi boot then already in 64 bit mode.
-	je start64
-	cmp bl, 'B'	;; If bios boot, currently 32 bits, goto configure 64 bit mode.
-	je start32
+	jne start32
+	;;je start64
+	jmp start64
+	;;cmp bl, 'B'	;; If bios boot, currently 32 bits, goto configure 64 bit mode.
+	;;je start32
 
 start32:
 

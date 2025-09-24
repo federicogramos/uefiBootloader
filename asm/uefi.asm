@@ -618,7 +618,7 @@ verifica_payload:
 	mov rax, [rsi]
 	mov rbx, "BOOTLOAD"	;; Chequeo simple de payload en lugar.
 	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64...
-	jne payloadSignatureFail
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;jne payloadSignatureFail
 
 get_memmap:
 	mov rdx, [memmap]			;; OUT EFI_MEMORY_DESCRIPTOR *MemoryMap
