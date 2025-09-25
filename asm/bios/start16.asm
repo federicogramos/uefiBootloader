@@ -1,4 +1,5 @@
-Pasaje 16 to 64 bits
+;;;Pasaje 16 to 64 bits
+
 BITS 16
 
 

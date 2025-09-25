@@ -33,23 +33,61 @@ function init_imgs {
 # Build the source code and create the software files.
 function build_all {
 
+	debug_flag=0
+	verbose_flag=0
+
+	# Parse command-line arguments.
+	while getopts "dv" opt; do
+	case "$opt" in
+		d) debug_flag=1 ;;
+		v) verbose_flag=1 ;;
+		*) 
+		echo "Invalid option: $0 [-d] [-v]" >&2
+		echo "-d: force bootloader step mode at compile level (no need to press 's' at boot)" >&2
+		echo "-v: verbose all make output" >&2
+
+		exit 1
+		;;
+	esac
+	done
+
+
 	make clean -C .
 
-	if [ "$1" = "-d" -o "$1" = "--debug" ]; then
-		make_output=$(make FORCE_STEP_MODE=1 all -C . 2>&1)
+	if [ "$debug_flag" -eq 1 ]; then
+		make_cmd="make FORCE_STEP_MODE=1 all -C ."
 	else
-		make_output=$(make all -C . 2>&1)
+		make_cmd="make all -C ."
 	fi
 
-	echo "$make_output" | grep --color=always -i "error" || echo "$make_output"
+	if [ "$verbose_flag" -eq 1 ]; then
+		make_output=$(eval "$make_cmd" 2>&1)
+		echo "$make_output" | sed -E "s/(error)/\x1b[1;31m\1\x1b[0m/Ig"
+	else
+		make_output=$(eval "$make_cmd" 2>&1)
+		echo "$make_output" | grep --color=always -i "error" || echo "$make_output"
+	fi
+
 
 	if [ ! -f "./build/uefi.sys" ]; then # Simple check of files generated ok.
-		echo -e "\e[31mError: uefi.sys no generado!\e[0m"
+		echo -e "\e[1;31mError: uefi.sys no generado!\e[0m"
+
+		if [ "$verbose_flag" -eq 0 ]; then
+			if grep --color=always -i "error" <<< "$make_output" > /dev/null; then
+				echo "Use flag -v para verbose salida de make."
+			fi
+		fi
 		exit 1
 	elif [ ! -f "./build/tsl.sys" ]; then
-		echo -e "\e[31mError: tsl.sys no generado!\e[0m"
+		echo -e "\e[1;31mError: tsl.sys no generado!\e[0m"
+		if [ "$verbose_flag" -eq 0 ]; then
+			if grep --color=always -i "error" <<< "$make_output" > /dev/null; then
+				echo "Use flag -v para verbose salida de make."
+			fi
+		fi
 		exit 1
 	fi
+
 
 	init_imgs $DISK_IMG_SIZE
 

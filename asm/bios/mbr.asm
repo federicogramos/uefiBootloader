@@ -1,14 +1,9 @@
-; =============================================================================
-; Pure64 MBR -- a 64-bit OS loader written in Assembly for x86-64 systems
-; Copyright (C) 2008-2014 Return Infinity -- see LICENSE.TXT
-;
-; This Master Boot Record will load Pure64 from a pre-defined location on the
-; hard drive without making use of the file system.
-;
-; In this code we are expecting a BMFS-formatted drive. With BMFS the Pure64
-; binary is required to start at sector 16 (8192 bytes from the start). A small
-; ckeck is made to make sure Pure64 was loaded by comparing a signiture.
-; =============================================================================
+;;=============================================================================
+;; MBR
+;; -- will load tsl payload.
+;; -- will leave cpu in 32 bit mode. 
+;;=============================================================================
+
 
 BITS 16
 
