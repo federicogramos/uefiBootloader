@@ -1,3 +1,7 @@
+Pasaje 16 to 64 bits
+BITS 16
+
+
 mov [p_BootDisk], bh	; Save disk from where system was booted from
 
 	mov eax, 16			; Set the correct segment registers

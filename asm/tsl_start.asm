@@ -24,7 +24,7 @@
 
 ;; tsl_ap.asm
 extern bootmode_branch
-
+																extern testeoJump
 
 ;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
 ;; codigo, se salta a 0x800000.
@@ -32,7 +32,7 @@ extern bootmode_branch
 
 section .text
 
-;;BITS 32
+;;BITS 16
 
 
 start:
