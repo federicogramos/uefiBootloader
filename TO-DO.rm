@@ -1,11 +1,10 @@
 # Integracion uefi + bios
 
--- el primer jump desde tsl start por bios me salta diferente si el salto es corto o si es largo, 
-fijarse por que.
 -- veo que tengo que ajustar ubicacion de tables de mapeo, revisar. 
 
+-- lo que se va a hacer es: levanta mbr todo tsl que tiene 1ero que nada start16
+-- modifico entonces uefi, para que no levante la parte de start16.
 
--- uefi sigue andando, tengo que hacer el mbr con todo hasta 32 y de 32 saltar al tsl
 -- toque la verificacion de payload en uefi, luego volver a ponerla.
 
 -- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).

@@ -6,6 +6,14 @@
 ;; -- BIOS Enhanced Disk Drive Specification 3.0: http://www.o3one.org/hwdocs/bi
 ;; os_doc/bios_specs_edd30.pdf
 ;; http://www.ctyme.com/intr/rb-0708.htm
+;;
+;; En 16 bits cuando el procesador no es de 16 si no de 32 o 64 en un modo de 16
+;; bits, prestar atencion a algunas instrucciones: jumps por ejemplo. El mismo o
+;; pcode lo interpreta en 32 de una manera y en 16 de otra, saltando en cada uno
+;; de esos casos a direcciones cercanas pero distintas porque en 32 toma operand
+;; o de 32 y en 16 de 16 (8?) lo cual genera un offset en la direccion de destin
+;; o. Pero un push de 32 es reconocido en 16 bits y ejecutado correctamente a pe
+;; sar de estar en modo de 16.
 ;;==============================================================================
 
 
