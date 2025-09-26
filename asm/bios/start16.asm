@@ -1,9 +1,6 @@
 ;;;Pasaje 16 to 64 bits
 
-BITS 16
-
-
-mov [p_BootDisk], bh	; Save disk from where system was booted from
+	mov [p_BootDisk], bh		; Save disk from where system was booted from
 
 	mov eax, 16			; Set the correct segment registers
 	mov ds, ax
@@ -21,9 +18,11 @@ mov [p_BootDisk], bh	; Save disk from where system was booted from
 	xor ebp, ebp
 	mov esp, 0x8000			; Set a known free location for the stack
 
-;; importante, aqui toma lo que le ha pasado desde bios, esto esta dentro de ifdef
-;; por eso lo que le pasa difiere de uefi
-;; leer info de video de VBEModeInfoBlock esta bien. Tener en cuenta que aqui es solo la asignacion para bios
+
+;;;;;;;;;;;;;;;; importante, aqui toma lo que le ha pasado desde bios, esto esta dentro de ifdef
+;;;; por eso lo que le pasa difiere de uefi
+;;;; leer info de video de VBEModeInfoBlock esta bien. Tener en cuenta que aqui es solo la asignacion para bios
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	; Save the frame buffer address, size (after its calculated), and the screen x,y
 	xor eax, eax
@@ -157,5 +156,3 @@ pde_low_32:				; Create a 2 MiB page
 	mov cr0, eax
 
 	jmp SYS64_CODE_SEL:start64	; Jump to 64-bit mode
-
-	

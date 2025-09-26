@@ -4,6 +4,10 @@
 fijarse por que.
 -- veo que tengo que ajustar ubicacion de tables de mapeo, revisar. 
 
+
+-- uefi sigue andando, tengo que hacer el mbr con todo hasta 32 y de 32 saltar al tsl
+-- toque la verificacion de payload en uefi, luego volver a ponerla.
+
 -- keep current uefi partitions (EFI System Partition (ESP): A FAT32 partition (e.g., 512MB) for UEFI boot files).
 -- si tuviera que crearla:
     sudo sgdisk --zap-all /dev/sdX
