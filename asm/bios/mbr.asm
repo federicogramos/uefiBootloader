@@ -18,10 +18,18 @@ entry:
 	mov ss, ax
 	mov es, ax
 	mov ds, ax
-	mov sp, 0x7C00
+	mov sp, 0x7c00
 	sti
 
 	mov [driveNumber], dl	;; Bios passes drive number in dl.
+
+	mov bx, sp
+	push eax
+	sub bx, sp
+	pop eax
+	add [msg_sizeofPush + 32], bl
+	mov si, msg_sizeofPush
+	call print_string_16
 
 	mov si, msg_extSupport
 	call print_string_16
@@ -40,16 +48,18 @@ entry:
 	mov si, msg_load
 	call print_string_16
 
-	mov eax, 512		; Number of sectors to load. 512 sectors = 262144 bytes = 256 KiB
-	mov ebx, 6117			; Start immediately after directory (offset 8192)
-	mov cx, 0x8000		; Pure64 expects to be loaded at 0x8000
+	mov ax, 512	;; Load 512 sectors = 262144 bytes = 256 KiB.
+	mov bx, 6117	;; Offset = 8192.
+	mov cx, 0x8000	;; Copy here.
 
 load_nextsector:
-	call readsector			; Load 512 bytes
-	dec eax
-	cmp eax, 0
+	call readsector	;; Each loop 512 bytes.
+	dec ax
+	cmp ax, 0
 	jnz load_nextsector
 
+
+;; TO-DO reponer
 	;;mov eax, [0x8000 + 6]
 	;;cmp eax, "BOOT"		; Match against the tsl_start.sys binary
 	;;jne magic_fail
@@ -73,10 +83,10 @@ copy_single_segment:
 	cmp cx, 0xA000		; Last address (bootloader + payload = 256KiB total)
 	jnz copy_payload_to_free_mem
 
-	mov eax, 0x0		; Reset
-	mov ebx, 0x0
-	mov ecx, 0x0
-	mov edx, 0x0
+	mov eax, 0x00
+	mov ebx, 0x00
+	mov ecx, 0x00
+	mov edx, 0x00
 	mov fs, ax
 	mov es, ax
 
@@ -85,17 +95,22 @@ copy_single_segment:
 
 	jmp 0x0000:0x8000
 
-magic_fail:
+
+err:
 	mov si, msg_err
 	call print_string_16
 
 ;; TO-DO: aqui mensaje.
 print_ext_not_supported:
+	mov si, msg_no
+	call print_string_16
 
 
 halt:
+	mov si, msg_halt
+	call print_string_16
 	hlt
-	jmp halt
+	jmp $
 
 ;------------------------------------------------------------------------------
 ; Read a sector from a disk, using LBA
@@ -177,13 +192,19 @@ print_string_16:			; Output string in SI to screen
 .done:
 	popa
 	ret
-;------------------------------------------------------------------------------
 
+
+;;==============================================================================
+
+
+msg_sizeofPush:	db "16b mode 32b push opcode pushes 0 bytes", 13, 10, 0
 msg_extSupport:	db "Verifying bios ext support..", 0
+msg_no:			db " no", 13, 10, 0
 msg_load:		db "Reading disk..", 0
 msg_ok:			db " ok", 13, 10, 0
 msg_exec:		db "Executing..", 0
 msg_err:		db " error", 0
+msg_halt:		db "Sys halted", 0
 
 driveNumber:		db 0x00
 
@@ -192,6 +213,7 @@ times 446 - $ + $$	db 0
 ; False partition table entry required by some BIOS vendors.
 db 0x80, 0x00, 0x01, 0x00, 0xEB, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF
 
-times 510 - $ + $$	db 0
+;; TO-DO: ld script.
+;;times 510 - $ + $$	db 0
 
 sign dw 0xAA55
