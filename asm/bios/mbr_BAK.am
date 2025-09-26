@@ -1,46 +1,34 @@
-;;==============================================================================
-;; Master Boot Record
-;;
-;; Referencias:
-;; -- https://github.com/fysnet/FYSOS/blob/master/boot/embr/embr.asm
-;; -- BIOS Enhanced Disk Drive Specification 3.0: http://www.o3one.org/hwdocs/bi
-;; os_doc/bios_specs_edd30.pdf
-;; http://www.ctyme.com/intr/rb-0708.htm
-;;==============================================================================
-
+; =============================================================================
+; Pure64 MBR -- a 64-bit OS loader written in Assembly for x86-64 systems
+; Copyright (C) 2008-2014 Return Infinity -- see LICENSE.TXT
+;
+; This Master Boot Record will load Pure64 from a pre-defined location on the
+; hard drive without making use of the file system.
+;
+; In this code we are expecting a BMFS-formatted drive. With BMFS the Pure64
+; binary is required to start at sector 16 (8192 bytes from the start). A small
+; ckeck is made to make sure Pure64 was loaded by comparing a signiture.
+; =============================================================================
 
 BITS 16
 
 entry:
-	cli
-	cld
+	cli				; Disable interrupts
+;	xchg bx, bx			; Bochs magic debug
 	xor ax, ax
 	mov ss, ax
 	mov es, ax
 	mov ds, ax
 	mov sp, 0x7C00
-	sti
+	sti				; Enable interrupts
 
-	mov [driveNumber], dl	;; Bios passes drive number in dl.
+	mov [DriveNumber], dl		; BIOS passes drive number in DL
 
-	mov si, msg_extSupport
-	call print_string_16
-
-	mov ah, 41h		;; Check extensions present.
-	mov bx, 55AAh	;; Required signature.
-	mov dl, [driveNumber]
-	int 13h
-	jc  print_ext_not_supported
-	cmp bx, 0xAA55
-	jne print_ext_not_supported
-
-	mov si, msg_ok
-	call print_string_16
-
-	mov si, msg_load
+	mov si, msg_Load
 	call print_string_16
 
 	mov eax, 512		; Number of sectors to load. 512 sectors = 262144 bytes = 256 KiB
+	;;mov ebx, 16			; Start immediately after directory (offset 8192)
 	mov ebx, 6117			; Start immediately after directory (offset 8192)
 	mov cx, 0x8000		; Pure64 expects to be loaded at 0x8000
 
@@ -80,19 +68,14 @@ copy_single_segment:
 	mov fs, ax
 	mov es, ax
 
-	mov si, msg_ok
+	mov si, msg_LoadDone
 	call print_string_16
 
 	jmp 0x0000:0x8000
 
 magic_fail:
-	mov si, msg_err
+	mov si, msg_MagicFail
 	call print_string_16
-
-;; TO-DO: aqui mensaje.
-print_ext_not_supported:
-
-
 halt:
 	hlt
 	jmp halt
@@ -125,7 +108,7 @@ read_it:
 	push byte 16			; [0] size of parameter block (word)
 
 	mov si, sp
-	mov dl, [driveNumber]
+	mov dl, [DriveNumber]
 	mov ah, 42h			; EXTENDED READ
 	int 0x13			; http://hdebruijn.soo.dto.tudelft.nl/newpage/interupt/out-0700.htm#0651
 
@@ -179,13 +162,11 @@ print_string_16:			; Output string in SI to screen
 	ret
 ;------------------------------------------------------------------------------
 
-msg_extSupport:	db "Verifying bios ext support..", 0
-msg_load:		db "Reading disk..", 0
-msg_ok:			db " ok", 13, 10, 0
-msg_exec:		db "Executing..", 0
-msg_err:		db " error", 0
 
-driveNumber:		db 0x00
+msg_Load db "MBR - Reading sectors...", 0
+msg_LoadDone db " - done.", 13, 10, "Executing...", 0
+msg_MagicFail db " - Not found!", 0
+DriveNumber db 0x00
 
 times 446 - $ + $$	db 0
 
