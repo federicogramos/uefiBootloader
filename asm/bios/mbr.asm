@@ -58,30 +58,35 @@ load_nextsector:
 	cmp ax, 0
 	jnz load_nextsector
 
+	mov si, msg_ok
+	call print_string_16
+
 
 ;; TO-DO reponer
 	;;mov eax, [0x8000 + 6]
 	;;cmp eax, "BOOT"		; Match against the tsl_start.sys binary
 	;;jne magic_fail
 
-	mov ax, 0x0800		; Segment where the bootloader and payload are loaded
-	mov cx, 0x6000		; Segment where the bootloader and payload will be copied
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; esta copia a 60000 no la quiero.
 
-copy_payload_to_free_mem:	; Move bootloader and payload to 0x60000
-	mov fs, ax				; From segment
-	mov es, cx				; To segment
-	mov bx, 0x0				; Offset
+	;;mov ax, 0x0800		; Segment where the bootloader and payload are loaded
+	;;mov cx, 0x6000		; Segment where the bootloader and payload will be copied
 
-copy_single_segment:
-	mov dl, [fs:bx]
-	mov [es:bx], dl
-	inc bx
-	jnz copy_single_segment
+;;copy_payload_to_free_mem:	; Move bootloader and payload to 0x60000
+;;	mov fs, ax				; From segment
+;;	mov es, cx				; To segment
+;;	mov bx, 0x0				; Offset
 
-	add ax, 0x1000
-	add cx, 0x1000
-	cmp cx, 0xA000		; Last address (bootloader + payload = 256KiB total)
-	jnz copy_payload_to_free_mem
+;;copy_single_segment:
+;;	mov dl, [fs:bx]
+;;	mov [es:bx], dl
+;;	inc bx
+;;	jnz copy_single_segment
+
+;;	add ax, 0x1000
+;;	add cx, 0x1000
+;;	cmp cx, 0xA000		; Last address (bootloader + payload = 256KiB total)
+;;	jnz copy_payload_to_free_mem
 
 	mov eax, 0x00
 	mov ebx, 0x00
@@ -90,8 +95,6 @@ copy_single_segment:
 	mov fs, ax
 	mov es, ax
 
-	mov si, msg_ok
-	call print_string_16
 
 	jmp 0x0000:0x8000
 
