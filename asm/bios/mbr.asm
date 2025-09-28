@@ -33,13 +33,13 @@ entry:
 
 	call pushTest
 
-	mov ah, 41h		;; Check extensions present.
-	mov bx, 55AAh	;; Required signature.
+	mov ah, 0x41			;; Check extensions present.
+	mov bx, 55AAh			;; Required signature.
 	mov dl, [driveNumber]
-	int 13h
-	jc  print_ext_not_supported
+	int 0x13
+	jc  notify_ext_not_supported
 	cmp bx, 0xAA55
-	jne print_ext_not_supported
+	jne notify_ext_not_supported
 
 	mov si, msg_ok
 	call print
@@ -50,7 +50,7 @@ entry:
 	mov ax, 512		;; Load 512 sectors = 262144 bytes = 256 KiB.
 	mov bx, 6117	;; Offset = 8192.
 	mov cx, 0x8000	;; Copy here.
-	call diskcpy
+	call diskcpy	;; Copia payload completo.
 
 	mov si, msg_ok
 	call print
@@ -82,22 +82,23 @@ entry:
 ;;	cmp cx, 0xA000		; Last address (bootloader + payload = 256KiB total)
 ;;	jnz copy_payload_to_free_mem
 
-	mov eax, 0x00
-	mov ebx, 0x00
-	mov ecx, 0x00
-	mov edx, 0x00
+	mov eax, 0
+	mov ebx, 0
+	mov ecx, 0
+	mov edx, 0
 	mov fs, ax
 	mov es, ax
 
 	jmp 0x0000:0x8000
 
 
+
+
 err:
 	mov si, msg_err
 	call print
 
-;; TO-DO: aqui mensaje.
-print_ext_not_supported:
+notify_ext_not_supported:
 	mov si, msg_no
 	call print
 
