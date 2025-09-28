@@ -1,19 +1,19 @@
 ;;==============================================================================
-;; Master Boot Record
-;;
+;; master boot record | @file /asm/boot/mbr.asm
+;;==============================================================================
 ;; Referencias:
-;; -- https://github.com/fysnet/FYSOS/blob/master/boot/embr/embr.asm
 ;; -- BIOS Enhanced Disk Drive Specification 3.0: http://www.o3one.org/hwdocs/bi
 ;; os_doc/bios_specs_edd30.pdf
+;; -- https://github.com/fysnet/FYSOS/blob/master/boot/embr/embr.asm
 ;; http://www.ctyme.com/intr/rb-0708.htm
 ;;
-;; En 16 bits cuando el procesador no es de 16 si no de 32 o 64 en un modo de 16
-;; bits, prestar atencion a algunas instrucciones: jumps por ejemplo. El mismo o
-;; pcode lo interpreta en 32 de una manera y en 16 de otra, saltando en cada uno
-;; de esos casos a direcciones cercanas pero distintas porque en 32 toma operand
-;; o de 32 y en 16 de 16 (8?) lo cual genera un offset en la direccion de destin
-;; o. Pero un push de 32 es reconocido en 16 bits y ejecutado correctamente a pe
-;; sar de estar en modo de 16.
+;; En 16 bits cuando el procesador no es de 16 si no de 32 o 64 pero ejecuta en 
+;; un modo de 16 bits, prestar atencion a algunas instrucciones: jumps por ejemp
+;; lo. El mismo opcode lo interpreta en 32 de una manera y en 16 de otra, saltan
+;; do en cada uno de esos casos a direcciones cercanas pero distintas porque en 
+;; 32 toma operando de 32 y en 16 de 16 (8?) lo cual genera un offset en la dire
+;; ccion de destino. Pero un push de 32 es reconocido en 16 bits y ejecutado cor
+;; rectamente a pesar de estar en modo de 16.
 ;;==============================================================================
 
 
@@ -31,16 +31,7 @@ entry:
 
 	mov [driveNumber], dl	;; Bios passes drive number in dl.
 
-	mov bx, sp
-	push eax
-	sub bx, sp
-	pop eax
-	add [msg_sizeofPush + 32], bl
-	mov si, msg_sizeofPush
-	call print_string_16
-
-	mov si, msg_extSupport
-	call print_string_16
+	call pushTest
 
 	mov ah, 41h		;; Check extensions present.
 	mov bx, 55AAh	;; Required signature.
@@ -51,23 +42,18 @@ entry:
 	jne print_ext_not_supported
 
 	mov si, msg_ok
-	call print_string_16
+	call print
 
 	mov si, msg_load
-	call print_string_16
+	call print
 
-	mov ax, 512	;; Load 512 sectors = 262144 bytes = 256 KiB.
+	mov ax, 512		;; Load 512 sectors = 262144 bytes = 256 KiB.
 	mov bx, 6117	;; Offset = 8192.
 	mov cx, 0x8000	;; Copy here.
-
-load_nextsector:
-	call readsector	;; Each loop 512 bytes.
-	dec ax
-	cmp ax, 0
-	jnz load_nextsector
+	call diskcpy
 
 	mov si, msg_ok
-	call print_string_16
+	call print
 
 
 ;; TO-DO reponer
@@ -103,37 +89,60 @@ load_nextsector:
 	mov fs, ax
 	mov es, ax
 
-
 	jmp 0x0000:0x8000
 
 
 err:
 	mov si, msg_err
-	call print_string_16
+	call print
 
 ;; TO-DO: aqui mensaje.
 print_ext_not_supported:
 	mov si, msg_no
-	call print_string_16
+	call print
 
 
 halt:
 	mov si, msg_halt
-	call print_string_16
+	call print
 	hlt
 	jmp $
 
-;------------------------------------------------------------------------------
-; Read a sector from a disk, using LBA
-; IN:	EAX - High word of 64-bit DOS sector number
-;	EBX - Low word of 64-bit DOS sector number
-;	ES:CX - destination buffer
-; OUT:	ES:CX points one byte after the last byte read
-;	EAX - High word of next sector
-;	EBX - Low word of sector
-readsector:
+
+
+;;==============================================================================
+;; diskcpy | Copy n sectors from disk.
+;;==============================================================================
+;; Arguments:
+;; -- ax: cant of 512 mem sectors to copy.
+;; -- bx: source offset in disk (addr/512).
+;; -- cx: destination addr.
+;;==============================================================================
+
+diskcpy:
+	call readSec	;; Each loop 512 bytes.
+	dec ax
+	cmp ax, 0
+	jnz diskcpy
+	ret
+
+
+;;==============================================================================
+;; readSec | Read a sector from a disk using extended read.
+;;==============================================================================
+;; Arguments:
+;; -- eax: high word of 64 bit sector.
+;; -- ebx: low word of 64 bit sector.
+;; -- {es:cx}: destination address.
+;; Returns:
+;; -- eax: high word of next sector.
+;; -- ebx: low word of sector.
+;; -- {es:cx}: p2source + cantBytes2copy
+;;==============================================================================
+
+readSec:
 	push eax
-	xor eax, eax			; We don't need to load from sectors > 32-bit
+	xor eax, eax	;; We don't need to load from sectors > 32-bit
 	push dx
 	push si
 	push di
@@ -143,12 +152,13 @@ read_it:
 	push ebx
 	mov di, sp			; remember parameter block end
 
-	push eax			; [C] sector number high 32bit
-	push ebx			; [8] sector number low 32bit
-	push es				; [6] buffer segment
-	push cx				; [4] buffer offset
-	push byte 1			; [2] 1 sector (word)
-	push byte 16			; [0] size of parameter block (word)
+	;; Build disk address packet.
+	push eax		;; dap10..15 dap.srcLba.hi
+	push ebx		;; dap06..09 dap.srcLba.lo
+	push es			;; dap04..05 dap.dst.seg
+	push cx			;; dap02..03 dap.dst.offset
+	push byte 1		;; dap01 dap.bkCant
+	push byte 16	;; dap00 dap.pkSiz
 
 	mov si, sp
 	mov dl, [driveNumber]
@@ -188,10 +198,31 @@ no_incr_es:
 ;------------------------------------------------------------------------------
 
 
+;;==============================================================================
+;; pushtest | Verifica compatibilidad de opcode push eax en modo 16 bits
+;;==============================================================================
+
+pushTest:
+	mov bx, sp
+	push eax
+	sub bx, sp
+	pop eax
+	add [msg_sizeofPush + 32], bl
+	mov si, msg_sizeofPush
+	call print
+
+	mov si, msg_extSupport
+	call print
+
+	ret
+
+
+
+
 ;------------------------------------------------------------------------------
 ; 16-bit function to print a string to the screen
 ; IN:	SI - Address of start of string
-print_string_16:			; Output string in SI to screen
+print:			; Output string in SI to screen
 	pusha
 	mov ah, 0x0E			; int 0x10 teletype function
 .repeat:
