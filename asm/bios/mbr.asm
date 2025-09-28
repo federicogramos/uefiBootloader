@@ -59,11 +59,13 @@ entry:
 
 
 ;;==============================================================================
-;; errors
+;; failure | abort boot with error notification
+;;==============================================================================
+;; Argument:
+;; -- si: string.
 ;;==============================================================================
 
-notify_ext_not_supported:
-	mov si, msg_no
+failure:
 	call print
 
 .halt:
@@ -105,12 +107,12 @@ diskcpy:
 ;;==============================================================================
 
 cpySec:
+	push ax			;; Reg is overriden by bios in 0x42 service return.
 	push dx
 	push si
 	push di
 
 .cpy:
-	push ebx		;; Backup sectorNumber.
 	mov di, sp		;; Base of disk address packet.
 
 	;; Build disk address packet.
@@ -123,34 +125,33 @@ cpySec:
 
 	mov si, sp
 	mov dl, [drvNum]
-	mov ah, 42h		;; Extended read.
+	mov ah, 0x42		;; Extended read.
 	int 0x13
 
-	mov sp, di		;; Clean stack.
-	pop ebx
+	mov sp, di			;; Clean stack.
 
-	jnc read_ok		; jump if no error
+	;;jnc .success		;; Check for errors.
 
-	push ax
-	xor ah, ah		; else, reset and retry
-	int 0x13
-	pop ax
-	jmp .cpy
-
-read_ok:
-	add ebx, 1			; increment next sector with carry
-	add cx, 512			; Add bytes per sector
-	jnc no_incr_es			; if overflow...
+.failure:
+	mov si, msg_err	;; TO-DO: retry before failure. Can also report error co
+						;; de in ah.
+	jmp failure
+	
+.success:
+	add ebx, 1		;; increment next sector with carry
+	add cx, 512		;; Add bytes per sector
+	jnc no_incr_es	;; if overflow...
 
 incr_es:
 	mov dx, es
-	add dh, 0x10			; ...add 1000h to ES
+	add dh, 0x10	;; ...add 1000h to ES
 	mov es, dx
 
 no_incr_es:
 	pop di
 	pop si
 	pop dx
+	pop ax
 
 	ret
 
@@ -170,13 +171,19 @@ extensionTest:
 	mov bx, 55aah			;; Required signature.
 	mov dl, [drvNum]
 	int 0x13
-	jc  notify_ext_not_supported
+	jc .unsupported
 	cmp bx, 0xaa55
-	jne notify_ext_not_supported
+	jne .unsupported
 
 	mov si, msg_ok
 	call print
+	jmp .fin
 
+.unsupported:
+	mov si, msg_no
+	jmp failure
+
+.fin:
 	ret
 
 
@@ -210,8 +217,9 @@ print:
 msg_extSupport:	db "Verifying bios ext support..", 0
 msg_no:			db " no", 13, 10, 0
 msg_load:		db "Reading disk..", 0
-msg_ok:			db " ok", 13, 10, 0
-msg_halt:		db "Sys halted", 0
+msg_err:		db " [error]", 13, 10, 0
+msg_ok:			db " [ok]", 13, 10, 0
+msg_halt:		db "System halted", 0
 
 drvNum:			db 0x00
 
