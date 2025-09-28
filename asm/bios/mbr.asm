@@ -18,6 +18,9 @@
 ;;==============================================================================
 
 
+%include "./asm/include/mbr.inc"
+
+
 BITS 16
 
 entry:
@@ -30,7 +33,7 @@ entry:
 	mov sp, 0x7c00
 	sti
 
-	mov [driveNumber], dl	;; Bios passes drive number in dl.
+	mov [drvNum], dl	;; Bios passes drive number in dl.
 
 	call pushTest
 	call extensionTest
@@ -38,39 +41,18 @@ entry:
 	mov si, msg_load
 	call print
 
-	mov ax, 512		;; Cant sectors. Load 512 = 262144 bytes = 256 KiB.
-	mov bx, 6117	;; Offset = 8192.
-	mov cx, 0x8000	;; Copy here.
-	call diskcpy	;; Copia payload completo.
+	mov ax, 512			;; Cant sectors. Load 512 = 262144 bytes = 256 KiB.
+	mov bx, 6117		;; Offset = 8192.
+	mov cx, 0x8000		;; Copy here.
+	call diskcpy		;; Copia payload completo.
 
 	mov si, msg_ok
 	call print
 
 ;; TO-DO reponer
-	;;mov eax, [0x8000 + 6]
-	;;cmp eax, "BOOT"		; Match against the tsl_start.sys binary
+	;;mov eax, [0x8000 + SIGNATURE_OFFSET]
+	;;cmp eax, "BOOT"	;; Simple payload verification (tsl_start.sys binary).
 	;;jne magic_fail
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; esta copia a 60000 no la quiero.
-
-	;;mov ax, 0x0800		; Segment where the bootloader and payload are loaded
-	;;mov cx, 0x6000		; Segment where the bootloader and payload will be copied
-
-;;copy_payload_to_free_mem:	; Move bootloader and payload to 0x60000
-;;	mov fs, ax				; From segment
-;;	mov es, cx				; To segment
-;;	mov bx, 0x0				; Offset
-
-;;copy_single_segment:
-;;	mov dl, [fs:bx]
-;;	mov [es:bx], dl
-;;	inc bx
-;;	jnz copy_single_segment
-
-;;	add ax, 0x1000
-;;	add cx, 0x1000
-;;	cmp cx, 0xA000		; Last address (bootloader + payload = 256KiB total)
-;;	jnz copy_payload_to_free_mem
 
 	mov eax, 0
 	mov ebx, 0
@@ -149,7 +131,7 @@ readSec:
 	push byte 16	;; dap00 dap.pkSiz
 
 	mov si, sp
-	mov dl, [driveNumber]
+	mov dl, [drvNum]
 	mov ah, 42h			; EXTENDED READ
 	int 0x13			; http://hdebruijn.soo.dto.tudelft.nl/newpage/interupt/out-0700.htm#0651
 
@@ -218,7 +200,7 @@ extensionTest:
 
 	mov ah, 0x41			;; Check extensions present.
 	mov bx, 55AAh			;; Required signature.
-	mov dl, [driveNumber]
+	mov dl, [drvNum]
 	int 0x13
 	jc  notify_ext_not_supported
 	cmp bx, 0xAA55
@@ -266,7 +248,7 @@ msg_load:		db "Reading disk..", 0
 msg_ok:			db " ok", 13, 10, 0
 msg_halt:		db "Sys halted", 0
 
-driveNumber:	db 0x00
+drvNum:			db 0x00
 
 ;; Zero fill.
 times 446 - $ + $$	db 0
