@@ -130,24 +130,24 @@ cpySec:
 
 	mov sp, di			;; Clean stack.
 
-	;;jnc .success		;; Check for errors.
+	jnc .success		;; Check for errors.
 
 .failure:
-	mov si, msg_err	;; TO-DO: retry before failure. Can also report error co
+	mov si, msg_err		;; TO-DO: retry before failure. Can also report error co
 						;; de in ah.
 	jmp failure
 	
 .success:
-	add ebx, 1		;; increment next sector with carry
-	add cx, 512		;; Add bytes per sector
-	jnc no_incr_es	;; if overflow...
+	add ebx, 1		;; Next sector.
+	add cx, 512		;; Destination addr update.
+	jnc .noCarry	;; if overflow...
 
-incr_es:
+.carry:
 	mov dx, es
-	add dh, 0x10	;; ...add 1000h to ES
+	add dh, 0x10	;; Carry to real mode segment register.
 	mov es, dx
 
-no_incr_es:
+.noCarry:
 	pop di
 	pop si
 	pop dx
