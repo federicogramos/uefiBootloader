@@ -18,7 +18,7 @@
 
 BITS 16
 
-entry:
+entryPoint:
 	cli
 	cld
 	xor ax, ax
