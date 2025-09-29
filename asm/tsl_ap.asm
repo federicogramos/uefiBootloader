@@ -238,21 +238,16 @@ ap_sleep:
 
 BITS 32
 
-nop
-nop
-nop
 bootmode_branch:
-;;jmp start32
-
-
-	cmp bl, 'U'	;; If uefi boot then already in 64 bit mode.
-	jne start32
-	;;je start64
 	jmp start64
-	;;cmp bl, 'B'	;; If bios boot, currently 32 bits, goto configure 64 bit mode.
-	;;je start32
 
-start32:
+	;;cmp bl, 'U'	;; If uefi boot then already in 64 bit mode.
+	;;je start64
+
+	;;cmp bl, 'B'	;; If bios boot, currently 32 bits, goto configure 64 bit mode.
+	;;je start__________________32
+
+;;start______________________32:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -261,7 +256,7 @@ start32:
 ;; genera corrimiento de memoria o no entra donde debe entrar porque script ld tsl.ld reporta overlap.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-%include "./asm/bios/start16.asm"
+;;%include "./asm/bios/start16.asm"
 
 
 
@@ -276,9 +271,9 @@ start32:
 
 
 
-%ifdef BIOS
-%include "./asm/bios/bios_32_64.asm"
-%endif
+;;%ifdef BIOS
+;;%include "./asm/bios/bios_32_64.asm"
+;;%endif
 
 
 ;;==============================================================================
