@@ -24,7 +24,7 @@ UEFI_OBJ = $(OBJ_DIR)/$(UEFI_SRC:.asm=.o)
 UEFI_ELF = $(ELF_DIR)/$(UEFI_SRC:.asm=.elf)
 UEFI_SYS = $(BUILD_DIR)/$(UEFI_SRC:.asm=.sys)
 
-TSL_SRCS_LO = tsl_start.asm tsl_ap.asm
+TSL_SRCS_LO = start16.asm tsl_start.asm tsl_ap.asm
 TSL_SRCS_HI = tsl.asm
 TSL_OBJS_LO = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_LO))
 TSL_OBJS_HI = $(patsubst %.asm,$(OBJ_DIR)/%.o,$(TSL_SRCS_HI))
@@ -33,7 +33,7 @@ TSL_ELF_HI = $(ELF_DIR)/tsl_hi.elf
 TSL_SYS = $(BUILD_DIR)/tsl.sys
 
 
-all: $(UEFI_SYS) $(TSL_SYS) mbr
+all: mbr start16 $(UEFI_SYS) $(TSL_SYS)
 
 $(OBJ_DIR)/%.o: $(ASM_DIR)/%.asm
 	$(ASM) -g -F DWARF -f elf64 $< -o $@
@@ -51,9 +51,12 @@ $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 
-mbr:
-	$(ASM) -g -F DWARF -f elf64 ./asm/bios/mbr.asm -o ./obj/mbr.o
+mbr: build
+	$(ASM) -g -F DWARF -f elf64 ./asm/bios/mbr.asm -o $(OBJ_DIR)/mbr.o
 	$(LD) -T $(LD_DIR)/mbr.ld -o ./out/mbr.sys $(OBJ_DIR)/mbr.o
+
+start16: build
+	$(ASM) -g -F DWARF -f elf64 ./asm/bios/start16.asm -o $(OBJ_DIR)/start16.o
 
 build:
 	mkdir -p $(BUILD_DIR) $(IMG_DIR) $(OUT_DIR) $(OBJ_DIR) $(ELF_DIR) 

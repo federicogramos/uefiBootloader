@@ -33,9 +33,10 @@
 
 
 global bootmode_branch
+global GDTR32
 
 ;; tsl.asm
-extern tmpGDTR64	;; Only for bios boot. See tsl.asm 1178 TO-DO.
+;;extern tmpGDTR64	;; Only for bios boot. See tsl.asm 1178 TO-DO.
 extern GDTR64
 extern SYS64_CODE_SEL
 extern IDTR64
