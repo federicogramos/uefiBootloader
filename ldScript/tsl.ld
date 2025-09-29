@@ -4,6 +4,7 @@ SECTIONS
 	code_lo_start_reloc = 0x8000;
 	code_lo_start_load = 0x0000;
 	.text_low code_lo_start_reloc :	AT (code_lo_start_load) {
+		./obj/start16.o (.text)
 		./obj/tsl_start.o (.text)
 		./obj/tsl_ap.o (.text)
 	}
