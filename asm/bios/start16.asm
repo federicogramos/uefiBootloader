@@ -1,12 +1,18 @@
 ;;==============================================================================
-;; 
+;; pick real mode swich to protected mode | @file /asm/bios/start16.asm
 ;;==============================================================================
 
 
 %include "./asm/include/sysvar.inc"
 
 
+;; TO-DO: poner esto como un simbolo definido en donde mbr.ld hara el load de la
+;; funcion.
 ;;extern print
+print	equ 0xde + 0x7c00
+failure	equ 0x67 + 0x7c00
+vesa	equ 0x117 + 0x7c00
+
 
 ;; tsl_ap.asm
 extern GDTR32
@@ -26,7 +32,8 @@ BITS 16
 
 start16:
 
-
+	mov si, msg_e820
+	call print
 
 ; Get the BIOS E820 Memory Map
 ; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_0xE820
@@ -88,29 +95,6 @@ memmapend:
 
 
 
-	mov cx, 0x4000 - 1		; Start looking from here
-VBESearch:
-	inc cx
-	mov bx, cx			; Mode is saved to BX for the set command later
-	cmp cx, 0x5000
-	je halt
-	mov edi, VBEModeInfoBlock	; VBE data will be stored at this address
-	mov ax, 0x4F01			; VESA SuperVGA BIOS - GET SuperVGA MODE INFORMATION - http://www.ctyme.com/intr/rb-0274.htm
-	int 0x10
-	cmp ax, 0x004F			; Return value in AX should equal 0x004F if command supported and successful
-	jne VBESearch			; Try next mode
-	cmp byte [VBEModeInfoBlock.BitsPerPixel], 32 ; Desired bit depth
-	jne VBESearch			; If not equal, try next mode
-	cmp word [VBEModeInfoBlock.XResolution], Horizontal_Resolution ; Desired XRes here
-	jne VBESearch
-	cmp word [VBEModeInfoBlock.YResolution], Vertical_Resolution ; Desired YRes here
-	jne VBESearch
-	or bx, 0x4000			; Use linear/flat frame buffer model (set bit 14)
-	mov ax, 0x4F02			; VESA SuperVGA BIOS - SET SuperVGA VIDEO MODE - http://www.ctyme.com/intr/rb-0275.htm
-	int 0x10
-	cmp ax, 0x004F			; Return value in AX should equal 0x004F if supported and successful
-	jne halt
-
 
 
 
@@ -138,14 +122,16 @@ jmp 8:start32
 ;; -- si: string.
 ;;==============================================================================
 
-failure:
-	call print
-halt:
+;; no se usa, puesto que reutiliza el del mbr.
+
+;;failure:
+;;	call print
+;;halt:
 ;;.halt:
-	;;mov si, msg_halt
-	call print
-	hlt
-	jmp $
+;;	mov si, msg_halt
+;;	call print
+;;	hlt
+;;	jmp $
 
 
 ;;msg_halt:		db "System halted", 0
@@ -320,5 +306,12 @@ pde_low_32:				; Create a 2 MiB page
 
 
 	;;;;;;;;;;;;;;;;;;;; delete this
-	print:
-	nop
+	;;print:
+	;;nop
+
+
+;;==============================================================================
+;; section .data
+;;==============================================================================
+
+msg_e820:	db "Performing e820..", 0

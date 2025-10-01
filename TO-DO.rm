@@ -1,5 +1,7 @@
 # Integracion uefi + bios
 
+-- corregir que start16 se carga en 0x7e00 y no en 8000 (ver tsl.ld).
+
 -- veo que tengo que ajustar ubicacion de tables de mapeo, revisar. Quiza no. Dejar en suspenso esto.
 
 -- lo que se va a hacer es: levanta mbr todo tsl que tiene 1ero que nada start16. Si. Ahora ya incorporado el start16 debo ajustar tanto uefi como bios para asegurar que cada uno comience en el lugar correcto.
