@@ -9,8 +9,9 @@
 ;; Ubicacion en memoria los distintos fuentes que componen esta parte de inicial
 ;; izacion del sistema.
 ;;  +---------------+------------+-------+---..---+----------+------+
-;;  | tsl_start.asm | tsl_ap.asm | .data | 00..00 | tsl.asm  |.data |
-;;  | .text_low     | .text_low  | _low  | 00..00 | .text    |      |
+;;  | start  | tsl_sta | tsl_ap.asm | .data | 00..00 | tsl.asm  |.data |
+;;  | 16.asm | rt.asm
+;;           | .text_low     | .text_low  | _low  | 00..00 | .text    |      |
 ;;  +---------------+------------+-------+---..---+----------+------+
 ;;  |^              |            |       |        |          |      |
 ;;  |<-------------- 4KiB -------------->|        |<----   KiB ---->|

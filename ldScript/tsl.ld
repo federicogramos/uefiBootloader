@@ -1,6 +1,10 @@
 OUTPUT_FORMAT("binary")
-SECTIONS
-{
+
+SECTIONS {
+	
+	
+	
+	
 	code_lo_start_reloc = 0x8000;
 	code_lo_start_load = 0x0000;
 	.text_low code_lo_start_reloc :	AT (code_lo_start_load) {
@@ -47,8 +51,6 @@ SECTIONS
 		*(.bss)
 		*(EXCLUDE_FILE (*.o) COMMON)
 	}
-
-	
 
 /*	file_size = . - code_low_start;*/
 }

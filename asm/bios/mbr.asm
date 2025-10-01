@@ -7,6 +7,7 @@
 ;; -- https://github.com/fysnet/FYSOS/blob/master/boot/embr/embr.asm
 ;; http://www.ctyme.com/intr/rb-0708.htm
 ;; -- https://stanislavs.org/helppc/int_10.html
+;; -- https://wiki.osdev.org/A20_Line
 ;;
 ;; This mbr is for 32 and 64 bit machines. Will not work fine on 16 bit 8086 or 
 ;; 80286 because it uses prefix override for some instructions.
@@ -14,6 +15,9 @@
 
 
 %include "./asm/include/mbr.inc"
+
+
+global print	;; Export symbol so to use this print function in start16.asm.
 
 
 BITS 16
@@ -35,9 +39,11 @@ entryPoint:
 	mov si, msg_load
 	call print
 
-	mov ax, 512			;; Cant sectors. Load 512 = 262144 bytes = 256 KiB.
+load:
+	mov ax, (512 + 1)	;; Cant sectors. Load 512 = 262144 bytes = 256 KiB + 1 (start16.asm).
 	mov bx, 6117		;; Offset = 8192.
-	mov cx, 0x8000		;; Copy here.
+	;;mov cx, 0x8000		;; Copy here.
+	mov cx, 0x7E00		;; Destination.
 	call diskcpy		;; Copia payload completo.
 
 	mov si, msg_ok
@@ -48,6 +54,27 @@ entryPoint:
 	;;cmp eax, "BOOT"	;; Simple payload verification (tsl_start.sys binary).
 	;;jne magic_fail
 
+
+;; TO-DO: averiguar por que activar a20 debe estar luego de load.
+a20:
+	call a20_check
+	jnz start16_prepare
+
+.a20_set:
+	in al, 0x64		;; Status.
+	test al, 0x02
+	jnz .a20_set
+	mov al, 0xd1	;; 8042 Write command.
+	out 0x64, al
+
+.check:
+	in al, 0x64
+	test al, 0x02
+	jnz .check
+	mov al, 0xdf
+	out 0x60, al
+
+start16_prepare:
 	mov eax, 0
 	mov ebx, 0
 	mov ecx, 0
@@ -55,7 +82,8 @@ entryPoint:
 	mov fs, ax
 	mov es, ax
 
-	jmp 0x0000:0x8000
+start16_jump:
+	jmp 0x0000:0x7E00
 
 
 ;;==============================================================================
@@ -210,6 +238,46 @@ print:
 	ret
 
 
+
+
+
+
+
+
+;;==============================================================================
+;; a20_check | Check the status of a20 line
+;;==============================================================================
+;; Returns:
+;; -- FLAGS[zero] = 1 (a20 disabled) | FLAGS[zero] = 0 (a20 enabled)
+;;==============================================================================
+
+a20_check:
+
+	xor ax, ax
+	mov es, ax
+	not ax		;; 0xFFFF
+	mov ds, ax
+
+	mov di, 0x0500
+	mov si, 0x0510
+
+	mov al, [es:di]
+	push ax
+	mov al, [ds:si]
+	push ax
+
+	mov byte [es:di], 0x00
+	mov byte [ds:si], 0xFF	;; Will overwrite the prev move if a20 not set.
+	cmp byte [es:di], 0xFF
+
+	pop ax
+	mov [ds:si], al
+	pop ax
+	mov [es:di], al
+
+	ret
+
+
 ;;==============================================================================
 ;; section .data
 ;;==============================================================================
@@ -224,12 +292,12 @@ msg_halt:		db "System halted", 0
 drvNum:			db 0x00
 
 ;; Zero fill.
-times 446 - $ + $$	db 0
+;;times 446 - $ + $$	db 0
 
 ;; False partition table entry required by some BIOS vendors.
 					db 0x80, 0x00, 0x01, 0x00, 0xEB, 0xFF, 0xFF, 0xFF
 					db 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF
 
-times 510 - $ + $$	db 0
+;;times 510 - $ + $$	db 0
 
 sign:				dw 0xAA55

@@ -5,6 +5,9 @@
 
 %include "./asm/include/sysvar.inc"
 
+
+;;extern print
+
 ;; tsl_ap.asm
 extern GDTR32
 extern tmpGDTR64	;; Only for bios boot. See tsl.asm 1178 TO-DO.
@@ -83,19 +86,7 @@ memmapend:
 	mov ecx, 8
 	rep stosd
 
-; Enable the A20 gate
-set_A20:
-	in al, 0x64
-	test al, 0x02
-	jnz set_A20
-	mov al, 0xD1
-	out 0x64, al
-check_A20:
-	in al, 0x64
-	test al, 0x02
-	jnz check_A20
-	mov al, 0xDF
-	out 0x60, al
+
 
 	mov cx, 0x4000 - 1		; Start looking from here
 VBESearch:
@@ -158,31 +149,6 @@ halt:
 
 
 ;;msg_halt:		db "System halted", 0
-
-
-;;==============================================================================
-;; print | Imprime a pantalla usando bootservice.
-;;==============================================================================
-;; Argumentos:
-;; -- si: string addr 16 bits.
-;;==============================================================================
-
-
-;; TO-DO: pasar a libreria, esta repetido del mbr
-print:
-	pusha
-	mov ah, 0x0e		;; int 0x10: write text in teletype mode.
-
-.next:
-	lodsb
-	cmp al, 0
-	je .fin
-	int 0x10			;; Write boot service.
-	jmp .next
-
-.fin:
-	popa
-	ret
 
 
 
@@ -349,3 +315,10 @@ pde_low_32:				; Create a 2 MiB page
 	mov cr0, eax
 
 	jmp SYS64_CODE_SEL:start64	; Jump to 64-bit mode
+
+
+
+
+	;;;;;;;;;;;;;;;;;;;; delete this
+	print:
+	nop
