@@ -1,4 +1,5 @@
 # Integracion uefi + bios
+-- no le estoy apuntando vien a pasar el flag de step mode al inicio de uefi.
 
 -- corregir que start16 se carga en 0x7e00 y no en 8000 (ver tsl.ld).
 

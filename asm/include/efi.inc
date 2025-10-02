@@ -113,5 +113,6 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE		equ 24
 EFI_RUNTIME_SERVICES_RESETSYSTEM		equ 104
 
 
-DATA_HI_START_LOAD	equ 0x406400	;; Image load + offsetPayload + tsl.sys off
-									;; set = 0x400000 + 0x4000 + 0x2400.
+DATA_HI_START_LOAD	equ 0x406A00	;; Image load + start16 + offsetPayload + tsl.sys (sec
+									;; tion .data offset) = 0x400000 + 0x4000 + 
+									;; 0x200 + 0x2800.

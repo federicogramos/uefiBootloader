@@ -12,21 +12,25 @@
 ;; La salida de NASM se guarda en /EFI/BOOT/BOOTX64.EFI y se le inyecta el paylo
 ;; ad (UEFI bootloader + packedKernel.bin) que se requiera. Archivo BOOTX64.EFI,
 ;; luego de agregado el payload queda:
-;;  +--------------------------+-------------------------+------------+
-;;  |     binario uefi.sys     |         payload         | padeo de   |
-;;  |         |        |       | transient  | packed     | 0x00 hasta |
-;;  | Encabez | Codigo | Datos | system     | Kernel.bin | el fin     |
-;;  |         |        |       | low |  hi  |            |            |
-;;  +---------+--------+-------+-----+------+------------+------------+
-;;  |^        |^       |^      |^    |^     |^           |^          ^|
-;; 0x0    0x200   0x1000   0x4000  0x4400  0x7000     0x40000      0xFFFFF
-;; 0      512B    4KiB     16KiB   17KiB   28KiB      256KiB       1MiB-1
+;;  +--------------------------+-------------------------------+--------+
+;;  |     binario uefi.sys     |            payload            | padeo  |
+;;  |         |        |       |         | transient  | packed | 0x00   |
+;;  | Encabez | Codigo | Datos | start16 | system     | Kernel | hasta  |
+;;  |         |        |       |         | low |  hi  | .bin   | el fin |
+;;  +---------+--------+-------+---------+------------+--------+--------+
+;;  |^        |^       |^      |^        |^    |^     |^       ^|      ^|
+;; 0x0     0x200   0x1000   0x4000   0x4200   0x4400  0x7000  0x40000  0xFFFFF
+;; 0       512B    4KiB     16KiB    16.5KiB  17KiB   28KiB   256KiB   1MiB-1
 ;;==============================================================================
 
 
+START16_SIZE			equ 0x200
 TSL_BASE_ADDRESS		equ 0x800000
 TSL_BASE_ADDRESS_LOW	equ 0x8000
-TSL_LO_SIZE				equ 0x400
+TSL_LO_SIZE				equ 0x800	;; Puede hacerse 0x400 pero dado que se le s
+									;; uma START16_SIZE quedan 0x600 y prefiero 
+									;; alinear a 0x800 que a 0x200.
+
 
 %include "./asm/include/efi.inc"
 %define utf16(x) __utf16__(x)
@@ -307,8 +311,15 @@ entryPoint:
 ;; Ventana en la que se puede activar modo step presionando 's'.
 call ventana_modo_step
 
-;; Copio a la section data de la payload el flag cuyo valor es seteado en linked
-;; icion para que este disponible cuando se pase a tsl.sys
+;;jmp $
+;;nop
+;;nop
+;;nop
+
+
+
+;; Copio en la section data de la payload el flag cuyo valor es seteado en linke
+;; dicion para que este disponible cuando se pase a tsl.sys
 mov al, [STEP_MODE_FLAG]
 mov [DATA_HI_START_LOAD], al
 
@@ -613,12 +624,15 @@ print_video_information:
 	mov r9, fmt_fb_address
 	call print
 
+;; TO-DO: estos 512 ver si lo dejo asi o si lo pongo simbolicamente.
 verifica_payload:
-	mov rsi, PAYLOAD + 6
+	mov rsi, PAYLOAD + 6 + 512	;; The additional 512 bytes are to skip start16,
+								;; which is placed to completely fill the 1st 51
+								;; 2 bytes of the payload.
 	mov rax, [rsi]
 	mov rbx, "BOOTLOAD"	;; Chequeo simple de payload en lugar.
 	cmp rax, rbx		;; No se puede hacer cmp con operando inmediato de 64...
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;jne payloadSignatureFail
+	jne payloadSignatureFail
 
 get_memmap:
 	mov rdx, [memmap]			;; OUT EFI_MEMORY_DESCRIPTOR *MemoryMap
@@ -764,29 +778,32 @@ exit_uefi_services:
 
 	;; Payload al destino. Maximo tamano 240KiB y por eso cuando armamos imagen 
 	;; se deberia revisar que no sea mayor. Posible payload (previo copia):
-	;;  +-----------------------------------+--------------------+
-	;;  |              tsl.sys              |  packedKernel.bin  |
-	;;  | code | data | 00..0 | code | data | kernel | mods user |
-	;;  | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
-	;;  +-----------------------------------+--------------------+
-	;;  |<-- 0x2400 ---------------->|
-	;;  |<-- 240KiB -------------------------------------------->|
-	;;  |<-- 0x300 -->|       |<----------- 239KiB ------------->|
-	;;  |<-- 0x400 ---------->|                                  |
-	;;  |^                    |^                                 |^
-	;; 0x404000            0x404400                           0x440000
+	;;  +---------------------------------------------+--------------------+
+	;;  |              tsl.sys                        |  packedKernel.bin  |
+	;;  | start16 | code | data | 00..0 | code | data | kernel | mods user |
+	;;  |         | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
+	;;  +---------------------------------------------+--------------------+
+	;;  |  0x2800 --------------------->|0x2000|
+	;;  |< 240KiB -------------------------------------------------------->|
+	;;  |< 0x200 >|0x200 |0x100 |       |<----------- 238KiB ------------->|
+	;;  |< 0x800 ---------------------->|                                  |
+	;;  |^                              |^                                 |^
+	;; 0x404000                     0x404800                           0x440000
 	;; PAYLOAD
 
 	;; Low primeros TSL_LO_SIZE bytes de los 240 del payload.
-	mov rsi, PAYLOAD
+	mov rsi, PAYLOAD + START16_SIZE	;; The additional bytes are to skip start16, whi
+							;; ch is placed to completely fill the 1st 512 bytes
+							;; of the payload.
+
 	mov rdi, TSL_BASE_ADDRESS_LOW
 	mov rcx, TSL_LO_SIZE	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
 	rep movsb
 
 	;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
-	mov rsi, PAYLOAD + TSL_LO_SIZE
+	mov rsi, PAYLOAD + START16_SIZE + TSL_LO_SIZE
 	mov rdi, TSL_BASE_ADDRESS
-	mov rcx, (239 * 1024)	;; 239KiB.
+	mov rcx, (238 * 1024)	;; 238KiB.
 	rep movsb
 	
 	;; Datos de video pasamos a siguiente etapa de bootloader. Movemos y queda:
@@ -1115,7 +1132,7 @@ fmt_test_uefi:				dw utf16("test uefi"), 13, 0x0A, 0
 fmt_test_reg:				db "test reg = %r", 0x0A, 0
 
 ;;==============================================================================
-;; Here goes the payload
+;; Space reservation for the payload
 ;; =============================================================================
 
 section .payload
