@@ -1146,7 +1146,6 @@ clear_regs:
 section .data
 
 ;; Some additional system vars.
-;;db "probando"
 STEP_MODE_FLAG:		db 1	;; Lo activa presionar 's' al booteo. Este byte es f
 							;; orwardeado desde uefi.asm hacia aqui porque se ut
 							;; iliza en ambos lugares y la inicializacion se hac

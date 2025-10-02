@@ -783,18 +783,19 @@ exit_uefi_services:
 	;;  | start16 | code | data | 00..0 | code | data | kernel | mods user |
 	;;  |         | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
 	;;  +---------------------------------------------+--------------------+
-	;;  |  0x2800 --------------------->|0x2000|
-	;;  |< 240KiB -------------------------------------------------------->|
-	;;  |< 0x200 >|0x200 |0x100 |       |<----------- 238KiB ------------->|
-	;;  |< 0x800 ---------------------->|                                  |
+	;;  |< 0x200 >|0x200 |0x100 |       |0x2000|0x1000|<----- 226KiB ----->|
+	;;                   |<-- 0x600 --->|<------------ 238KiB ------------>|
+	;;  |<----------- 0x800 ----------->|
+	;;  |<---------------------------- 240KiB ---------------------------->|
 	;;  |^                              |^                                 |^
 	;; 0x404000                     0x404800                           0x440000
 	;; PAYLOAD
 
-	;; Low primeros TSL_LO_SIZE bytes de los 240 del payload.
-	mov rsi, PAYLOAD + START16_SIZE	;; The additional bytes are to skip start16, whi
-							;; ch is placed to completely fill the 1st 512 bytes
-							;; of the payload.
+	;; Saltea el codigo de start16 y se queda con los primeros TSL_LO_SIZE bytes
+	;; de los 240 del payload.
+	mov rsi, PAYLOAD + START16_SIZE	;; The additional START16_SIZE offset bytes 
+									;; are to skip start16, which is positioned 
+									;; as the 1st 512 bytes of the payload.
 
 	mov rdi, TSL_BASE_ADDRESS_LOW
 	mov rcx, TSL_LO_SIZE	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
