@@ -51,7 +51,7 @@ section .text
 
 TSL_BASE_ADDRESS equ 0x8000
 
-db "inifede"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;db "inifede"
 
 start64:
 mov al, [STEP_MODE_FLAG]
@@ -1146,7 +1146,7 @@ clear_regs:
 section .data
 
 ;; Some additional system vars.
-db "probando"
+;;db "probando"
 STEP_MODE_FLAG:		db 1	;; Lo activa presionar 's' al booteo. Este byte es f
 							;; orwardeado desde uefi.asm hacia aqui porque se ut
 							;; iliza en ambos lugares y la inicializacion se hac
