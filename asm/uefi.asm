@@ -780,7 +780,7 @@ exit_uefi_services:
 	;; se deberia revisar que no sea mayor. Posible payload (previo copia):
 	;;  +---------------------------------------------+--------------------+
 	;;  |              tsl.sys                        |  packedKernel.bin  |
-	;;  | start16 | code | data | 00..0 | code | data | kernel | mods user |
+	;;  | start16 | code | data | 0_pad | code | data | kernel | mods user |
 	;;  |         | low  | low  | 00..0 | hi   | hi   | .bin   | land.bin  |
 	;;  +---------------------------------------------+--------------------+
 	;;  |< 0x200 >|0x200 |0x100 |       |0x2000|0x1000|<----- 226KiB ----->|
@@ -798,10 +798,11 @@ exit_uefi_services:
 									;; as the 1st 512 bytes of the payload.
 
 	mov rdi, TSL_BASE_ADDRESS_LOW
-	mov rcx, TSL_LO_SIZE	;; Bytes a partir de TSL_BASE_ADDRESS_LOW.
+	mov rcx, TSL_LO_SIZE	;; Bytes a partir de TSL_BASE_ADDRESS_LOW (code_lo +
+							;; data_lo + zero_padding).
 	rep movsb
 
-	;; Hi tsl. Los restantes 239K. Se encuentran alineados a 1K.
+	;; Hi tsl. Los restantes 238K. Se encuentran alineados a 1K.
 	mov rsi, PAYLOAD + START16_SIZE + TSL_LO_SIZE
 	mov rdi, TSL_BASE_ADDRESS
 	mov rcx, (238 * 1024)	;; 238KiB.
@@ -813,6 +814,7 @@ exit_uefi_services:
 	;; dword [0x00005F10] = Screen X
 	;; dword [0x00005F12] = Screen Y
 	;; dword [0x00005F14] = PixelsPerScanLine
+	;; dword [0x00005F16] = BPP
 
 	mov rdi, 0x00005F00
 	mov rax, [FB]
@@ -825,8 +827,8 @@ exit_uefi_services:
 	stosw				;; 5F00 + 8 * 2 + 2 * 1 = 16-bit Screen Y.
 	mov rax, [PPSL]
 	stosw				;; 5F00 + 8 * 2 + 2 * 2 = 16-bit PixelsPerScanLine.
-	mov rax, 32			;; BPP hardcodeado, supuestamente uefi siempre 32? Grub 
-						;; muestra que hay modos con 24 seleccionables.
+	mov rax, 32			;; TO-DO: bpp hardcodeado, supuestamente uefi siempre 32
+						;; ? Grub muestra que hay modos con 24 seleccionables.
 	stosw				;; 16-bit BitsPerPixel
 
 	mov rax, [memmap]			;; Mem map base address.
