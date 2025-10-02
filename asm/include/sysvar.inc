@@ -100,11 +100,12 @@ VBEModeInfoBlock.Reserved2		equ VBEModeInfoBlock + 48	; DD - Reserved - always s
 
 
 
-FB:			equ 0x0000000000005F00	;; 8 bytes, 256 bytes.
-FB_SIZE		equ 0x0000000000005F08	;; 8 bytes, Frame buffer size (bytes)
-HR:			equ 0x0000000000005F10	;; 2 bytes, Screen X
-VR:			equ 0x0000000000005F12	;; 2 bytes, Screen Y
-PPSL:		equ 0x0000000000005F14	;; 2 bytes, PixelsPerScanLine
+FB:			equ 0x00005F00	;; 8 bytes, 256 bytes.
+FB_SIZE		equ 0x00005F08	;; 8 bytes, Frame buffer size (bytes)
+HR:			equ 0x00005F10	;; 2 bytes, Screen X
+VR:			equ 0x00005F12	;; 2 bytes, Screen Y
+PPSL:		equ 0x00005F14	;; 2 bytes, PixelsPerScanLine
+BPP:		equ 0x00005F16	;; 2 bytes, bpp
 
 
 
