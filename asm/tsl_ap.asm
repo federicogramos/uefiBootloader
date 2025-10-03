@@ -283,19 +283,7 @@ bootmode_branch:
 
 section .data
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;extern data_lo_start_load
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;extern data_lo_start_reloc_aligned
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;extern code_hi_start_load
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;extern data_lo_start_load
-
 align 16
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;pepe: 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	dq data_lo_start_load
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	dq data_lo_start_reloc_aligned
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;dq code_hi_size_aligned
-
-
-;;db "hello"
 
 GDTR32:										;; Global Descriptor Table Register.
 				dw gdt32_end - gdt32 - 1	;; Size.
