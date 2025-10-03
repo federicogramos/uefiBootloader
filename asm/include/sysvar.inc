@@ -27,6 +27,7 @@ IM_ActivedCoreIDs:	equ 0x0000000000005E00	;; 1by per entry. 1 = 1 core active.
 ;; [0x00005F10]	;; Screen X
 ;; [0x00005F12]	;; Screen Y
 ;; [0x00005F14]	;; PixelsPerScanLine
+;; [0x00005F16]	;; bpp
 ;; Luego, durante el bootloader, la mantiene aqui, pero tambien copia al infoMap
 ;; 0x5080
 

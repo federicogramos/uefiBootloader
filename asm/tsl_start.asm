@@ -8,32 +8,27 @@
 
 ;; Ubicacion en memoria los distintos fuentes que componen esta parte de inicial
 ;; izacion del sistema.
-;;  +---------------+------------+-------+---..---+----------+------+
-;;  | start  | tsl_sta | tsl_ap.asm | .data | 00..00 | tsl.asm  |.data |
-;;  | 16.asm | rt.asm
-;;           | .text_low     | .text_low  | _low  | 00..00 | .text    |      |
-;;  +---------------+------------+-------+---..---+----------+------+
-;;  |^              |            |       |        |          |      |
-;;  |<-------------- 4KiB -------------->|        |<----   KiB ---->|
-;; 0x8000                      0x8200  0x8400   0x800000
-;; 
-;; 20250924:
-;; code 0 a 0x200 , data 0x200 a 400
-;; y en 0x400 aparece tsl que se carga en 800000
+;;  +----------+---------+----------------+--/ /---+--------------+
+;;  | start    | tsl_sta |      tsl_      | 00..00 |   tsl.asm    |
+;;  | 16.asm   | rt.asm  |      ap.asm    | 00..00 |              |
+;;  | .text_   | .text_  | .text_ | .data | 00..00 | .text |.data |
+;;  |  start16 |  low    |  low   | _low  | 00..00 |       |      |
+;;  +----------+---------+--------+-------+--/ /---+-------+------+
+;;  |^         |^                 |^      |^       |^      |^     |^
+;; 0x7E00    0x8000            0x8200  0x8800  0x800000  802000  803000
+;;  |<- 512 -->|<--------- 4KiB --------->|        |<--- 12KiB --->|
+;;  (solo bios)
 
 %include "./asm/include/tsl.inc"
 
 ;; tsl_ap.asm
 extern bootmode_branch
-									extern testeoJump
 
-;; 1 pagina reservada en 0x8000 para booteo en 16 bits de los ap. Terminado ese
+;; 1 pagina en 0x8000 utilizada para booteo en 16 bits de los ap. Terminado ese
 ;; codigo, se salta a 0x800000.
 
 
 section .text
-
-;;BITS 16
 
 
 start:
