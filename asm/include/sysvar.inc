@@ -21,18 +21,6 @@ SystemVariables:	equ 0x0000000000005800
 IM_ActivedCoreIDs:	equ 0x0000000000005E00	;; 1by per entry. 1 = 1 core active.
 
 
-;; Cuando bootea uefi, la info de video durante uefi la mete aqui:
-;; [0x00005F00]	;; Frame buffer base
-;; [0x00005F08]	;; Frame buffer size (bytes)
-;; [0x00005F10]	;; Screen X
-;; [0x00005F12]	;; Screen Y
-;; [0x00005F14]	;; PixelsPerScanLine
-;; [0x00005F16]	;; bpp
-;; Luego, durante el bootloader, la mantiene aqui, pero tambien copia al infoMap
-;; 0x5080
-
-VBEModeInfoBlock:
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -52,10 +40,26 @@ VBEModeInfoBlock:
 ; Set the desired screen resolution values below
 ;;;;;; esto en br1100 no cambia nada
 ;;;;;; en qemu hace que se vea ok, o que no pueda inicializar pantalla (1366 por ej)
-Horizontal_Resolution		equ 1024
-Vertical_Resolution		equ 768
+Horizontal_Resolution:		equ 1024
+Vertical_Resolution:		equ 768
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;VBEModeInfoBlock: equ 0x5F00
+
+
+;; Cuando bootea uefi, la info de video durante uefi la mete aqui:
+;; [0x00005F00]	;; Frame buffer base
+;; [0x00005F08]	;; Frame buffer size (bytes)
+;; [0x00005F10]	;; Screen X
+;; [0x00005F12]	;; Screen Y
+;; [0x00005F14]	;; PixelsPerScanLine
+;; [0x00005F16]	;; bpp
+;; Luego, durante el bootloader, la mantiene aqui, pero tambien copia al infoMap
+;; 0x5080
+
+;;VBEModeInfoBlock:
+
+
+VBEModeInfoBlock: equ 0x5F00
+
 ; VESA
 ; Mandatory information for all VBE revisions
 VBEModeInfoBlock.ModeAttributes		equ VBEModeInfoBlock + 0	; DW - mode attributes

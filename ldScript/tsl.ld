@@ -2,8 +2,6 @@ OUTPUT_FORMAT("binary")
 
 SECTIONS {
 	
-	
-	
 	code_start16_reloc = 0x7e00;
 	code_start16_load = 0x0000;
 	.text_start16 code_start16_reloc :	AT (code_start16_load) {

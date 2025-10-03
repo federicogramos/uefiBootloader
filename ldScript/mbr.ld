@@ -1,37 +1,20 @@
 OUTPUT_FORMAT("binary")
-SECTIONS
-{
-	. = 0x7C00;
-	codeStart = .;
 
-	.text :	{
-		text = .;
-		*(.text)
+SECTIONS {
+
+	code_reloc = 0x7c00 ;
+	code_load = 0x0000;
+	.text code_reloc :	AT (code_load) {
+		./obj/mbr.o (.text)
 	}
 
-	codeSize = . - codeStart;
-
-	. = ALIGN(0x1000);
-	dataStart = .;
-	dataOffset = dataStart - codeStart;
-
-	.data : {
-		data = .;
-		*(.data)
-
-		. = ALIGN(0x4000);
-		payload = .;
-		*(.payload)
+	. = ALIGN(0x10);
+	code_end_reloc_aligned = . ;
+	code_size_aligned = code_end_reloc_aligned - code_reloc;
+	data_start_reloc_aligned = . ;
+	data_start_load = code_load + code_size_aligned;
+	.data data_start_reloc_aligned : AT (data_start_load) {
+		./obj/mbr.o (.data)
 	}
 
-	dataSize = . - dataStart;
-	. = ALIGN(0x1000);
-
-	.bss : {
-		bss = .;
-		*(.bss)
-		*(EXCLUDE_FILE (*.o) COMMON)
-	}
-
-	fileSize = . - codeStart;
 }

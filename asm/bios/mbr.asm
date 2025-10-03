@@ -18,7 +18,7 @@
 %include "./asm/include/sysvar.inc"
 
 
-global print	;; Export symbol so to use this print function in start16.asm.
+;;global print_bios	;; Export symbol so to use this print function in start16.asm.
 
 
 BITS 16
@@ -35,20 +35,27 @@ entryPoint:
 
 	mov [drvNum], dl	;; Bios passes drive number in dl.
 
+
+	mov si, msg_extSupport
+	call print_bios
+
 	call extensionTest
 
-	mov si, msg_load
-	call print
 
 load:
-	mov ax, (512 + 1)	;; Cant sectors. Load 512 = 262144 bytes = 256 KiB + 1 (start16.asm).
+	mov si, msg_reading
+	call print_bios
+
+	mov ax, (512 + 1)	;; Cant sectors. Load 512 = 262144 bytes = 256 KiB + 1 (
+						;; start16.asm). TO-DO: en realidad solo 240 que es el t
+						;; amano completo de la payload. Ya incluye a start16. R
+						;; evisar tamanos.
 	mov bx, 6117		;; Offset = 8192.
-	;;mov cx, 0x8000		;; Copy here.
 	mov cx, 0x7E00		;; Destination.
 	call diskcpy		;; Copia payload completo.
 
 	mov si, msg_ok
-	call print
+	call print_bios
 
 ;; TO-DO reponer
 	;;mov eax, [0x8000 + SIGNATURE_OFFSET]
@@ -56,7 +63,6 @@ load:
 	;;jne magic_fail
 
 
-;; TO-DO: averiguar por que activar a20 debe estar luego de load.
 a20:
 	call a20_check
 	jnz start16_prepare
@@ -74,6 +80,7 @@ a20:
 	jnz .check
 	mov al, 0xdf
 	out 0x60, al
+
 
 start16_prepare:
 	mov eax, 0
@@ -95,11 +102,11 @@ start16_jump:
 ;;==============================================================================
 
 failure:
-	call print
+	call print_bios
 
 .halt:
 	mov si, msg_halt
-	call print
+	call print_bios
 	hlt
 	jmp $
 
@@ -193,9 +200,6 @@ cpySec:
 ;;==============================================================================
 
 extensionTest:
-	mov si, msg_extSupport
-	call print
-
 	mov ah, 0x41			;; Check extensions present.
 	mov bx, 55aah			;; Required signature.
 	mov dl, [drvNum]
@@ -204,8 +208,11 @@ extensionTest:
 	cmp bx, 0xaa55
 	jne .unsupported
 
+	;;mov si, msg_extSupport
+	;;call print_bios
+
 	mov si, msg_ok
-	call print
+	call print_bios
 	jmp .fin
 
 .unsupported:
@@ -217,21 +224,21 @@ extensionTest:
 
 
 ;;==============================================================================
-;; print | Imprime a pantalla usando bootservice.
+;; print_bios | Imprime a pantalla usando bootservice.
 ;;==============================================================================
 ;; Argumentos:
 ;; -- si: string addr 16 bits.
 ;;==============================================================================
 
-print:
+print_bios:
 	pusha
-	mov ah, 0x0e		;; int 0x10: write text in teletype mode.
+	mov ah, 0x0e	;; int 0x10: write text in teletype mode.
 
 .next:
 	lodsb
 	cmp al, 0
 	je .fin
-	int 0x10			;; Write boot service.
+	int 0x10		;; Write boot service.
 	jmp .next
 
 .fin:
@@ -250,13 +257,18 @@ print:
 ;;==============================================================================
 ;; Returns:
 ;; -- FLAGS[zero] = 1 (a20 disabled) | FLAGS[zero] = 0 (a20 enabled)
+;;
+;; Preserves all registers including segment registers.
 ;;==============================================================================
 
 a20_check:
+	pusha
+	push ds
+	push es
 
 	xor ax, ax
 	mov es, ax
-	not ax		;; 0xFFFF
+	not ax					;; 0xFFFF
 	mov ds, ax
 
 	mov di, 0x0500
@@ -276,9 +288,11 @@ a20_check:
 	pop ax
 	mov [es:di], al
 
+	pop es
+	pop ds
+	popa
+
 	ret
-
-
 
 
 ;;==============================================================================
@@ -332,9 +346,9 @@ ret
 ;; section .data
 ;;==============================================================================
 
-msg_extSupport:	db "Verifying bios ext support..", 0
+msg_extSupport:	db "Bios ext support..", 0
 msg_no:			db " no", 13, 10, 0
-msg_load:		db "Reading disk..", 0
+msg_reading:	db "Reading disk..", 0
 msg_err:		db " [error]", 13, 10, 0
 msg_ok:			db " [ok]", 13, 10, 0
 msg_halt:		db "System halted", 0

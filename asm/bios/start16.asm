@@ -1,5 +1,5 @@
 ;;==============================================================================
-;; pick real mode swich to protected mode | @file /asm/bios/start16.asm
+;; Real mode swich to protected mode | @file /asm/bios/start16.asm
 ;;==============================================================================
 
 
@@ -8,10 +8,11 @@
 
 ;; TO-DO: poner esto como un simbolo definido en donde mbr.ld hara el load de la
 ;; funcion.
-;;extern print
-print	equ 0xde + 0x7c00
-failure	equ 0x67 + 0x7c00
-vesa	equ 0x117 + 0x7c00
+;;extern print_bios
+;;extern failure
+print_bios	equ 0x00de + 0x7c00	;; print_bios en 0x7cde
+;;failure	equ 0x0067 + 0x7c00
+;;vesa	equ 0x0111 + 0x7c00
 
 
 ;; tsl_ap.asm
@@ -24,16 +25,11 @@ extern start64
 
 ;; Primera parte: pasa real mode a protected mode.
 
-
-
-
-
 BITS 16
-
 start16:
-
+	mov ax, print_bios
 	mov si, msg_e820
-	call print
+	call ax
 
 ; Get the BIOS E820 Memory Map
 ; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_0xE820
@@ -125,11 +121,11 @@ jmp 8:start32
 ;; no se usa, puesto que reutiliza el del mbr.
 
 ;;failure:
-;;	call print
+;;	call print_bios
 ;;halt:
 ;;.halt:
 ;;	mov si, msg_halt
-;;	call print
+;;	call print_bios
 ;;	hlt
 ;;	jmp $
 
@@ -306,12 +302,14 @@ pde_low_32:				; Create a 2 MiB page
 
 
 	;;;;;;;;;;;;;;;;;;;; delete this
-	;;print:
+	;;print_bios:
 	;;nop
 
 
 ;;==============================================================================
 ;; section .data
 ;;==============================================================================
+
+;; TO-DO: agregar section data.
 
 msg_e820:	db "Performing e820..", 0
