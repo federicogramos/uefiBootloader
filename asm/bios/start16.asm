@@ -1,5 +1,11 @@
 ;;==============================================================================
 ;; Real mode swich to protected mode | @file /asm/bios/start16.asm
+;;
+;; Para bios boot primero real mode a protected mode. Uefi saltea esta parte, ya
+;; bootea en 64. 
+;;
+;; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_0xE820
+;; https://wiki.osdev.org/Detecting_Memory_(x86)#Getting_an_E820_Memory_Map
 ;;==============================================================================
 
 
@@ -11,44 +17,48 @@
 ;;extern print_bios
 ;;extern failure
 print_bios	equ 0x00de + 0x7c00	;; print_bios en 0x7cde
-;;failure	equ 0x0067 + 0x7c00
-;;vesa	equ 0x0111 + 0x7c00
 
+;; tsl.asm
+extern start64
 
 ;; tsl_ap.asm
 extern GDTR32
 extern tmpGDTR64	;; Only for bios boot. See tsl.asm 1178 TO-DO.
 extern SYS64_CODE_SEL
 
-extern start64
-
-
-;; Primera parte: pasa real mode a protected mode.
 
 BITS 16
+
 start16:
 	mov ax, print_bios
 	mov si, msg_e820
-	call ax
+	call ax	;; Calling using pointer works with directly defining functio addr.
 
-; Get the BIOS E820 Memory Map
-; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_0xE820
-; The code below is from https://wiki.osdev.org/Detecting_Memory_(x86)#Getting_an_E820_Memory_Map
-; inputs: es:di -> destination buffer for 24 byte entries
-; outputs: bp = entry count, trashes all registers except esi
-; The function below creates a memory map at address 0x6000 and the records are:
-; 64-bit Base
-; 64-bit Length
-; 32-bit Type (1 = normal, 2 reserved, ACPI reclaimable)
-; 32-bit ACPI
-; 64-bit Padding
-do_e820:
-	mov edi, 0x00006000		; location that memory map will be stored to
-	xor ebx, ebx			; ebx must be 0 to start
-	xor bp, bp			; keep an entry count in bp
-	mov edx, 0x0534D4150		; Place "SMAP" into edx
+
+;;==============================================================================
+;;e820 | builds memmap
+;; Arguments:
+;; -- {es:di} = destination buffer for 24 byte entries.
+;; Returns:
+;; -- bp = entry count
+;;
+;; trashes all registers except esi
+;; Creates memory map at 0x6000.
+;; and the records are:
+;; 64 bit Base
+;; 64 bit Length
+;; 32 bit Type (1 = normal, 2 reserved, ACPI reclaimable)
+;; 32 bit ACPI
+;; 64 bit Padding
+;;==============================================================================
+
+e820:
+	mov edi, 0x00006000		;; Addrr to place memmap.
+	xor ebx, ebx
+	xor bp, bp				;; Entry count.
+	mov edx, 0x0534D4150	;; SMAP.
 	mov eax, 0xe820
-	mov [es:di + 20], dword 1	; force a valid ACPI 3.X entry
+	mov dword [es:di + 20], 1	;; force a valid ACPI 3.X entry
 	mov ecx, 24			; ask for 24 bytes
 	int 0x15
 	jc nomemmap			; carry set on first call means "unsupported function"
@@ -103,7 +113,6 @@ memmapend:
 	mov eax, cr0
 	or al, 0x01			; Set protected mode bit
 	mov cr0, eax
-	;;jmp 8:0x8000			; Jump to 32-bit protected mode
 
 ;;;;;;;;;;;;;; esto tiene que ser a start32
 ;;jmp 8:0x8000

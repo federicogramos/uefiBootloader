@@ -308,20 +308,13 @@ entryPoint:
 	mov rdx, fmt_curr_txt_mode
 	call efi_print	;; Current video settings del modo texto con el q inicia.
 
-;; Ventana en la que se puede activar modo step presionando 's'.
-call ventana_modo_step
+	;; Ventana en la que se puede activar modo step presionando 's'.
+	call ventana_modo_step
 
-;;jmp $
-;;nop
-;;nop
-;;nop
-
-
-
-;; Copio en la section data de la payload el flag cuyo valor es seteado en linke
-;; dicion para que este disponible cuando se pase a tsl.sys
-mov al, [STEP_MODE_FLAG]
-mov [DATA_HI_START_LOAD], al
+	;; Copio en la section data de la payload el flag cuyo valor es seteado en l
+	;; inkedicion para que este disponible cuando se pase a tsl.sys
+	mov al, [STEP_MODE_FLAG]
+	mov [DATA_HI_START_LOAD], al
 
 
 ;; Buscar info ACPI.
