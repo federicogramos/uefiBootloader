@@ -98,6 +98,8 @@ Scancode different sets reference.
 [basicinputoutput.com](https://www.basicinputoutput.com/2024/11/the-keyboard-controller-interface.html)
 Me fui un poco por las ramas, pero linda tabla con comandos varios para mouse, led, teclado. Tiene otros posteos interesantes, dejo la referencia porque luego quiero darle una mirada a otros posteos.
 
+[kernel.org](https://www.kernel.org/doc/html/v6.16-rc2/driver-api/cxl/platform/bios-and-efi.html)
+
 ### Info en espera
 
 [i386-stub.c ftp.gnu.org](https://ftp.gnu.org/old-gnu/Manuals/gdb/html_node/gdb_125.html)
