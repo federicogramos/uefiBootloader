@@ -12,18 +12,22 @@
 
 %include "./asm/include/sysvar.inc"
 
-
+;; mbr.asm
 ;; TO-DO: poner esto como un simbolo definido en donde mbr.ld hara el load de la
 ;; funcion.
 ;;extern print_bios
 ;;extern failure
-print_bios	equ 0x00de + 0x7c00	;; print_bios en 0x7cde
+print_bios:	equ 0x00de + 0x7c00	;; print_bios en 0x7cde
+vesa:		equ 0x011d + 0x7c00	;; print_bios en 0x011d
+
 
 ;; tsl.asm
 extern start64
 
 ;; tsl_ap.asm
-extern GDTR32
+;;extern GDTR32
+GDTR32: equ 0x8200
+
 extern tmpGDTR64	;; Only for bios boot. See tsl.asm 1178 TO-DO.
 extern SYS64_CODE_SEL
 
@@ -58,35 +62,43 @@ start16:
 ;;==============================================================================
 
 e820:
-	mov edi, 0x00006000			;; Addrr to place memmap.
-	xor ebx, ebx
 	xor bp, bp					;; Entry count.
 
 	mov eax, 0xe820
-	mov dword [es:di + 20], 1	;; Buffer Pointer.
-								;; force a valid ACPI 3.X entry
+	xor ebx, ebx				;; Continuation value to get the next range of p
+								;; hysical memory.
+	mov edi, 0x00006000			;; ;; Buffer Pointer. Destination memmap addr.
 	mov ecx, 24					;; Buffer Size [bytes].
 	mov edx, 0x0534D4150		;; Signature = "SMAP".
+	mov dword [es:di + 20], 1	;; Compatibility with ACPI 3.X entry.
 	int 0x15
 
-	jc .nomemmap				;; Error condition if CF = 1.
+	jc .nomemmap			;; Error condition if CF = 1. TO-DO: aqui no solo te
+							;; rminar, sino que avisar que ha ocurrido error.
 	mov edx, 0x0534D4150	;; Need to reset. According wiki.osdev.org: some BIO
 							;; Ses apparently trash this register.
-	cmp eax, edx			; on success, eax must have been reset to "SMAP"
+	cmp eax, edx			;; eax != "SMAP" notifies incorrect bios revision. T
+							;; O-DO> notify this error.
 	jne .nomemmap
-	test ebx, ebx			; ebx = 0 implies list is only 1 entry long (worthless)
+	test ebx, ebx			;; Continuation value to get the next address range 
+							;; descriptor. A value of ebx = 0 means that this is
+							;; the last descriptor. Note: the BIOS can also indi
+							;; cate that the last descriptor has already been re
+							;; turned during previous iterations by returning th
+							;; e carry flag set. TO-DO: aunque sea cero debe ser
+							;; procesado.
 	je .nomemmap
 	jmp .jmpin
 .loop:
-	mov eax, 0xe820			; eax, ecx get trashed on every int 0x15 call
-	mov [es:di + 20], dword 1	; force a valid ACPI 3.X entry
+	mov eax, 0xe820
+	mov [es:di + 20], dword 1	;; In order to make a valid ACPI 3.X entry.
 	mov ecx, 24			; ask for 24 bytes again
 	int 0x15
 	jc .memmapend			; carry set means "end of list already reached"
 	mov edx, 0x0534D4150		; repair potentially trashed register
 .jmpin:
 	jcxz .skipent			; skip any 0 length entries
-	cmp cl, 20			; got a 24 byte ACPI 3.X response?
+	cmp cl, 20			;; Buffer Size. The minimum structure size returned by the BIOS is 20 bytes. It should really be 24 byte ACPI 3.X response.
 	jbe .notext
 	test byte [es:di + 20], 1	; if so: is the "ignore this data" bit clear?
 	je .skipent
@@ -97,17 +109,21 @@ e820:
 	mov ecx, [es:di + 12]		; get upper dword of memory region length
 	jecxz .skipent			; if length qword is 0, skip entry
 .goodent:
-	inc bp				; got a good entry: ++count, move to next storage spot
-	add di, 32			; Pad to 32 bytes for each record
+	inc bp				;; count++
+	add di, 32			;; Each record aligns to 32 bytes.
 .skipent:
 	test ebx, ebx			; if ebx resets to 0, list is complete
 	jne .loop
 .nomemmap:
 .memmapend:
-	xor eax, eax			; Create a blank record for termination (32 bytes)
+	xor eax, eax		;; Blank record marks end of memmap.
 	mov ecx, 8
 	rep stosd
 
+
+
+	mov ax, vesa
+	call ax	;; Calling using pointer works with directly defining functio addr.
 
 
 
@@ -291,24 +307,30 @@ pde_low_32:				; Create a 2 MiB page
 ; Load the GDT
 	lgdt [tmpGDTR64]
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; aqui estamos en 0x7f7e
 ; Enable extended properties
 	mov eax, cr4
 	or eax, 0x0000000B0		; PGE (Bit 7), PAE (Bit 5), and PSE (Bit 4)
 	mov cr4, eax
 
+;;;;;;;;;;;;;;;;;;;; hasta aqui oka 0x7f90
 ; Point cr3 at PML4
 	mov eax, 0x00202008		; Write-thru enabled (Bit 3)
 	mov cr3, eax
 
+;;;;;;;;;;;;;;;;;;;;;;;;; hasta aqui llega 0x7f98
 ; Enable long mode and SYSCALL/SYSRET
 	mov ecx, 0xC0000080		; EFER MSR number
 	rdmsr				; Read EFER
 	or eax, 0x00000101 		; LME (Bit 8)
 	wrmsr				; Write EFER
 
+
+;;;;;;;;;;;;;;;;;;;; hasta aqui oka 0x7fa6
 	mov bl, 'B'
 	mov bh, byte [p_BootDisk]
 
+;; hasta aqui llega. 0x7fae
 ; Enable paging to activate long mode
 	mov eax, cr0
 	or eax, 0x80000000		; PG (Bit 31)

@@ -124,6 +124,14 @@ VBESearch:
 
 
 
+
+
+
+	call vesa
+
+
+
+
 	mov bl, 'B'			; 'B' as we booted via BIOS
 
 	; At this point we are done with real mode and BIOS interrupts. Jump to 32-bit mode.
