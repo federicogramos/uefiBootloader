@@ -4,7 +4,8 @@
 ;; Para bios boot primero real mode a protected mode. Uefi saltea esta parte, ya
 ;; bootea en 64. 
 ;;
-;; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_0xE820
+;; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_
+;; 0xE820
 ;; https://wiki.osdev.org/Detecting_Memory_(x86)#Getting_an_E820_Memory_Map
 ;;==============================================================================
 
@@ -36,11 +37,15 @@ start16:
 
 
 ;;==============================================================================
-;;e820 | builds memmap
+;;e820 | build memmap
+;;==============================================================================
 ;; Arguments:
 ;; -- {es:di} = destination buffer for 24 byte entries.
 ;; Returns:
 ;; -- bp = entry count
+;;
+;; https://uefi.org/htmlspecs/ACPI_Spec_6_4_html/15_System_Address_Map_Interface
+;; s/int-15h-e820h---query-system-address-map.html
 ;;
 ;; trashes all registers except esi
 ;; Creates memory map at 0x6000.
@@ -53,48 +58,52 @@ start16:
 ;;==============================================================================
 
 e820:
-	mov edi, 0x00006000		;; Addrr to place memmap.
+	mov edi, 0x00006000			;; Addrr to place memmap.
 	xor ebx, ebx
-	xor bp, bp				;; Entry count.
-	mov edx, 0x0534D4150	;; SMAP.
+	xor bp, bp					;; Entry count.
+
 	mov eax, 0xe820
-	mov dword [es:di + 20], 1	;; force a valid ACPI 3.X entry
-	mov ecx, 24			; ask for 24 bytes
+	mov dword [es:di + 20], 1	;; Buffer Pointer.
+								;; force a valid ACPI 3.X entry
+	mov ecx, 24					;; Buffer Size [bytes].
+	mov edx, 0x0534D4150		;; Signature = "SMAP".
 	int 0x15
-	jc nomemmap			; carry set on first call means "unsupported function"
-	mov edx, 0x0534D4150		; Some BIOSes apparently trash this register?
+
+	jc .nomemmap				;; Error condition if CF = 1.
+	mov edx, 0x0534D4150	;; Need to reset. According wiki.osdev.org: some BIO
+							;; Ses apparently trash this register.
 	cmp eax, edx			; on success, eax must have been reset to "SMAP"
-	jne nomemmap
+	jne .nomemmap
 	test ebx, ebx			; ebx = 0 implies list is only 1 entry long (worthless)
-	je nomemmap
-	jmp jmpin
-e820lp:
+	je .nomemmap
+	jmp .jmpin
+.loop:
 	mov eax, 0xe820			; eax, ecx get trashed on every int 0x15 call
 	mov [es:di + 20], dword 1	; force a valid ACPI 3.X entry
 	mov ecx, 24			; ask for 24 bytes again
 	int 0x15
-	jc memmapend			; carry set means "end of list already reached"
+	jc .memmapend			; carry set means "end of list already reached"
 	mov edx, 0x0534D4150		; repair potentially trashed register
-jmpin:
-	jcxz skipent			; skip any 0 length entries
+.jmpin:
+	jcxz .skipent			; skip any 0 length entries
 	cmp cl, 20			; got a 24 byte ACPI 3.X response?
-	jbe notext
+	jbe .notext
 	test byte [es:di + 20], 1	; if so: is the "ignore this data" bit clear?
-	je skipent
-notext:
+	je .skipent
+.notext:
 	mov ecx, [es:di + 8]		; get lower dword of memory region length
 	test ecx, ecx			; is the qword == 0?
-	jne goodent
+	jne .goodent
 	mov ecx, [es:di + 12]		; get upper dword of memory region length
-	jecxz skipent			; if length qword is 0, skip entry
-goodent:
+	jecxz .skipent			; if length qword is 0, skip entry
+.goodent:
 	inc bp				; got a good entry: ++count, move to next storage spot
 	add di, 32			; Pad to 32 bytes for each record
-skipent:
+.skipent:
 	test ebx, ebx			; if ebx resets to 0, list is complete
-	jne e820lp
-nomemmap:
-memmapend:
+	jne .loop
+.nomemmap:
+.memmapend:
 	xor eax, eax			; Create a blank record for termination (32 bytes)
 	mov ecx, 8
 	rep stosd
