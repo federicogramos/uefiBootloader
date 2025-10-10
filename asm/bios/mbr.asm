@@ -52,7 +52,9 @@ load:
 						;; evisar tamanos.
 	mov bx, 6117		;; Offset = 8192.
 	mov cx, 0x7E00		;; Destination.
-	call diskcpy		;; Copia payload completo.
+	call diskcpy		;; Copia payload completo. En este momento no tengo acce
+						;; so a 0x800000 donde luego de activar modo progegido, 
+						;; copiare tsl.
 
 	mov si, msg_ok
 	call print_bios

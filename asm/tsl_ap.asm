@@ -193,8 +193,8 @@ startap64:
 	xor r14, r14
 	xor r15, r15
 
-	mov ax, 0x10	;; TODO: is this needed?
-	mov ds, ax		;; Clear the legacy segment registers.
+	mov ax, 0x10
+	mov ds, ax
 	mov es, ax
 	mov ss, ax
 	mov fs, ax

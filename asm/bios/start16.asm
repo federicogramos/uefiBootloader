@@ -134,6 +134,8 @@ e820:
 
 	; At this point we are done with real mode and BIOS interrupts. Jump to 32-bit mode.
 	cli				; No more interrupts
+
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 0x7ea0
 	lgdt [cs:GDTR32]		; Load GDT register
 	mov eax, cr0
 	or al, 0x01			; Set protected mode bit
@@ -141,7 +143,7 @@ e820:
 
 ;;;;;;;;;;;;;; esto tiene que ser a start32
 ;;jmp 8:0x8000
-jmp 8:start32
+jmp 0x08:start32
 ;;;;;;;;;;;;;;; here ends mbr completion
 
 
@@ -175,9 +177,15 @@ BITS 32
 
 ;;;Pasaje 32 to 64 bits
 start32:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;mov eax, tmpGDTR64
+
+
+
+
+
 	mov [p_BootDisk], bh		;; Save disk from where system was booted from
 
-	mov eax, 16			;; Set the correct segment registers
+	mov eax, 0x10			;; Set the correct segment registers
 	mov ds, ax
 	mov es, ax
 	mov ss, ax
@@ -191,7 +199,10 @@ start32:
 	xor esi, esi
 	xor edi, edi
 	xor ebp, ebp
-	mov esp, 0x8000			; Set a known free location for the stack
+	;;;;;;;;;;;;;;;;;;;;;mov esp, 0x8000			; Set a known free location for the stack
+	mov esp, 0x7000			; Set a known free location for the stack
+
+
 
 
 ;;;;;;;;;;;;;;;; importante, aqui toma lo que le ha pasado desde bios, esto esta dentro de ifdef
@@ -252,6 +263,15 @@ start32:
 	mov eax, 32
 	stosw				; BitsPerPixel
 
+
+
+;;;;;;;;;;;;;;;;; 7f23
+;;;;;;;;;;;;;;;;;;;;;;;;; este salto lo hace bien
+
+
+
+
+
 	; Clear memory for the Page Descriptor Entries (0x10000 - 0x5FFFF)
 	mov edi, 0x00210000
 	mov ecx, 81920
@@ -304,8 +324,46 @@ pde_low_32:				; Create a 2 MiB page
 	cmp ecx, 2048
 	jne pde_low_32			; Create 2048 2 MiB page maps.
 
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;hasta aqui oka 7f7e
+
+
+
+mov eax, tmpGDTR64
+
 ; Load the GDT
 	lgdt [tmpGDTR64]
+
+
+
+
+mov al, [0x8000]
+jmp 8:salto
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+salto:
+
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; aqui estamos en 0x7f7e
 ; Enable extended properties
@@ -327,8 +385,32 @@ pde_low_32:				; Create a 2 MiB page
 
 
 ;;;;;;;;;;;;;;;;;;;; hasta aqui oka 0x7fa6
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;mov al, [0x8000]
+;;jmp 8:salto
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;nop
+;;salto:
+
 	mov bl, 'B'
 	mov bh, byte [p_BootDisk]
+
 
 ;; hasta aqui llega. 0x7fae
 ; Enable paging to activate long mode
@@ -336,6 +418,8 @@ pde_low_32:				; Create a 2 MiB page
 	or eax, 0x80000000		; PG (Bit 31)
 	mov cr0, eax
 
+;;;;;;;;;; hasta aqui 0x7fb9
+mov al, [0x8000]
 	jmp SYS64_CODE_SEL:start64	; Jump to 64-bit mode
 
 
