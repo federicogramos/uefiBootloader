@@ -23,6 +23,7 @@
 
 BITS 16
 
+
 entryPoint:
 	cli
 	cld
@@ -42,7 +43,7 @@ entryPoint:
 	call extensionTest
 
 
-load:
+load_start16_tsl_hi:
 	mov si, msg_reading
 	call print_bios
 

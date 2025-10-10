@@ -1,6 +1,6 @@
 ;;==============================================================================
 ;; Real mode swich to protected mode | @file /asm/bios/start16.asm
-;;
+;;==============================================================================
 ;; Para bios boot primero real mode a protected mode. Uefi saltea esta parte, ya
 ;; bootea en 64. 
 ;;
@@ -19,6 +19,9 @@
 ;;extern failure
 print_bios:	equ 0x00de + 0x7c00	;; print_bios en 0x7cde
 vesa:		equ 0x011d + 0x7c00	;; print_bios en 0x011d
+diskcpy:		equ 0x0 + 0x7c00	;; print_bios en 0x011d
+
+msg_ok:	equ 0x00
 
 
 ;; tsl.asm
@@ -205,64 +208,30 @@ start32:
 
 
 
-;;;;;;;;;;;;;;;; importante, aqui toma lo que le ha pasado desde bios, esto esta dentro de ifdef
-;;;; por eso lo que le pasa difiere de uefi
-;;;; leer info de video de VBEModeInfoBlock esta bien. Tener en cuenta que aqui es solo la asignacion para bios
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	; Save the frame buffer address, size (after its calculated), and the screen x,y
-	xor eax, eax
-	xor ebx, ebx
+load_tsl_hi:
+	mov ax, print_bios
+	mov si, msg_read_tsl_hi
+	call ax	;; Calling using pointer works with directly defining functio addr.
 
-	mov ax, [0x5F00 + 16]		; BytesPerScanLine (modo vesa)
-	push eax
-	
-	mov bx, [0x5F00 + 16 + 2 * 2]		; YResolution  (vesa)
-	push ebx
+	mov ax, (512 + 1)	;; Cant sectors. Load 512 = 262144 bytes = 256 KiB + 1 (
+						;; start16.asm). TO-DO: en realidad solo 240 que es el t
+						;; amano completo de la payload. Ya incluye a start16. R
+						;; evisar tamanos.
+	mov bx, 6117		;; Offset = 8192.
+	mov cx, 0x7E00		;; Destination.
+	call diskcpy		;; Copia payload completo. En este momento no tengo acce
+						;; so a 0x800000 donde luego de activar modo progegido, 
+						;; copiare tsl.
 
-	mov ax, [0x5F00 + 16 + 2]		; XResolution (vesa)
-	push eax
-	
-	mul ebx
-	mov ecx, eax
-	shl ecx, 2			; Quick multiply by 4
+	mov si, msg_ok
+	call print_bios
 
 
-;; aqui en bios, deja las cosas en el mismo orden que uefi
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;[0x00005F00]		; Frame buffer base
-;;;[0x00005F08]		; Frame buffer size (bytes)
-;;;[0x00005F10]	; Screen X
-;;;;[0x00005F12]	; Screen Y
-;;;;[0x00005F14]	; PixelsPerScanLine 
-;;;;; recontramega importante (para bios, no uefi), aqui va a colocar 
 
-	mov edi, 0x5F00
-	mov eax, [0x5F00 + 40];;;; ya que para bios, el vbeinfoblock tiene esta estructura (framebuffer en +40)
-	stosd				; 64-bit Frame Buffer Base (low)
-	;;;;;;;; y pasandolo aqui 0x5f00 esta unificando un vbeInfoblock con estructura nueva tanto
-	;;;;;;;; para efi como para bios
-	
-	xor eax, eax
-	stosd				; 64-bit Frame Buffer Base (high) completa qword
-	
-	mov eax, ecx
-	stosd				; 64-bit Frame Buffer Size in bytes (low)
-	xor eax, eax
-	stosd				; 64-bit Frame Buffer Size in bytes (high)
-	
-	pop eax
-	stosw				; 16-bit Screen X
 
-	pop eax
-	stosw				; 16-bit Screen Y
 
-	pop eax
-	shr eax, 2			; 4 bytes / px => bpsl/4
-	stosw				; PixelsPerScanLine
-	mov eax, 32
-	stosw				; BitsPerPixel
-
+	call buildVideoData
 
 
 ;;;;;;;;;;;;;;;;; 7f23
@@ -436,4 +405,9 @@ mov al, [0x8000]
 
 ;; TO-DO: agregar section data.
 
-msg_e820:	db "Performing e820..", 0
+msg_e820:			db "Performing e820..", 0
+msg_read_tsl_hi:	db "Reading tsl hi..", 0
+
+
+;; Zero fill.
+times 512 - $ + $$	db 0
