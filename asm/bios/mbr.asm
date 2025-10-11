@@ -13,6 +13,19 @@
 ;; 80286 because it uses prefix override for some instructions.
 ;;==============================================================================
 
+;; Payload recibido es todo lo enumerado a continuacion, pero en esta etapa de B
+;; bootload solo se pasa a memoria las porciones senaladas.
+;;  +----------+---------+----------------+--/ /---+--------------+
+;;  | start    | tsl_sta |      tsl_      | 00..00 |   tsl.asm    |
+;;  | 16.asm   | rt.asm  |      ap.asm    | 00..00 |              |
+;;  | .text_   | .text_  | .text_ | .data | 00..00 | .text |.data |
+;;  |  start16 |  low    |  low   | _low  | 00..00 |       |      |
+;;  +----------+---------+--------+-------+--/ /---+-------+------+
+;;  |^         |^                 |^      |^       |^      |^     |^
+;; 0x7E00    0x8000            0x8200  0x8800  0x800000  802000  803000
+;;  |<- 512 -->|<--------- 4KiB --------->|        |<--- 12KiB --->|
+;;  |<--copy-->|<--cpy-->|<-----copy----->|
+
 
 %include "./asm/include/mbr.inc"
 %include "./asm/include/sysvar.inc"
@@ -36,56 +49,20 @@ entryPoint:
 
 	mov [drvNum], dl	;; Bios passes drive number in dl.
 
-
 	mov si, msg_extSupport
 	call print_bios
 
 	call extensionTest
-
-
-load_start16_tsl_hi:
-	mov si, msg_reading
-	call print_bios
-
-	mov ax, (512 + 1)	;; Cant sectors. Load 512 = 262144 bytes = 256 KiB + 1 (
-						;; start16.asm). TO-DO: en realidad solo 240 que es el t
-						;; amano completo de la payload. Ya incluye a start16. R
-						;; evisar tamanos.
-	mov bx, 6117		;; Offset = 8192.
-	mov cx, 0x7E00		;; Destination.
-	call diskcpy		;; Copia payload completo. En este momento no tengo acce
-						;; so a 0x800000 donde luego de activar modo progegido, 
-						;; copiare tsl.
-
-	mov si, msg_ok
-	call print_bios
 
 ;; TO-DO reponer
 	;;mov eax, [0x8000 + SIGNATURE_OFFSET]
 	;;cmp eax, "BOOT"	;; Simple payload verification (tsl_start.sys binary).
 	;;jne magic_fail
 
+	call load_start16_tsl_lo
 
-a20:
-	call a20_check
-	jnz start16_prepare
+	call a20_line
 
-.a20_set:
-	in al, 0x64		;; Status.
-	test al, 0x02
-	jnz .a20_set
-	mov al, 0xd1	;; 8042 Write command.
-	out 0x64, al
-
-.check:
-	in al, 0x64
-	test al, 0x02
-	jnz .check
-	mov al, 0xdf
-	out 0x60, al
-
-
-start16_prepare:
 	mov eax, 0
 	mov ebx, 0
 	mov ecx, 0
@@ -112,6 +89,29 @@ failure:
 	call print_bios
 	hlt
 	jmp $
+
+
+;;==============================================================================
+;; load_start16_tsl_lo | copy the required part of the payload
+;;==============================================================================
+
+load_start16_tsl_lo:
+	mov si, msg_reading
+	call print_bios
+
+	mov ax, (512 + 1)	;; Cant sectors. Load 512 = 262144 bytes = 256 KiB + 1 (
+						;; start16.asm). TO-DO: en realidad solo 240 que es el t
+						;; amano completo de la payload. Ya incluye a start16. R
+						;; evisar tamanos.
+	mov bx, 6117		;; Offset = 8192.
+	mov cx, 0x7E00		;; Destination.
+	call diskcpy		;; Copia payload completo. En este momento no tengo acce
+						;; so a 0x800000 donde luego de activar modo progegido, 
+						;; copiare tsl.
+	mov si, msg_ok
+	call print_bios
+
+	ret
 
 
 ;;==============================================================================
@@ -247,6 +247,31 @@ print_bios:
 .fin:
 	popa
 	ret
+
+
+;;==============================================================================
+;; a20_line | Config a20 line
+;;==============================================================================
+
+
+
+a20_line:
+	call a20_check
+	jnz start16_continue
+
+.a20_set:
+	in al, 0x64		;; Status.
+	test al, 0x02
+	jnz .a20_set
+	mov al, 0xd1	;; 8042 Write command.
+	out 0x64, al
+
+.check:
+	in al, 0x64
+	test al, 0x02
+	jnz .check
+	mov al, 0xdf
+	out 0x60, al
 
 
 ;;==============================================================================

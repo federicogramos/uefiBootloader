@@ -27,7 +27,7 @@ section .text
 
 
 ;;==============================================================================
-; num2hexStr - escribe el hexadecimal de un nro, dentro de un placeholder utf8
+; num2hexStr | escribe el hexadecimal de un nro, dentro de un placeholder utf8
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
@@ -81,7 +81,7 @@ num2hexStr:
 
 
 ;;==============================================================================
-;; num2str - convierte un entero en un string null terminated
+;; num2str | convierte un entero en un string null terminated
 ;;==============================================================================
 ;; Argumentos:
 ;; -- placeholder por stack, 1er push.
@@ -138,7 +138,7 @@ num2str:
 
 
 ;;==============================================================================
-;; print - wrapper print_color, imprime por defecto con texto PRINT_COLOR_WHT.
+;; print | wrapper print_color, imprime por defecto con texto PRINT_COLOR_WHT.
 ;;==============================================================================
 ;; Argumentos:
 ;; -- r9 = cadena fmt
@@ -154,7 +154,7 @@ print:
 
 
 ;;==============================================================================
-;; print_color - impresion utf8 a buffer de video luego de ExitBootSerivces()
+;; print_color | impresion utf8 a buffer de video luego de ExitBootSerivces()
 ;;==============================================================================
 ;; Argumentos:
 ;; -- r9 = cadena fmt
@@ -392,7 +392,7 @@ keyboard_command:
 
 
 ;;==============================================================================
-;; keyboard_get_key | Se queda esperando tecla 'n'.
+;; keyboard_get_key | se queda esperando tecla 'n'.
 ;;==============================================================================
 
 keyboard_get_key:
@@ -423,7 +423,7 @@ keyboard_get_key:
 
 
 ;;==============================================================================
-;; emptyKbBuffer - Vacia el teclado, dejando ninguna tecla pendiente.
+;; emptyKbBuffer | vacia el teclado, dejando ninguna tecla pendiente.
 ;;==============================================================================
 
 emptyKbBuffer:
