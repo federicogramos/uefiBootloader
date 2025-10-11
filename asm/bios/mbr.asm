@@ -30,12 +30,17 @@
 %include "./asm/include/mbr.inc"
 %include "./asm/include/sysvar.inc"
 
-
 ;;global print_bios	;; Export symbol so to use this print function in start16.asm.
 
 
-BITS 16
+section .text
 
+
+;;=============================================================================
+;;
+;;=============================================================================
+
+BITS 16
 
 entryPoint:
 	cli
@@ -115,7 +120,7 @@ load_start16_tsl_lo:
 
 
 ;;==============================================================================
-;; diskcpy | Copy n sectors from disk.
+;; diskcpy | Copy n sectors from disk
 ;;==============================================================================
 ;; Arguments:
 ;; -- ax: cant of 512 mem sectors to copy.
@@ -132,7 +137,7 @@ diskcpy:
 
 
 ;;==============================================================================
-;; cpySec | Read a sector from a disk using extended read (2TB max disk size)
+;; cpySec | read a sector from a disk using extended read (2TB max disk size)
 ;;==============================================================================
 ;; Arguments:
 ;; -- ebx: low word of 64 bit src sector (only 32 bits implementation).
@@ -196,7 +201,7 @@ cpySec:
 
 
 ;;==============================================================================
-;; extensionTest | Verifica soporte de extension bios.
+;; extensionTest | verifica soporte de extension bios
 ;;==============================================================================
 ;; Registers CS, DS, ES, SS, BX, CX, DX are preserved unless
 ;; explicitly changed
@@ -227,7 +232,7 @@ extensionTest:
 
 
 ;;==============================================================================
-;; print_bios | Imprime a pantalla usando bootservice.
+;; print_bios | imprime a pantalla usando bootservice
 ;;==============================================================================
 ;; Argumentos:
 ;; -- si: string addr 16 bits.
@@ -250,14 +255,12 @@ print_bios:
 
 
 ;;==============================================================================
-;; a20_line | Config a20 line
+;; a20_line | config a20 line
 ;;==============================================================================
-
-
 
 a20_line:
 	call a20_check
-	jnz start16_continue
+	jnz .end
 
 .a20_set:
 	in al, 0x64		;; Status.
@@ -273,9 +276,12 @@ a20_line:
 	mov al, 0xdf
 	out 0x60, al
 
+.end:
+	ret
+
 
 ;;==============================================================================
-;; a20_check | Check the status of a20 line
+;; a20_check | check the status of a20 line
 ;;==============================================================================
 ;; Returns:
 ;; -- FLAGS[zero] = 1 (a20 disabled) | FLAGS[zero] = 0 (a20 enabled)
