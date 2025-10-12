@@ -7,12 +7,83 @@
 ;; mbr.asm
 extern failure
 
+global a20_line
 global e820
 global vesa
 
 section .text
 
 BITS 16
+
+
+
+;;==============================================================================
+;; a20_line | config a20 line
+;;==============================================================================
+
+a20_line:
+	call a20_check
+	jnz .end
+
+.a20_set:
+	in al, 0x64		;; Status.
+	test al, 0x02
+	jnz .a20_set
+	mov al, 0xd1	;; 8042 Write command.
+	out 0x64, al
+
+.check:
+	in al, 0x64
+	test al, 0x02
+	jnz .check
+	mov al, 0xdf
+	out 0x60, al
+
+.end:
+	ret
+
+
+;;==============================================================================
+;; a20_check | check the status of a20 line
+;;==============================================================================
+;; Returns:
+;; -- FLAGS[zero] = 1 (a20 disabled) | FLAGS[zero] = 0 (a20 enabled)
+;;
+;; Preserves all registers including segment registers.
+;;==============================================================================
+
+a20_check:
+	pusha
+	push ds
+	push es
+
+	xor ax, ax
+	mov es, ax
+	not ax					;; 0xFFFF
+	mov ds, ax
+
+	mov di, 0x0500
+	mov si, 0x0510
+
+	mov al, [es:di]
+	push ax
+	mov al, [ds:si]
+	push ax
+
+	mov byte [es:di], 0x00
+	mov byte [ds:si], 0xFF	;; Will overwrite the prev move if a20 not set.
+	cmp byte [es:di], 0xFF
+
+	pop ax
+	mov [ds:si], al
+	pop ax
+	mov [es:di], al
+
+	pop es
+	pop ds
+	popa
+
+	ret
 
 
 ;;==============================================================================

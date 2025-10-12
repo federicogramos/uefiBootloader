@@ -7,11 +7,11 @@
 ;; -- https://github.com/fysnet/FYSOS/blob/master/boot/embr/embr.asm
 ;; http://www.ctyme.com/intr/rb-0708.htm
 ;; -- https://stanislavs.org/helppc/int_10.html
-;; -- https://wiki.osdev.org/A20_Line
 ;;
 ;; This mbr is for 32 and 64 bit machines. Will not work fine on 16 bit 8086 or 
 ;; 80286 because it uses prefix override for some instructions.
 ;;==============================================================================
+
 
 ;; Payload recibido es todo lo enumerado a continuacion, pero en esta etapa de B
 ;; bootload solo se pasa a memoria las porciones senaladas.
@@ -28,7 +28,6 @@
 
 
 %include "./asm/include/mbr.inc"
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/include/sysvar.inc"
 
 global print_bios	;; Export symbol so to use this print function in start16.asm.
 global diskcpy
@@ -37,12 +36,12 @@ global failure
 
 section .text
 
+BITS 16
+
 
 ;;=============================================================================
 ;;
 ;;=============================================================================
-
-BITS 16
 
 entryPoint:
 	cli
@@ -67,7 +66,6 @@ entryPoint:
 	;;jne magic_fail
 
 	call load_start16_tsl_lo
-	call a20_line
 
 	mov eax, 0
 	mov ebx, 0
@@ -252,75 +250,6 @@ print_bios:
 
 .fin:
 	popa
-	ret
-
-
-;;==============================================================================
-;; a20_line | config a20 line
-;;==============================================================================
-
-a20_line:
-	call a20_check
-	jnz .end
-
-.a20_set:
-	in al, 0x64		;; Status.
-	test al, 0x02
-	jnz .a20_set
-	mov al, 0xd1	;; 8042 Write command.
-	out 0x64, al
-
-.check:
-	in al, 0x64
-	test al, 0x02
-	jnz .check
-	mov al, 0xdf
-	out 0x60, al
-
-.end:
-	ret
-
-
-;;==============================================================================
-;; a20_check | check the status of a20 line
-;;==============================================================================
-;; Returns:
-;; -- FLAGS[zero] = 1 (a20 disabled) | FLAGS[zero] = 0 (a20 enabled)
-;;
-;; Preserves all registers including segment registers.
-;;==============================================================================
-
-a20_check:
-	pusha
-	push ds
-	push es
-
-	xor ax, ax
-	mov es, ax
-	not ax					;; 0xFFFF
-	mov ds, ax
-
-	mov di, 0x0500
-	mov si, 0x0510
-
-	mov al, [es:di]
-	push ax
-	mov al, [ds:si]
-	push ax
-
-	mov byte [es:di], 0x00
-	mov byte [ds:si], 0xFF	;; Will overwrite the prev move if a20 not set.
-	cmp byte [es:di], 0xFF
-
-	pop ax
-	mov [ds:si], al
-	pop ax
-	mov [es:di], al
-
-	pop es
-	pop ds
-	popa
-
 	ret
 
 

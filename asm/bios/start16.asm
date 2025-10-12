@@ -4,6 +4,7 @@
 ;; Para bios boot primero real mode a protected mode. Uefi saltea esta parte, ya
 ;; bootea en 64. 
 ;;
+;; -- https://wiki.osdev.org/A20_Line
 ;; https://wiki.osdev.org/Detecting_Memory_(x86)#BIOS_Function:_INT_0x15,_EAX_=_
 ;; 0xE820
 ;; https://wiki.osdev.org/Detecting_Memory_(x86)#Getting_an_E820_Memory_Map
@@ -18,6 +19,7 @@ extern diskcpy
 extern msg_ok
 
 ;; /lib/bios16.asm
+extern a20_line
 extern e820
 extern vesa
 
@@ -48,6 +50,9 @@ section .text
 BITS 16
 
 start16:
+
+	call a20_line
+
 	mov si, msg_e820
 	call print_bios
 
@@ -61,6 +66,7 @@ start16:
 	or al, 0x01					;; Set protected mode bit.
 	mov cr0, eax
 
+start32_jump:
 	jmp 0x08:start32			;; To 32-bit code.
 
 
@@ -115,6 +121,7 @@ en_paging:
 
 	mov bl, 'B'
 
+start64_jump:
 	jmp SYS64_CODE_SEL:start64	;; To 64-bit mode.
 
 
