@@ -420,4 +420,4 @@ msg_read_tsl_hi:	db "Reading tsl hi..", 0
 
 
 ;; Zero fill.
-times 512 - $ + $$	db 0
+;;;;times 512 - $ + $$	db 0

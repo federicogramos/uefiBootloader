@@ -1,5 +1,6 @@
 OUTPUT_FORMAT("binary")
 
+/* TO-DO: generar simbolos ya realocados de mbr */
 SECTIONS {
 	
 	code_start16_reloc = 0x7e00;
@@ -28,7 +29,7 @@ SECTIONS {
 	.data_low data_lo_start_reloc_aligned : AT (data_lo_start_load) {
 		./obj/tsl_ap.o (.data)
 	}
-data_lo_end_reloc_not_aligned = .;
+	data_lo_end_reloc_not_aligned = .;
 	. = ALIGN(0x800);	/* 0x8800. Puede hacerse 0x400 pero dado que se le su */
 						/* ma START16_SIZE quedan 0x600 y prefiero alineamint */
 						/* o a 0x800 que a 0x200. Previo a ser relocalizado queda en 0xA00*/

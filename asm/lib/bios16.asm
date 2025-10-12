@@ -79,4 +79,3 @@ failure:
 
 
 msg_halt:		db "System halted", 0
-x:				dd msg_halt

@@ -54,6 +54,7 @@ $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI) ./obj/bios16.o ./obj/bios32.o
 mbr: build
 	$(ASM) -g -F DWARF -f elf64 ./asm/bios/mbr.asm -o $(OBJ_DIR)/mbr.o
 	$(LD) -T $(LD_DIR)/mbr.ld -o ./out/mbr.sys $(OBJ_DIR)/mbr.o
+	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/mbr.ld -o ./elf/mbr.elf $(OBJ_DIR)/mbr.o
 
 start16: build
 	$(ASM) -g -F DWARF -f elf64 ./asm/bios/start16.asm -o $(OBJ_DIR)/start16.o
