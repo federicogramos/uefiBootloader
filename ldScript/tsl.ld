@@ -1,6 +1,5 @@
 OUTPUT_FORMAT("binary")
 
-/* TO-DO: generar simbolos ya realocados de mbr */
 SECTIONS {
 	
 	code_start16_reloc = 0x7e00;

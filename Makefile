@@ -47,14 +47,17 @@ $(UEFI_SYS): build ./obj/lib.o ./obj/efi.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/uefi.ld -o $(UEFI_ELF) $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
 
 $(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI) ./obj/bios16.o ./obj/bios32.o
-	$(LD) -T $(LD_DIR)/tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o $(OBJ_DIR)/bios16.o $(OBJ_DIR)/bios32.o
-	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o $(OBJ_DIR)/bios16.o $(OBJ_DIR)/bios32.o
+	$(LD) -T $(LD_DIR)/tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o $(OBJ_DIR)/bios16.o $(OBJ_DIR)/bios32.o $(OBJ_DIR)/mbr_symbols.o
+	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o $(OBJ_DIR)/bios16.o $(OBJ_DIR)/bios32.o $(OBJ_DIR)/mbr_symbols.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 
 mbr: build
 	$(ASM) -g -F DWARF -f elf64 ./asm/bios/mbr.asm -o $(OBJ_DIR)/mbr.o
 	$(LD) -T $(LD_DIR)/mbr.ld -o ./out/mbr.sys $(OBJ_DIR)/mbr.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/mbr.ld -o ./elf/mbr.elf $(OBJ_DIR)/mbr.o
+	$(LD) -r --just-symbols=./elf/mbr.elf -o $(OBJ_DIR)/mbr_symbols.o
+#--retain-symbols-file exported_symbols.txt
+#nm --defined-only --extern-only ./elf/mbr.elf | awk '{print "PROVIDE(", $$3, " = ", $$1, ");"}' > ./asm/include/mbr_symbols.inc
 
 start16: build
 	$(ASM) -g -F DWARF -f elf64 ./asm/bios/start16.asm -o $(OBJ_DIR)/start16.o

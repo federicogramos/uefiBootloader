@@ -4,12 +4,13 @@
 
 %include "./asm/include/sysvar.inc"
 
+;; mbr.asm
 ;; TO-DO: print_bios reponer el address correcto.
 extern print_bios
-print_bios: equ 0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;print_bios: equ 0
 
 global vesa
-global failure
+;;;;;;;;;;;;;;;;;;;;;;;;;global failure
 
 
 section .text_low
@@ -79,3 +80,4 @@ failure:
 
 
 msg_halt:		db "System halted", 0
+x:				dq print_bios

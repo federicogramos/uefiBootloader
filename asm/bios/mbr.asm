@@ -30,7 +30,7 @@
 %include "./asm/include/mbr.inc"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/include/sysvar.inc"
 
-;;global print_bios	;; Export symbol so to use this print function in start16.asm.
+global print_bios	;; Export symbol so to use this print function in start16.asm.
 
 
 section .text

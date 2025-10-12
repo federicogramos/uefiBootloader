@@ -1,19 +1,23 @@
+/* En este ld script es importante mantener diferenciados con el prefijo "mbr_"
+ * los simbolos code_end, code_size, etc porque todos los simbolos de mbr son ex
+ * portados ya que se usan en la linkedicion de tsl.sys */
+
 OUTPUT_FORMAT("binary")
 
 SECTIONS {
 
-	code_reloc = 0x7c00 ;
-	code_load = 0x0000;
-	.text code_reloc :	AT (code_load) {
+	mbr_code_reloc = 0x7c00 ;
+	mbr_code_load = 0x0000;
+	.text mbr_code_reloc :	AT (mbr_code_load) {
 		./obj/mbr.o (.text)
 	}
 
 	. = ALIGN(0x10);
-	code_end_reloc_aligned = . ;
-	code_size_aligned = code_end_reloc_aligned - code_reloc;
-	data_start_reloc_aligned = . ;
-	data_start_load = code_load + code_size_aligned;
-	.data data_start_reloc_aligned : AT (data_start_load) {
+	mbr_code_end_reloc_aligned = . ;
+	mbr_code_size_aligned = mbr_code_end_reloc_aligned - mbr_code_reloc;
+	mbr_data_start_reloc_aligned = . ;
+	mbr_data_start_load = mbr_code_load + mbr_code_size_aligned;
+	.data mbr_data_start_reloc_aligned : AT (mbr_data_start_load) {
 		./obj/mbr.o (.data)
 	}
 
