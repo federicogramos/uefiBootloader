@@ -46,9 +46,9 @@ $(UEFI_SYS): build ./obj/lib.o ./obj/efi.o
 	$(LD) -T $(LD_DIR)/uefi.ld -o $@ $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/uefi.ld -o $(UEFI_ELF) $(UEFI_OBJ) $(OBJ_DIR)/lib.o $(OBJ_DIR)/efi.o
 
-$(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI)
-	$(LD) -T $(LD_DIR)/tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
-	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
+$(TSL_SYS): build $(TSL_OBJS_LO) $(TSL_OBJS_HI) ./obj/bios16.o ./obj/bios32.o
+	$(LD) -T $(LD_DIR)/tsl.ld -o $@ $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o $(OBJ_DIR)/bios16.o $(OBJ_DIR)/bios32.o
+	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl.ld -o $(TSL_ELF_LO) $(TSL_OBJS_LO) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o $(OBJ_DIR)/bios16.o $(OBJ_DIR)/bios32.o
 	$(LD) --oformat=elf64-x86-64 -T $(LD_DIR)/tsl_hi.ld -o $(TSL_ELF_HI) $(TSL_OBJS_HI) $(OBJ_DIR)/lib.o
 
 mbr: build

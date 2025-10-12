@@ -18,11 +18,14 @@
 ;;extern print_bios
 ;;extern failure
 print_bios:	equ 0x00de + 0x7c00	;; print_bios en 0x7cde
-vesa:		equ 0x011d + 0x7c00	;; print_bios en 0x011d
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;vesa:		equ 0x011d + 0x7c00	;; print_bios en 0x011d
 diskcpy:		equ 0x0 + 0x7c00	;; print_bios en 0x011d
 
 msg_ok:	equ 0x00
 
+;; /lib/bios.asm
+extern vesa
+extern vesa2uefi
 
 ;; tsl.asm
 extern start64
@@ -33,6 +36,9 @@ GDTR32: equ 0x8200
 
 extern tmpGDTR64	;; Only for bios boot. See tsl.asm 1178 TO-DO.
 extern SYS64_CODE_SEL
+
+
+section .text
 
 
 ;;==============================================================================
@@ -235,7 +241,7 @@ load_tsl_hi:
 
 
 
-	call buildVideoData
+	call vesa2uefi
 
 
 ;;;;;;;;;;;;;;;;; 7f23
