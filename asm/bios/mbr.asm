@@ -31,7 +31,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;%include "./asm/include/sysvar.inc"
 
 global print_bios	;; Export symbol so to use this print function in start16.asm.
-
+global diskcpy
+global msg_ok
+global failure
 
 section .text
 
@@ -65,7 +67,6 @@ entryPoint:
 	;;jne magic_fail
 
 	call load_start16_tsl_lo
-
 	call a20_line
 
 	mov eax, 0

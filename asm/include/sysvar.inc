@@ -150,6 +150,9 @@ p_BootMode:			equ SystemVariables + 0x181	;; 'U' for UEFI, otherwise BIOS
 p_IOAPICIntSourceC:	equ SystemVariables + 0x182
 p_x2APIC:			equ SystemVariables + 0x183
 p_HPET_Timers:		equ SystemVariables + 0x184
+
+;; TO-DO: delete, no lo voy a usar.
 p_BootDisk:			equ SystemVariables + 0x185	;; 'F' for Floppy drive
+
 p_1gb_pages:		equ SystemVariables + 0x186	;; 1 if 1GB pages are supported
 

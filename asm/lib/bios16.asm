@@ -5,17 +5,103 @@
 %include "./asm/include/sysvar.inc"
 
 ;; mbr.asm
-;; TO-DO: print_bios reponer el address correcto.
-extern print_bios
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;print_bios: equ 0
+extern failure
 
+global e820
 global vesa
-;;;;;;;;;;;;;;;;;;;;;;;;;global failure
 
-
-section .text_low
+section .text
 
 BITS 16
+
+
+;;==============================================================================
+;;e820 | build memmap
+;;==============================================================================
+;; Arguments:
+;; -- {es:di} = destination buffer for 24 byte entries.
+;; Returns:
+;; -- bp = entry count
+;;
+;; https://uefi.org/htmlspecs/ACPI_Spec_6_4_html/15_System_Address_Map_Interface
+;; s/int-15h-e820h---query-system-address-map.html
+;;
+;; trashes all registers except esi
+;; Creates memory map at 0x6000.
+;; and the records are:
+;; 64 bit Base
+;; 64 bit Length
+;; 32 bit Type (1 = normal, 2 reserved, ACPI reclaimable)
+;; 32 bit ACPI
+;; 64 bit Padding
+;;==============================================================================
+
+e820:
+	xor bp, bp					;; Entry count.
+
+	mov eax, 0xe820
+	xor ebx, ebx				;; Continuation value to get the next range of p
+								;; hysical memory.
+	mov edi, 0x00006000			;; ;; Buffer Pointer. Destination memmap addr.
+	mov ecx, 24					;; Buffer Size [bytes].
+	mov edx, 0x0534D4150		;; Signature = "SMAP".
+	mov dword [es:di + 20], 1	;; Compatibility with ACPI 3.X entry.
+	int 0x15
+
+	jc .nomemmap			;; Error condition if CF = 1. TO-DO: aqui no solo te
+							;; rminar, sino que avisar que ha ocurrido error.
+	mov edx, 0x0534D4150	;; Need to reset. According wiki.osdev.org: some BIO
+							;; Ses apparently trash this register.
+	cmp eax, edx			;; eax != "SMAP" notifies incorrect bios revision. T
+							;; O-DO> notify this error.
+	jne .nomemmap
+	test ebx, ebx			;; Continuation value to get the next address range 
+							;; descriptor. A value of ebx = 0 means that this is
+							;; the last descriptor. Note: the BIOS can also indi
+							;; cate that the last descriptor has already been re
+							;; turned during previous iterations by returning th
+							;; e carry flag set. TO-DO: aunque sea cero debe ser
+							;; procesado.
+	je .nomemmap
+	jmp .jmpin
+
+.loop:
+	mov eax, 0xe820
+	mov [es:di + 20], dword 1	;; In order to make a valid ACPI 3.X entry.
+	mov ecx, 24			; ask for 24 bytes again
+	int 0x15
+	jc .memmapend			; carry set means "end of list already reached"
+	mov edx, 0x0534D4150		; repair potentially trashed register
+
+.jmpin:
+	jcxz .skipent			; skip any 0 length entries
+	cmp cl, 20			;; Buffer Size. The minimum structure size returned by the BIOS is 20 bytes. It should really be 24 byte ACPI 3.X response.
+	jbe .notext
+	test byte [es:di + 20], 1	; if so: is the "ignore this data" bit clear?
+	je .skipent
+
+.notext:
+	mov ecx, [es:di + 8]		; get lower dword of memory region length
+	test ecx, ecx			; is the qword == 0?
+	jne .goodent
+	mov ecx, [es:di + 12]		; get upper dword of memory region length
+	jecxz .skipent			; if length qword is 0, skip entry
+
+.goodent:
+	inc bp				;; count++
+	add di, 32			;; Each record aligns to 32 bytes.
+
+.skipent:
+	test ebx, ebx			; if ebx resets to 0, list is complete
+	jne .loop
+
+.nomemmap:
+.memmapend:
+	xor eax, eax		;; Blank record marks end of memmap.
+	mov ecx, 8
+	rep stosd
+
+	ret
 
 
 ;;==============================================================================
@@ -58,26 +144,5 @@ vesa:
 	ret
 
 
-;;==============================================================================
-;; failure | abort boot with error notification
-;;==============================================================================
-;; Argument:
-;; -- si: string.
-;;
-;; TO-DO: codigo repetido. Ver si esto lo reemplazo por el failure definido en mbr.
-;;==============================================================================
+;; section .data
 
-failure:
-	call print_bios
-
-.halt:
-	mov si, msg_halt
-	call print_bios
-	hlt
-	jmp $
-
-
-
-
-msg_halt:		db "System halted", 0
-x:				dq print_bios
