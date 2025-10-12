@@ -8,6 +8,9 @@
 ;; http://www.ctyme.com/intr/rb-0708.htm
 ;; -- https://stanislavs.org/helppc/int_10.html
 ;;
+;; Carga en memoria una parte del payload, encargada de configurar el procesador
+;; de real mode a finalmente 64 bit long mode.
+;;
 ;; This mbr is for 32 and 64 bit machines. Will not work fine on 16 bit 8086 or 
 ;; 80286 because it uses prefix override for some instructions.
 ;;==============================================================================
@@ -29,7 +32,7 @@
 
 %include "./asm/include/mbr.inc"
 
-global print_bios	;; Export symbol so to use this print function in start16.asm.
+global print_bios	;; Export so to use in start16.asm.
 global diskcpy
 global msg_ok
 global failure
