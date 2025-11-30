@@ -1,0 +1,121 @@
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map
+
+                0x0000000000400000                . = 0x400000
+                0x0000000000400000                headerStart = .
+
+.header         0x0000000000400000      0x158
+                0x0000000000400000                aux = .
+                0x0000000000400000                header = .
+ *(.header)
+ .header        0x0000000000400000      0x158 ./obj/uefi.o
+                0x0000000000000158                headerSize = (. - headerStart)
+                0x0000000000400200                . = ALIGN (0x200)
+                0x0000000000400200                codeStart = .
+                0x0000000000000200                codeOffset = (codeStart - headerStart)
+
+.text           0x0000000000400200      0xdf0
+                0x0000000000400200                text = .
+ *(.text)
+ .text          0x0000000000400200      0x845 ./obj/uefi.o
+ *fill*         0x0000000000400a45        0xb 
+ .text          0x0000000000400a50      0x2eb ./obj/lib.o
+                0x0000000000400a50                num2hexStr
+                0x0000000000400a9c                num2str
+                0x0000000000400ae5                print
+                0x0000000000400af1                print_color
+                0x0000000000400cce                memsetFramebuffer
+                0x0000000000400ce5                keyboard_command
+                0x0000000000400cfb                keyboard_get_key
+                0x0000000000400d21                emptyKbBuffer
+ *fill*         0x0000000000400d3b        0x5 
+ .text          0x0000000000400d40      0x2b0 ./obj/efi.o
+                0x0000000000400d40                ventana_modo_step
+                0x0000000000400ddc                efi_print
+                0x0000000000400f44                efi_prompt_step_mode
+                0x0000000000000df0                codeSize = (. - codeStart)
+                0x0000000000401000                . = ALIGN (0x1000)
+                0x0000000000401000                dataStart = .
+                0x0000000000001000                dataOffset = (dataStart - headerStart)
+
+.data           0x0000000000401000    0xff000
+                0x0000000000401000                data = .
+ *(.data)
+ .data          0x0000000000401000      0x8d2 ./obj/uefi.o
+                0x0000000000401038                CONOUT_INTERFACE
+                0x0000000000401048                CONIN_INTERFACE
+                0x0000000000401060                FB
+                0x0000000000401068                FB_SIZE
+                0x0000000000401080                PPSL
+                0x00000000004010e0                STEP_MODE_FLAG
+                0x0000000000401119                EFI_INPUT_KEY
+ *fill*         0x00000000004018d2        0x2 
+ .data          0x00000000004018d4      0x898 ./obj/lib.o
+                0x00000000004018e4                print_cursor
+ .data          0x000000000040216c      0x144 ./obj/efi.o
+                0x0000000000404000                . = ALIGN (0x4000)
+ *fill*         0x00000000004022b0     0x1d50 
+                0x0000000000404000                payload = .
+ *(.payload)
+ .payload       0x0000000000404000    0xfc000 ./obj/uefi.o
+                0x00000000000ff000                dataSize = (. - dataStart)
+                0x0000000000500000                . = ALIGN (0x1000)
+
+.bss            0x0000000000500000        0x0
+                0x0000000000500000                bss = .
+ *(.bss)
+ *(EXCLUDE_FILE(*.o) COMMON)
+                0x0000000000100000                fileSize = (. - headerStart)
+LOAD ./obj/uefi.o
+LOAD ./obj/lib.o
+LOAD ./obj/efi.o
+OUTPUT(build/uefi.sys binary)
+
+.debug_aranges  0x0000000000000000       0x90
+ .debug_aranges
+                0x0000000000000000       0x30 ./obj/uefi.o
+ .debug_aranges
+                0x0000000000000030       0x30 ./obj/lib.o
+ .debug_aranges
+                0x0000000000000060       0x30 ./obj/efi.o
+
+.debug_pubnames
+                0x0000000000000000       0x36
+ .debug_pubnames
+                0x0000000000000000       0x12 ./obj/uefi.o
+ .debug_pubnames
+                0x0000000000000012       0x12 ./obj/lib.o
+ .debug_pubnames
+                0x0000000000000024       0x12 ./obj/efi.o
+
+.debug_info     0x0000000000000000       0xf2
+ .debug_info    0x0000000000000000       0x50 ./obj/uefi.o
+ .debug_info    0x0000000000000050       0x51 ./obj/lib.o
+ .debug_info    0x00000000000000a1       0x51 ./obj/efi.o
+
+.debug_abbrev   0x0000000000000000       0x51
+ .debug_abbrev  0x0000000000000000       0x1b ./obj/uefi.o
+ .debug_abbrev  0x000000000000001b       0x1b ./obj/lib.o
+ .debug_abbrev  0x0000000000000036       0x1b ./obj/efi.o
+
+.debug_line     0x0000000000000000      0x435
+ .debug_line    0x0000000000000000      0x1f5 ./obj/uefi.o
+ .debug_line    0x00000000000001f5      0x12f ./obj/lib.o
+ .debug_line    0x0000000000000324      0x111 ./obj/efi.o
+
+.debug_frame    0x0000000000000000       0x14
+ .debug_frame   0x0000000000000000        0x4 ./obj/uefi.o
+ *fill*         0x0000000000000004        0x4 
+ .debug_frame   0x0000000000000008        0x4 ./obj/lib.o
+ *fill*         0x000000000000000c        0x4 
+ .debug_frame   0x0000000000000010        0x4 ./obj/efi.o
+
+.debug_loc      0x0000000000000000       0x30
+ .debug_loc     0x0000000000000000       0x10 ./obj/uefi.o
+ .debug_loc     0x0000000000000010       0x10 ./obj/lib.o
+ .debug_loc     0x0000000000000020       0x10 ./obj/efi.o
